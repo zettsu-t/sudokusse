@@ -211,7 +211,8 @@ void SudokuLoaderTest::test_enumerateSudoku() {
 
         inst.enumerateSudoku();
         uint64_t actual = sudokuXmmAllPatternCnt;
-        CPPUNIT_ASSERT_EQUAL(1140000ull, actual);
+        uint64_t expected = 1140000ull;
+        CPPUNIT_ASSERT_EQUAL(expected, actual);
         delete pSudokuInStream;
         pSudokuInStream = 0;
     }

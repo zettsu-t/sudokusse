@@ -4,20 +4,29 @@ Copyright (C) 2012-2013 Zettsu Tatsuya (是津達也)
 [ビルド環境]
 Windows 7 64 bit版
 
-MinGW-w64 for 64 bit Windows (ver. 4.5)
-+ MSYS     1.0.11
-+ GNU Make 3.81
-+ g++      4.5.2 20101002 (prerelease)
-+ GNU assembler 2.20.51
-
 Ruby 1.9.2dev (2010-07-11 revision 28618) [i386-mswin32]
+Cygwinとは別に用意する
+
+MinGW-w64 および Cygwin 64bit version
+
+MinGW-w64 for 64 bit Windows
++ MSYS     1.0.17
++ GNU Make 3.81
++ g++      4.8.1 (rev5, Built by MinGW-W64 project)
++ GNU assembler 2.23.2
+
+Cygwin 64bit version
++ GNU Make 3.82.90
++ g++      4.8.1
++ GNU assembler 2.23.52
+
 
 [実行環境]
-Cygwin 1.7.16
-Perl 5.14.2 (Cygwin同梱)
+Cygwin 1.7.25
+Perl 5.14.4 (Cygwin同梱)
 
 [テスト環境]
-CppUnit 1.21.1 (MinGW-w64 + MSYS向けにビルド)
+CppUnit 1.12.1 (MinGW-w64 + MSYS向けにビルド)
 
 
 [ビルド方法]

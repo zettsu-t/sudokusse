@@ -1,5 +1,22 @@
 SSE4.2版 数独ソルバー 説明
 
+[アセンブリ記述]
+
+sudokusse.s のメモリアクセスは、すべてRIP-relative (instruction pointer
+からの相対アドレス)にする。つまり
+        movdqa  xmm0,  xmmword ptr [sudokuXmmToPrint]
+ではなく、
+        movdqa  xmm0,  xmmword ptr [rip + sudokuXmmToPrint]
+と記述する。そのようにしないと、MinGW-w64ではリンクできるが、Cygwinでは
+リンクできない。
+
+
+[コンパイルおよびリンク時の注意]
+
+sudokusse.exeにC/C++ライブラリをスタティックリンクしないと、Cygwinから
+起動したときにlibstdc++-6.dllをリンクできないので、起動できなくなる。
+
+
 [実行時間]
 
 実行時間を下記の通り表示する。

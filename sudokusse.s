@@ -59,7 +59,7 @@
 
 .data
 # 本体コード
-sudokuXmmMaxLoopcnt:            .quad 81   # ループの上限回数
+.set  sudokuMaxLoopcnt,         81         # ループの上限回数
 sudokuXmmAborted:               .quad 0    # マスの矛盾を発見した(これ以上進められない)とき非0
 sudokuXmmElementCnt:            .quad 0    # 埋まった(候補が一意になった)マスの数(0..81)
 sudokuXmmUniqueCandidate:       .quad 0    # バックトラッキングで最後に決め打ちで埋めた候補
@@ -85,7 +85,9 @@ sudokuXmmCandidateArray:  .quad 0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0, 0,0,0,0,0,
                           .quad 0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0 ,0
 
 # マスを処理するラベル
-.set  funcPtrByteSize, 8
+.set  funcPtrByteSize, 8        # ジャンプ先のサイズ(byte単位)
+.set  funcPtrByteSizeLog2, 3    # ジャンプ先のサイズ(左シフト回数)
+
 .align 16
 sudokuXmmCountFuncTable:
     .quad countAt00, countAt01, countAt02, countAt03, countAt04, countAt05, countAt06, countAt07, countAt08, countAt09
@@ -463,7 +465,7 @@ testCollectUniqueCandidatesInRowPart:
 testCollectUniqueCandidatesInLine:
         InitMaskRegister
         xor     rax, rax
-        mov     qword ptr sudokuXmmAborted, 0
+        mov     qword ptr [rip + sudokuXmmAborted], 0
         CollectUniqueCandidatesInLine rax, xRegRow1, rbx, rcx, r8, r9, r10, r11, r12, r13, r14
         ret
 
@@ -489,7 +491,7 @@ testCollectUniqueCandidatesInLine:
         .global testFilterUniqueCandidatesInLine
 testFilterUniqueCandidatesInLine:
         InitMaskRegister
-        mov     qword ptr sudokuXmmAborted, 0
+        mov     qword ptr [rip + sudokuXmmAborted], 0
         FilterUniqueCandidatesInLine xRegWork2, xRegRow1, r8, r9, r10, r11, r12, r13, r14, xRegWork1
         ret
 
@@ -505,7 +507,7 @@ testFilterUniqueCandidatesInLine:
         .global testFCollectUniqueCandidatesInThreeLine
 testFCollectUniqueCandidatesInThreeLine:
         InitMaskRegister
-        mov     qword ptr sudokuXmmAborted, 0
+        mov     qword ptr [rip + sudokuXmmAborted], 0
         CollectUniqueCandidatesInThreeLine xRegRow1to3, xRegRow1, xRegRow2, xRegRow3, r8, r9, r10, r11, r12, r13, r14, xRegWork1, xRegWork2
         ret
 
@@ -626,10 +628,10 @@ testSelectElementInRowParts2:
 
 .macro testFillUniqueElement inBoxShift
         InitMaskRegister
-        mov     rbx, testFillUniqueElementPreRowPart
-        mov     rcx, testFillUniqueElementPreColumn
-        mov     rdx, testFillUniqueElementPreBox
-        mov     rsi, testFillUniqueElementPreRow
+        mov     rbx, [rip + testFillUniqueElementPreRowPart]
+        mov     rcx, [rip + testFillUniqueElementPreColumn]
+        mov     rdx, [rip + testFillUniqueElementPreBox]
+        mov     rsi, [rip + testFillUniqueElementPreRow]
         FillUniqueElement rbx, rax, rcx, rdx, rsi, \inBoxShift, r10, r11, r12, r13, r14, xRegWork1, xRegWork2
         ret
 .endm
@@ -660,10 +662,10 @@ testFillUniqueElement2:
 
 .macro testFillOneUniqueCandidates inBoxShift
         InitMaskRegister
-        mov     rax, testFillUniqueElementPreRowPart
-        mov     rbx, testFillUniqueElementPreColumn
-        mov     rcx, testFillUniqueElementPreBox
-        mov     rdx, testFillUniqueElementPreRow
+        mov     rax, [rip + testFillUniqueElementPreRowPart]
+        mov     rbx, [rip + testFillUniqueElementPreColumn]
+        mov     rcx, [rip + testFillUniqueElementPreBox]
+        mov     rdx, [rip + testFillUniqueElementPreRow]
         FillOneUniqueCandidates rax, rcx, rdx, rbx, \inBoxShift, r9, r10, r11, r12, r13, r14, xRegWork1, xRegWork2
         ret
 .endm
@@ -905,9 +907,9 @@ testFindThreePartsCandidates:
 .macro TestFillThreePartsUniqueCandidates outBoxShift
         InitMaskRegister
         FillThreePartsUniqueCandidates rax, xRegRow1to3, xRegRow1, xRegRowAll, \outBoxShift, rdx, rsi, r8, r9, r10, r11, r12, r13, r14, xRegWork1, xRegWork2
-        movdqa  testFillNineUniqueCandidatesRowX,    xmm1
-        movdqa  testFillNineUniqueCandidatesBoxX,    xmm10
-        movdqa  testFillNineUniqueCandidatesColumnX, xmm0
+        movdqa  [rip + testFillNineUniqueCandidatesRowX],    xmm1
+        movdqa  [rip + testFillNineUniqueCandidatesBoxX],    xmm10
+        movdqa  [rip + testFillNineUniqueCandidatesColumnX], xmm0
         ret
 .endm
 
@@ -928,11 +930,11 @@ testFillThreePartsUniqueCandidates2:
 
 .macro TestFillRowPartCandidates outBoxShiftTarget, outBoxShiftOtherA, outBoxShiftOtherB
         InitMaskRegister
-        mov     rax, testFillNineUniqueCandidatesPreRow
+        mov     rax, [rip + testFillNineUniqueCandidatesPreRow]
         FillRowPartCandidates rax, xRegRow1to3, xRegRow1, xRegRowAll, \outBoxShiftTarget, \outBoxShiftOtherA, \outBoxShiftOtherB, rbx, rcx, rdx, rsi, r8, r9, r10, r11, r12, r13, r14, xRegWork1, xRegWork2
-        movdqa  testFillNineUniqueCandidatesRowX,    xmm1
-        movdqa  testFillNineUniqueCandidatesBoxX,    xmm10
-        movdqa  testFillNineUniqueCandidatesColumnX, xmm0
+        movdqa  [rip + testFillNineUniqueCandidatesRowX],    xmm1
+        movdqa  [rip + testFillNineUniqueCandidatesBoxX],    xmm10
+        movdqa  [rip + testFillNineUniqueCandidatesColumnX], xmm0
         ret
 .endm
 
@@ -966,9 +968,9 @@ testTestFillRowPartCandidates2:
 testFillNineUniqueCandidates:
         InitMaskRegister
         FillNineUniqueCandidates xRegRow1to3, xRegRow1, xRegRowAll, rax, rbx, rcx, rdx, rsi, r8, r9, r10, r11, r12, r13, r14, xRegWork1, xRegWork2
-        movdqa  testFillNineUniqueCandidatesRowX,    xmm1
-        movdqa  testFillNineUniqueCandidatesBoxX,    xmm10
-        movdqa  testFillNineUniqueCandidatesColumnX, xmm0
+        movdqa  [rip + testFillNineUniqueCandidatesRowX],    xmm1
+        movdqa  [rip + testFillNineUniqueCandidatesBoxX],    xmm10
+        movdqa  [rip + testFillNineUniqueCandidatesColumnX], xmm0
         ret
 
 .macro Collect27UniqueCandidates regBoxX, regRow1X, regRow2X, regRow3X, regColumnX, regWork1, regWork2, regWork3, regWork4, regWork5, regWork6, regWork7, regWork8, regWork9, regWork10, regWork11, regWork12, regWork13, regWork1X, regWork2X
@@ -999,13 +1001,13 @@ testFillNineUniqueCandidates:
 
 .macro TestFindRowPartCandidates outBoxShift
         InitMaskRegister
-        mov     rsi, testFindRowPartCandidatesPreRowPartTarget
-        mov     r8,  testFindRowPartCandidatesPreRowCandidates
-        mov     r9,  testFindRowPartCandidatesPreBox
+        mov     rsi, [rip + testFindRowPartCandidatesPreRowPartTarget]
+        mov     r8,  [rip + testFindRowPartCandidatesPreRowCandidates]
+        mov     r9,  [rip + testFindRowPartCandidatesPreBox]
         FindRowPartCandidates rsi, rax, rbx, rcx, rdx, r8, r9, xRegRow1to3, xRegRowAll, \outBoxShift, r10, r11, r12, r13, r14, xRegWork1, xRegWork2
-        mov     testFindRowPartCandidatesRowPartTarget, rsi
-        mov     testFindRowPartCandidatesRowCandidates, r8
-        mov     testFindRowPartCandidatesBox, r9
+        mov     [rip + testFindRowPartCandidatesRowPartTarget], rsi
+        mov     [rip + testFindRowPartCandidatesRowCandidates], r8
+        mov     [rip + testFindRowPartCandidatesBox], r9
         ret
 .endm
 
@@ -1068,9 +1070,9 @@ testFindNineCandidates:
         xorps   xRegRow4to6, xRegRow4to6
         xorps   xRegRow7to9, xRegRow7to9
         FindNineCandidates xRegRow1, xRegRow2, xRegRow3, xRegRow1to3, xRegRow4to6, xRegRow7to9, xRegRowAll, rax, rbx, rcx, rdx, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, xRegWork1, xRegWork2
-        movdqa  testFillNineUniqueCandidatesRowX,    xmm1
-        movdqa  testFillNineUniqueCandidatesBoxX,    xmm10
-        movdqa  testFillNineUniqueCandidatesColumnX, xmm0
+        movdqa  [rip + testFillNineUniqueCandidatesRowX],    xmm1
+        movdqa  [rip + testFillNineUniqueCandidatesBoxX],    xmm10
+        movdqa  [rip + testFillNineUniqueCandidatesColumnX], xmm0
         ret
 
 .macro Find27UniqueCandidates regRow1X, regRow2X, regRow3X, regBoxX, regThreeRow1X, regThreeRow2X, regColumnX, regWork1, regWork2, regWork3, regWork4, regWork5, regWork6, regWork7, regWork8, regWork9, regWork10, regWork11, regWork12, regWork13, regWork1X, regWork2X
@@ -1282,10 +1284,10 @@ testCountRowPartElements2:
         .global testSearchRowPartElements
 testSearchRowPartElements:
         InitMaskRegister
-        mov  rcx, testSearchRowPartElementsPreRowPart
-        mov  rdx, testSearchRowPartElementsPreUniqueCandidate
-        mov  rsi, testSearchRowPartElementsPreInBoxShift
-        mov  rdi, testSearchRowPartElementsPreOutBoxShift
+        mov  rcx, [rip + testSearchRowPartElementsPreRowPart]
+        mov  rdx, [rip + testSearchRowPartElementsPreUniqueCandidate]
+        mov  rsi, [rip + testSearchRowPartElementsPreInBoxShift]
+        mov  rdi, [rip + testSearchRowPartElementsPreOutBoxShift]
         SearchRowPartElements rbx, xRegRow1, rdx, rax, rsi, rdi, rcx, r11, r12, r13, r14, xRegWork1, xRegWork2
         ret
 
@@ -1345,10 +1347,10 @@ testSearchRowPartElements:
         .global testSearchRowElements
 testSearchRowElements:
         InitMaskRegister
-        mov  rbx, testSearchRowElementsPreUniqueCandidate
-        mov  rcx, testSearchRowElementsPreCandidateRow
-        mov  rdx, testSearchRowElementsPreInBoxShift
-        mov  rsi, testSearchRowElementsPreOutBoxShift
+        mov  rbx, [rip + testSearchRowElementsPreUniqueCandidate]
+        mov  rcx, [rip + testSearchRowElementsPreCandidateRow]
+        mov  rdx, [rip + testSearchRowElementsPreInBoxShift]
+        mov  rsi, [rip + testSearchRowElementsPreOutBoxShift]
         SearchRowElements xRegRow1, rbx, rax, rcx, rdx, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, xRegWork1, xRegWork2
         ret
 
@@ -1449,18 +1451,18 @@ loopFilling:
         jnz     keepFilling
 
 exitFilling:
-        mov     qword ptr sudokuXmmAborted, 0
-        mov     qword ptr sudokuXmmElementCnt, regCurrentPopcnt
+        mov     qword ptr [rip + sudokuXmmAborted], 0
+        mov     qword ptr [rip + sudokuXmmElementCnt], regCurrentPopcnt
         ret
 
 abortFilling:
-        mov     qword ptr sudokuXmmAborted, 1
-        mov     qword ptr sudokuXmmElementCnt, 0
+        mov     qword ptr [rip + sudokuXmmAborted], 1
+        mov     qword ptr [rip + sudokuXmmElementCnt], 0
         ret
 
 keepFilling:
         # 強制終了
-        cmp     regLoopCnt, sudokuXmmMaxLoopcnt
+        cmp     regLoopCnt, sudokuMaxLoopcnt
         jae     exitFilling
         FastInc regLoopCnt
         SaveLoopCnt regLoopCnt, regCurrentPopcnt
@@ -1479,11 +1481,11 @@ searchNextCandidate:
         .set    regOutBoxShift,      r14
 
         InitMaskRegister
-        mov     regUniqueCandidate, sudokuXmmUniqueCandidate
-        mov     regCandidateCnt,    sudokuXmmCandidateCnt
-        mov     regCandidateRow,    sudokuXmmCandidateRow
-        mov     regInBoxShift,      sudokuXmmCandidateInBoxShift
-        mov     regOutBoxShift,     sudokuXmmCandidateOutBoxShift
+        mov     regUniqueCandidate, [rip + sudokuXmmUniqueCandidate]
+        mov     regCandidateCnt,    [rip + sudokuXmmCandidateCnt]
+        mov     regCandidateRow,    [rip + sudokuXmmCandidateRow]
+        mov     regInBoxShift,      [rip + sudokuXmmCandidateInBoxShift]
+        mov     regOutBoxShift,     [rip + sudokuXmmCandidateOutBoxShift]
 
         # 前回の検索の続きを行う
         or      regCandidateCnt, regCandidateCnt
@@ -1500,11 +1502,11 @@ beginSearchNextCandidate:
         SearchNextCandidate regUniqueCandidate, regCandidateCnt, regCandidateRow, regInBoxShift, regOutBoxShift, r8, r9, rax, rbx, rcx, rdx, rsi, rdi, xRegWork1, xRegWork2
 
 endSearchNextCandidate:
-        mov     sudokuXmmUniqueCandidate, regUniqueCandidate
-        mov     sudokuXmmCandidateCnt,    regCandidateCnt
-        mov     sudokuXmmCandidateRow,    regCandidateRow
-        mov     sudokuXmmCandidateInBoxShift,  regInBoxShift
-        mov     sudokuXmmCandidateOutBoxShift, regOutBoxShift
+        mov     [rip + sudokuXmmUniqueCandidate], regUniqueCandidate
+        mov     [rip + sudokuXmmCandidateCnt],    regCandidateCnt
+        mov     [rip + sudokuXmmCandidateRow],    regCandidateRow
+        mov     [rip + sudokuXmmCandidateInBoxShift],  regInBoxShift
+        mov     [rip + sudokuXmmCandidateOutBoxShift], regOutBoxShift
         ret
 
         .global loadXmmRegisters
@@ -2009,11 +2011,11 @@ testFastSetUniqueCandidatesAtCellSub88:
 .endm
 
 .macro CallCountUniqueCandidatesAtCell cellCount
-        call [sudokuXmmCountFuncTable + \cellCount * funcPtrByteSize]
+        call [rip + sudokuXmmCountFuncTable + \cellCount * funcPtrByteSize]
 .endm
 
 .macro JmpCountUniqueCandidatesAtCell cellCount
-        jmp [sudokuXmmCountFuncTable + \cellCount * funcPtrByteSize]
+        jmp [rip + sudokuXmmCountFuncTable + \cellCount * funcPtrByteSize]
 .endm
 
 .macro CountUniqueCandidatesAtNextCell cellCount, candidate
@@ -2023,29 +2025,29 @@ testFastSetUniqueCandidatesAtCellSub88:
         FastSetUniqueCandidatesAtCell gRegNewCandidate, \cellCount
         CallCountUniqueCandidatesAtCell (\cellCount + 1)
 11009:
-        mov     gRegSum64, qword ptr [sudokuXmmCandidateArray  + \cellCount * arrayElementByteSize]
+        mov     gRegSum64, qword ptr [rip + sudokuXmmCandidateArray + \cellCount * arrayElementByteSize]
 .endm
 
 .macro FastPrintAllCells
-        movdqa  xmmword ptr [sudokuXmmToPrint],     xmm0
-        movdqa  xmmword ptr [sudokuXmmToPrint+16],  xmm1
-        movdqa  xmmword ptr [sudokuXmmToPrint+32],  xmm2
-        movdqa  xmmword ptr [sudokuXmmToPrint+48],  xmm3
-        movdqa  xmmword ptr [sudokuXmmToPrint+64],  xmm4
-        movdqa  xmmword ptr [sudokuXmmToPrint+80],  xmm5
-        movdqa  xmmword ptr [sudokuXmmToPrint+96],  xmm6
-        movdqa  xmmword ptr [sudokuXmmToPrint+112], xmm7
-        movdqa  xmmword ptr [sudokuXmmToPrint+128], xmm8
-        movdqa  xmmword ptr [sudokuXmmToPrint+144], xmm9
-        movdqa  xmmword ptr [sudokuXmmToPrint+160], xmm10
-        movdqa  xmmword ptr [sudokuXmmToPrint+176], xmm11
-        movdqa  xmmword ptr [sudokuXmmToPrint+192], xmm12
-        movdqa  xmmword ptr [sudokuXmmToPrint+208], xmm13
-        movdqa  xmmword ptr [sudokuXmmToPrint+224], xmm14
-        movdqa  xmmword ptr [sudokuXmmToPrint+240], xmm15
+        movdqa  xmmword ptr [rip + sudokuXmmToPrint],     xmm0
+        movdqa  xmmword ptr [rip + sudokuXmmToPrint+16],  xmm1
+        movdqa  xmmword ptr [rip + sudokuXmmToPrint+32],  xmm2
+        movdqa  xmmword ptr [rip + sudokuXmmToPrint+48],  xmm3
+        movdqa  xmmword ptr [rip + sudokuXmmToPrint+64],  xmm4
+        movdqa  xmmword ptr [rip + sudokuXmmToPrint+80],  xmm5
+        movdqa  xmmword ptr [rip + sudokuXmmToPrint+96],  xmm6
+        movdqa  xmmword ptr [rip + sudokuXmmToPrint+112], xmm7
+        movdqa  xmmword ptr [rip + sudokuXmmToPrint+128], xmm8
+        movdqa  xmmword ptr [rip + sudokuXmmToPrint+144], xmm9
+        movdqa  xmmword ptr [rip + sudokuXmmToPrint+160], xmm10
+        movdqa  xmmword ptr [rip + sudokuXmmToPrint+176], xmm11
+        movdqa  xmmword ptr [rip + sudokuXmmToPrint+192], xmm12
+        movdqa  xmmword ptr [rip + sudokuXmmToPrint+208], xmm13
+        movdqa  xmmword ptr [rip + sudokuXmmToPrint+224], xmm14
+        movdqa  xmmword ptr [rip + sudokuXmmToPrint+240], xmm15
 
         push    rbp
-        mov     qword ptr sudokuXmmStackPointer, rsp
+        mov     qword ptr [rip + sudokuXmmStackPointer], rsp
 
         # x64のABIは、呼び出し先関数の領域を32 byte分だけ、呼び出し側で確保する
         .set    MinStackSize, 32
@@ -2056,26 +2058,26 @@ testFastSetUniqueCandidatesAtCellSub88:
         # そのため下位ビットを切り捨てて、下位アドレスの16 byte境界にそろえる
         # これをしないと、std::cout << の実行中にC++ライブラリの中で異常終了することになる
         and     rsp, ~0xf
-        call    [sudokuXmmPrintFunc]
-        mov     rsp, qword ptr sudokuXmmStackPointer
+        call    [rip + sudokuXmmPrintFunc]
+        mov     rsp, qword ptr [rip + sudokuXmmStackPointer]
         pop     rbp
 
-        movdqa  xmm0,  xmmword ptr [sudokuXmmToPrint]
-        movdqa  xmm1,  xmmword ptr [sudokuXmmToPrint+16]
-        movdqa  xmm2,  xmmword ptr [sudokuXmmToPrint+32]
-        movdqa  xmm3,  xmmword ptr [sudokuXmmToPrint+48]
-        movdqa  xmm4,  xmmword ptr [sudokuXmmToPrint+64]
-        movdqa  xmm5,  xmmword ptr [sudokuXmmToPrint+80]
-        movdqa  xmm6,  xmmword ptr [sudokuXmmToPrint+96]
-        movdqa  xmm7,  xmmword ptr [sudokuXmmToPrint+112]
-        movdqa  xmm8,  xmmword ptr [sudokuXmmToPrint+128]
-        movdqa  xmm9,  xmmword ptr [sudokuXmmToPrint+144]
-        movdqa  xmm10, xmmword ptr [sudokuXmmToPrint+160]
-        movdqa  xmm11, xmmword ptr [sudokuXmmToPrint+176]
-        movdqa  xmm12, xmmword ptr [sudokuXmmToPrint+192]
-        movdqa  xmm13, xmmword ptr [sudokuXmmToPrint+208]
-        movdqa  xmm14, xmmword ptr [sudokuXmmToPrint+224]
-        movdqa  xmm15, xmmword ptr [sudokuXmmToPrint+240]
+        movdqa  xmm0,  xmmword ptr [rip + sudokuXmmToPrint]
+        movdqa  xmm1,  xmmword ptr [rip + sudokuXmmToPrint+16]
+        movdqa  xmm2,  xmmword ptr [rip + sudokuXmmToPrint+32]
+        movdqa  xmm3,  xmmword ptr [rip + sudokuXmmToPrint+48]
+        movdqa  xmm4,  xmmword ptr [rip + sudokuXmmToPrint+64]
+        movdqa  xmm5,  xmmword ptr [rip + sudokuXmmToPrint+80]
+        movdqa  xmm6,  xmmword ptr [rip + sudokuXmmToPrint+96]
+        movdqa  xmm7,  xmmword ptr [rip + sudokuXmmToPrint+112]
+        movdqa  xmm8,  xmmword ptr [rip + sudokuXmmToPrint+128]
+        movdqa  xmm9,  xmmword ptr [rip + sudokuXmmToPrint+144]
+        movdqa  xmm10, xmmword ptr [rip + sudokuXmmToPrint+160]
+        movdqa  xmm11, xmmword ptr [rip + sudokuXmmToPrint+176]
+        movdqa  xmm12, xmmword ptr [rip + sudokuXmmToPrint+192]
+        movdqa  xmm13, xmmword ptr [rip + sudokuXmmToPrint+208]
+        movdqa  xmm14, xmmword ptr [rip + sudokuXmmToPrint+224]
+        movdqa  xmm15, xmmword ptr [rip + sudokuXmmToPrint+240]
 .endm
 
 .macro CountUniqueCandidatesAtCellLoop outBoxShift, inBoxShift, cellCount, xRegSrcTarget, xRegSrcOther1, xRegSrcOther2, rowNumber
@@ -2122,7 +2124,7 @@ testFastSetUniqueCandidatesAtCellSub88:
         # すべてのマスが埋まった
         add     gRegCount, gRegOne64
 
-        cmp     qword ptr sudokuXmmPrintAllCandidate, 0
+        cmp     qword ptr [rip + sudokuXmmPrintAllCandidate], 0
         # 候補を表示しないに分岐しないようにして速くする
         jnz     10021f
         jmp     gRegReturn
@@ -2130,15 +2132,15 @@ testFastSetUniqueCandidatesAtCellSub88:
 10021:
         not     gRegSum
         and     gRegSum, gRegFastBitMask
-        mov     qword ptr sudokuXmmRightBottomSolved, gRegSum64
-        mov     qword ptr sudokuXmmAllPatternCnt, gRegCount
-        mov     qword ptr sudokuXmmReturnAddr, gRegReturn
+        mov     qword ptr [rip + sudokuXmmRightBottomSolved], gRegSum64
+        mov     qword ptr [rip + sudokuXmmAllPatternCnt], gRegCount
+        mov     qword ptr [rip + sudokuXmmReturnAddr], gRegReturn
 
         FastPrintAllCells
         FastInitMaskRegister
-        mov     gRegReturn, qword ptr sudokuXmmReturnAddr
-        mov     gRightBottomElement64, qword ptr sudokuXmmRightBottomElement
-        mov     gRegCount, qword ptr sudokuXmmAllPatternCnt
+        mov     gRegReturn, qword ptr [rip + sudokuXmmReturnAddr]
+        mov     gRightBottomElement64, qword ptr [rip + sudokuXmmRightBottomElement]
+        mov     gRegCount, qword ptr [rip + sudokuXmmAllPatternCnt]
         jmp     gRegReturn
 
         .else
@@ -2214,18 +2216,22 @@ testFastSetUniqueCandidatesAtCellSub88:
 
         .global sudokuXmmCountFromCell
 sudokuXmmCountFromCell:
-        mov     gRegWork1, sudokuXmmMaxLoopcnt - 1
+        mov     gRegWork64, sudokuMaxLoopcnt
+        FastDec gRegWork64
         cmp     rax, gRegWork64
         cmova   rax, gRegWork64
-        lea     rax, [sudokuXmmCountFuncTable + rax * funcPtrByteSize]
 
-        mov     gRightBottomElement64, qword ptr sudokuXmmRightBottomElement
-        mov     qword ptr sudokuXmmDebug, 0
+        lea     gRegWork64, [rip + sudokuXmmCountFuncTable]
+        ShlNonZero rax, funcPtrByteSizeLog2
+        add     rax, gRegWork64
+
+        mov     gRightBottomElement64, qword ptr [rip + sudokuXmmRightBottomElement]
+        mov     qword ptr [rip + sudokuXmmDebug], 0
         xor     gRegCount, gRegCount
 
         FastInitMaskRegister
         call    [rax]
-        mov     qword ptr sudokuXmmAllPatternCnt, gRegCount
+        mov     qword ptr [rip + sudokuXmmAllPatternCnt], gRegCount
         ret
 
 countAt00:

@@ -10,11 +10,12 @@
 # Ruby 1.9.2dev
 
 # set link options to link c/c++ libraries statically
-LIBCFLAGS=
+# libstdc++-6.dll in MinGW-w64 cannot be loaded on Cygwin
+LIBCFLAGS= -static
 
 # -O2 optimization is better than -O3
 CPPFLAGS= -O2 -Wall -masm=intel -m64 -msse4.2 $(LIBCFLAGS)
-LDFLAGS= $(LIBCFLAGS)
+LDFLAGS= $(LIBCFLAGS) -mcmodel=small
 
 CELLS_UNPACKED_TARGET= bin/sudokusse.exe
 CELLS_PACKED_TARGET= bin/sudokusse_cells_packed.exe
@@ -42,10 +43,10 @@ $(CELLS_UNPACKED_OBJS): $(HEADERS) Makefile
 
 $(CELLS_PACKED_OBJS): $(HEADERS) Makefile
 
-sudokusse_cells_unpacked.o : sudokusse.s
+sudokusse_cells_unpacked.o : sudokusse.s Makefile
 	$(AS) -defsym CellsPacked=0 -o $@ $<
 
-sudokusse_cells_packed.o : sudokusse.s
+sudokusse_cells_packed.o : sudokusse.s Makefile
 	$(AS) -defsym CellsPacked=1 -o $@ $<
 
 $(GENERATED_CODE): $(GENERATOR_SCRIPT) Makefile

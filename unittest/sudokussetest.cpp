@@ -143,7 +143,8 @@ void SudokuSseEnumeratorMapTest::test_Constructor() {
         }
 
         uint64_t actual = sudokuXmmPrintAllCandidate;
-        CPPUNIT_ASSERT_EQUAL(0ull, actual);
+        uint64_t expected = 0ull;
+        CPPUNIT_ASSERT_EQUAL(expected, actual);
     } while(0);
 
     CPPUNIT_ASSERT_EQUAL(pInstance_, SudokuSseEnumeratorMap::pInstance_);

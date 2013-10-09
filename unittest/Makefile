@@ -4,31 +4,24 @@
 INCLUDES=-I. -I.. -I/local/include
 LIBPATH=-L/local/lib
 
+# set link options to link c/c++ libraries statically
+LIBCFLAGS=
+CPPFLAGS=-g -Wall -masm=intel -DUNITTEST $(INCLUDES)
+LDFLAGS= $(LIBCFLAGS) -mcmodel=small
+
 CELLS_UNPACKED_TARGET= unittest.exe
 CELLS_PACKED_TARGET= unittest_cells_packed.exe
 TARGETS = $(CELLS_UNPACKED_TARGET) $(CELLS_PACKED_TARGET)
-CPPFLAGS=-g -Wall -masm=intel -DUNITTEST $(INCLUDES)
 
-TESTEROBJS= \
-	main.o \
-	sudokussetest.o \
-	sudokutest.o \
-	sudokucelltest.o \
-	sudokumaptest.o \
-	sudokusolvertest.o \
-	sudokuloadertest.o \
+TESTEROBJS= main.o sudokussetest.o sudokutest.o sudokucelltest.o \
+			sudokumaptest.o sudokusolvertest.o sudokuloadertest.o
 
-TESTEDOBJS= \
-	sudoku.o \
-	sudokuxmmreg.o \
-	sudokumap.o \
+TESTEDOBJS= sudoku.o sudokuxmmreg.o sudokumap.o
 
 CELLS_UNPACKED_OBJS= $(TESTEROBJS) $(TESTEDOBJS) sudokusse_cells_unpacked.o
 CELLS_PACKED_OBJS=   $(TESTEROBJS) $(TESTEDOBJS) sudokusse_cells_packed.o
 
-HEADERS = \
-	../sudoku.h \
-	sudokutest.h
+HEADERS = ../sudoku.h sudokutest.h
 
 GENERATED_CODE=sudokumap.cpp
 GENERATOR_SCRIPT=../sudokumap.rb
@@ -50,19 +43,19 @@ $(CELLS_UNPACKED_OBJS): $(HEADERS) Makefile
 $(CELLS_PACKED_OBJS): $(HEADERS) Makefile
 
 # no inlining
-sudoku.o: ../sudoku.cpp
+sudoku.o: ../sudoku.cpp Makefile
 	$(CXX) $(CPPFLAGS) -c $<
 
-sudokuxmmreg.o: ../sudokuxmmreg.cpp
+sudokuxmmreg.o: ../sudokuxmmreg.cpp Makefile
 	$(CXX) $(CPPFLAGS) -c $<
 
-sudokumap.o: sudokumap.cpp
+sudokumap.o: sudokumap.cpp Makefile
 	$(CXX) $(CPPFLAGS) -c $<
 
-sudokusse_cells_unpacked.o : ../sudokusse.s
+sudokusse_cells_unpacked.o : ../sudokusse.s Makefile
 	$(AS) -defsym CellsPacked=0 -o $@ $<
 
-sudokusse_cells_packed.o : ../sudokusse.s
+sudokusse_cells_packed.o : ../sudokusse.s Makefile
 	$(AS) -defsym CellsPacked=1 -o $@ $<
 
 $(GENERATED_CODE): $(GENERATOR_SCRIPT) Makefile
