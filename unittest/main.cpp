@@ -1,5 +1,5 @@
 // CppTest実行メイン部
-// Copyright (C) 2012-2013 Zettsu Tatsuya
+// Copyright (C) 2012-2015 Zettsu Tatsuya
 //
 // クラス定義は下記から流用
 // http://www.atmarkit.co.jp/fdotnet/cpptest/cpptest02/cpptest02_03.html

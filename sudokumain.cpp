@@ -1,18 +1,9 @@
 // Sudoku solver with SSE 4.2
-// Copyright (C) 2012-2013 Zettsu Tatsuya
+// Copyright (C) 2012-2015 Zettsu Tatsuya
 
 #include "sudoku.h"
 
 int main(int argc, char *argv[]) {
-    /* サイズ検査(static_assertが使えるときはそうする) */
-    if ((sizeof(SudokuTime) != 8) ||
-        (sizeof(SudokuSseElement) != 4) ||
-        (sizeof(__m128) != 16) ||
-        (sizeof(sudokuXmmPrintFunc) < sizeof(uintptr_t))) {
-        std::cerr << "type size error" << std::endl;
-        return 1;
-    }
-
     /* 使うCPUを固定すると、processorとcacheのaffinityが上がる */
     DWORD_PTR procMask = 1;
     if (!SetProcessAffinityMask(GetCurrentProcess(), procMask)) {
@@ -20,6 +11,8 @@ int main(int argc, char *argv[]) {
     }
 
     /* 本当はデータのポインタと関数のポインタは互換ではない */
+    static_assert(sizeof(uintptr_t) == sizeof(&PrintPattern), "Unexpected uintptr_t size");
+    static_assert(sizeof(sudokuXmmPrintFunc) == sizeof(uintptr_t), "Unexpected sudokuXmmPrintFunc size");
     sudokuXmmPrintFunc = reinterpret_cast<uintptr_t>(&PrintPattern);
 
     if (!SudokuLoader::CanLaunch(argc, argv)) {

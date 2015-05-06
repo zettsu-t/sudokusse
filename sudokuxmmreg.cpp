@@ -1,5 +1,5 @@
 // Sudoku solver with SSE 4.2
-// Copyright (C) 2012-2013 Zettsu Tatsuya
+// Copyright (C) 2012-2015 Zettsu Tatsuya
 
 #include "sudoku.h"
 

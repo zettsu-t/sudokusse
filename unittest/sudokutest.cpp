@@ -1,5 +1,5 @@
 // 共通関数
-// Copyright (C) 2012-2013 Zettsu Tatsuya
+// Copyright (C) 2012-2015 Zettsu Tatsuya
 
 #include <cppunit/extensions/HelperMacros.h>
 #include <cassert>
@@ -17,10 +17,16 @@ protected:
 CPPUNIT_TEST_SUITE_REGISTRATION(SudokuMacroTest);
 
 void SudokuMacroTest::test_arraySizeof() {
-    const size_t expected = 7;
-    int array[expected];
-    CPPUNIT_ASSERT_EQUAL(expected, arraySizeofSafe(array));
+    constexpr size_t expected = 7;
+    static int array[expected];
     CPPUNIT_ASSERT_EQUAL(expected, arraySizeof(array));
+
+    struct LocalStruct {
+        int a;
+        int b;
+    };
+    static LocalStruct structArray[expected];
+    CPPUNIT_ASSERT_EQUAL(expected, arraySizeof(structArray));
 }
 
 SudokuCellCandidates SudokuTestCommon::ConvertToCandidate(char index) {

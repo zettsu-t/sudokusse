@@ -1,5 +1,5 @@
 // Sudoku solver with SSE 4.2
-// Copyright (C) 2012-2013 Zettsu Tatsuya
+// Copyright (C) 2012-2015 Zettsu Tatsuya
 
 #include <stdint.h>
 #include <string>
@@ -7,7 +7,7 @@
 #include <windows.h>
 
 // 仮想関数を一切禁止すると速くなる。許可するなら下段のマクロを無効にする
-#define NO_DESTRUCTOR_AND_VTABLE 1
+#define NO_DESTRUCTOR_AND_VTABLE (1)
 
 // 読みにくいが高速にする
 #define FAST_MODE (true)
@@ -21,53 +21,58 @@
 
 #ifdef NO_DESTRUCTOR_AND_VTABLE
   #define ALLOW_VIRTUAL
-  #define NO_DESTRUCTOR 1
+  #define NO_DESTRUCTOR (1)
 #else
   #define ALLOW_VIRTUAL virtual
 #endif
 
 // 型宣言(32Kbyte L1 Data Cacheに収まること)
-typedef unsigned short SudokuIndex;          // マスとマスの集合の番号(shortの方が速い)
-typedef unsigned int SudokuLoopIndex;        // マスとマスの集合の番号のループインデックス(intの方が速い)
-typedef unsigned int SudokuCellCandidates;   // マスの候補の集合
-typedef int SudokuNumber;                    // マスの初期設定の候補となる数字
-typedef unsigned long long SudokuTime;       // 時刻と時間
-typedef uint32_t SudokuSseElement;           // SSE4.2命令で解く場合のN byteデータアクセス単位(3マス分)
-typedef uint64_t gRegister;                                  // 汎用レジスタ(必ず符号なし)
-typedef __m128   xmmRegister __attribute__((aligned(16)));   // XMMレジスタ
-typedef uint64_t SudokuPatternCount;         // 解の数
+using SudokuIndex = unsigned short;          // マスとマスの集合の番号(shortの方が速い)
+using SudokuLoopIndex = unsigned int;        // マスとマスの集合の番号のループインデックス(intの方が速い)
+using SudokuCellCandidates = unsigned int;   // マスの候補の集合
+using SudokuNumber = int;                    // マスの初期設定の候補となる数字
+using SudokuTime = unsigned long long;       // 時刻と時間
+using SudokuSseElement = uint32_t;           // SSE4.2命令で解く場合のN byteデータアクセス単位(3マス分)
+using gRegister = uint64_t;                                // 汎用レジスタ(必ず符号なし)
+using xmmRegister = __m128 __attribute__((aligned(16)));   // XMMレジスタ
+using SudokuPatternCount = uint64_t;         // 解の数
+
+static_assert(sizeof(SudokuTime) == 8, "Unexpected SudokuTime size");
+static_assert(sizeof(SudokuSseElement) == 4, "Unexpected SudokuSseElement size");
+static_assert(sizeof(xmmRegister) == 16, "Unexpected xmmRegister size");
 
 // SSE4.2設定
 namespace SudokuSse {
-    const size_t RegisterCnt = 16;    // 数独の結果を入れるXMMレジスタ数
-    const size_t RegisterWordCnt = 4; // XMMレジスタのword数
+    constexpr size_t RegisterCnt = 16;    // 数独の結果を入れるXMMレジスタ数
+    constexpr size_t RegisterWordCnt = 4; // XMMレジスタのword数
 }
 
-union XmmRegisterSet {  // 全XMMレジスタ(128bit * 16本)
+// 全XMMレジスタ(128bit * 16本)
+union XmmRegisterSet {
     SudokuSseElement regVal_[SudokuSse::RegisterCnt * SudokuSse::RegisterWordCnt];
     xmmRegister      regXmmVal_[SudokuSse::RegisterCnt];
 };
 
 // 数独の定数
 namespace Sudoku {
-    static const SudokuIndex SizeOfCellsPerGroup = 9;    // 列、行、箱に含むマスの数
-    static const SudokuIndex SizeOfGroupsPerMap = 9;     // 列、行、箱の数
-    static const SudokuIndex SizeOfAllCells = 81;        // すべてのマスの数
-    static const SudokuIndex SizeOfCandidates = 9;       // マスの候補数
-    static const SudokuIndex SizeOfUniqueCandidate = 1;  // 唯一のマスの候補数
-    static const SudokuIndex OutOfRangeCandidates = 0x10;    // 候補が全くないか1つのときの範囲外の候補数 = 2^n
-    static const SudokuIndex OutOfRangeMask = OutOfRangeCandidates - 1;   // 候補が全くないか1つのときの範囲外の候補数のマスク
-    static const SudokuIndex SizeOfGroupsPerCell = 3;    // マスが属する列、行、箱
-    static const SudokuIndex SizeOfLookUpCell = 512;     // マスの属性の早見表の要素数
-    static const SudokuIndex SizeOfBoxesOnEdge = 3;      // 3*3の箱が一辺に3個ある
-    static const SudokuIndex SizeOfCellsOnBoxEdge = 3;   // 3*3の箱の一辺に3マスある
+    constexpr SudokuIndex SizeOfCellsPerGroup = 9;    // 列、行、箱に含むマスの数
+    constexpr SudokuIndex SizeOfGroupsPerMap = 9;     // 列、行、箱の数
+    constexpr SudokuIndex SizeOfAllCells = 81;        // すべてのマスの数
+    constexpr SudokuIndex SizeOfCandidates = 9;       // マスの候補数
+    constexpr SudokuIndex SizeOfUniqueCandidate = 1;  // 唯一のマスの候補数
+    constexpr SudokuIndex OutOfRangeCandidates = 0x10;    // 候補が全くないか1つのときの範囲外の候補数 = 2^n
+    constexpr SudokuIndex OutOfRangeMask = OutOfRangeCandidates - 1;   // 候補が全くないか1つのときの範囲外の候補数のマスク
+    constexpr SudokuIndex SizeOfGroupsPerCell = 3;    // マスが属する列、行、箱
+    constexpr SudokuIndex SizeOfLookUpCell = 512;     // マスの属性の早見表の要素数
+    constexpr SudokuIndex SizeOfBoxesOnEdge = 3;      // 3*3の箱が一辺に3個ある
+    constexpr SudokuIndex SizeOfCellsOnBoxEdge = 3;   // 3*3の箱の一辺に3マスある
     // bit数の少ない型で定義して使う方で拡張する
-    static const unsigned short EmptyCandidates = 0;     // 空集合
-    static const unsigned short UniqueCandidates = 1;    // 唯一の候補
-    static const unsigned short AllCandidates = 0x1ff;   // 全集合(bit8..0が1)
-    static const SudokuSseElement AllThreeCandidates = 0x7ffffff;   // 3マスの全集合(bit8..0が1)
-    static const short MinCandidatesNumber = 1;          // マスの初期設定の候補となる数字の最小値
-    static const short MaxCandidatesNumber = 9;          // マスの初期設定の候補となる数字の最大値
+    constexpr unsigned short EmptyCandidates = 0;     // 空集合
+    constexpr unsigned short UniqueCandidates = 1;    // 唯一の候補
+    constexpr unsigned short AllCandidates = 0x1ff;   // 全集合(bit8..0が1)
+    constexpr SudokuSseElement AllThreeCandidates = 0x7ffffff;   // 3マスの全集合(bit8..0が1)
+    constexpr short MinCandidatesNumber = 1;          // マスの初期設定の候補となる数字の最小値
+    constexpr short MaxCandidatesNumber = 9;          // マスの初期設定の候補となる数字の最大値
 }
 
 // 共通関数
@@ -86,7 +91,7 @@ namespace Sudoku {
 }
 
 // 解き方
-enum SudokuSolverType {
+enum class SudokuSolverType {
     SOLVER_GENERAL,  // C++テンプレートプログラミング
     SOLVER_SSE_4_2,  // SSE4.2 assembly
 };
@@ -99,7 +104,7 @@ public:
 protected:
     SudokuBaseSolver(std::ostream* pSudokuOutStream);
     virtual void printType(const std::string& presetStr, std::ostream* pSudokuOutStream);
-    int       count_;             // 手順を試した回数
+    int            count_;             // 手順を試した回数
     std::ostream*  pSudokuOutStream_;  // 結果の出力先
 };
 
@@ -155,16 +160,17 @@ private:
     SudokuCellCandidates candidates_;   // マスの候補(1..9が候補ならbit1..9が1)
     // エントリ属性
     static const SudokuCellLookUp CellLookUp_[Sudoku::SizeOfLookUpCell];
+
     // 空集合
-    static const SudokuCellCandidates SudokuEmptyCandidates = Sudoku::EmptyCandidates;
+    static constexpr SudokuCellCandidates SudokuEmptyCandidates = Sudoku::EmptyCandidates;
     // 唯一の候補
-    static const SudokuCellCandidates SudokuUniqueCandidates = Sudoku::UniqueCandidates;
+    static constexpr SudokuCellCandidates SudokuUniqueCandidates = Sudoku::UniqueCandidates;
     // 全集合(bit8..0が1)
-    static const SudokuCellCandidates SudokuAllCandidates = Sudoku::AllCandidates;
+    static constexpr SudokuCellCandidates SudokuAllCandidates = Sudoku::AllCandidates;
     // マスの初期設定の候補となる数字の最小値
-    static const SudokuNumber SudokuMinCandidatesNumber = Sudoku::MinCandidatesNumber;
+    static constexpr SudokuNumber SudokuMinCandidatesNumber = Sudoku::MinCandidatesNumber;
     // マスの初期設定の候補となる数字の最大値
-    static const SudokuNumber SudokuMaxCandidatesNumber = Sudoku::MaxCandidatesNumber;
+    static constexpr SudokuNumber SudokuMaxCandidatesNumber = Sudoku::MaxCandidatesNumber;
 };
 
 // 全マス(C++テンプレートプログラミング)
@@ -196,12 +202,15 @@ private:
     SudokuCell cells_[Sudoku::SizeOfAllCells];
     // バックトラック対象の選択に横、縦、3*3箱のどれを選ぶか
     SudokuIndex backtrackedGroup_;
+
     // すべての列と行と箱に属するマス
     static const SudokuIndex Group_[Sudoku::SizeOfGroupsPerCell][Sudoku::SizeOfGroupsPerMap][Sudoku::SizeOfCellsPerGroup];
+
     // すべてマスの属する、列と行と箱
     static const SudokuIndex ReverseGroup_[Sudoku::SizeOfAllCells][Sudoku::SizeOfGroupsPerCell];
+
     // 3*3マスのグループ集合番号
-    static const SudokuIndex SudokuBoxGroupId = 2;
+    static constexpr SudokuIndex SudokuBoxGroupId = 2;
     // 高速化
     template <SudokuIndex index> INLINE SudokuIndex unrolledCountFilledCells
         (SudokuIndex accumCount) const;
@@ -283,12 +292,12 @@ public:
     void Print(std::ostream* pSudokuOutStream) const;
     void SetCandidates(SudokuSseElement candidates);
     SudokuSseElement GetCandidates(void);
-    static const SudokuSseElement AllCandidates = Sudoku::AllCandidates;  // 全候補のときは全bitを立てる
+    static constexpr SudokuSseElement AllCandidates = Sudoku::AllCandidates;  // 全候補のときは全bitを立てる
 private:
-    static const SudokuSseElement SudokuEmptyCandidates = Sudoku::EmptyCandidates;
-    static const SudokuSseElement SudokuUniqueCandidates = Sudoku::UniqueCandidates;
-    static const SudokuNumber SudokuMinCandidatesNumber = Sudoku::MinCandidatesNumber;
-    static const SudokuNumber SudokuMaxCandidatesNumber = Sudoku::MaxCandidatesNumber;
+    static constexpr SudokuSseElement SudokuEmptyCandidates = Sudoku::EmptyCandidates;
+    static constexpr SudokuSseElement SudokuUniqueCandidates = Sudoku::UniqueCandidates;
+    static constexpr SudokuNumber SudokuMinCandidatesNumber = Sudoku::MinCandidatesNumber;
+    static constexpr SudokuNumber SudokuMaxCandidatesNumber = Sudoku::MaxCandidatesNumber;
     SudokuSseElement candidates_;   // マスの候補(1..9が候補ならbit0..8が1)
 };
 
@@ -318,9 +327,7 @@ class SudokuSseMap {
     friend class SudokuSseMapTest;
     template <class TestedT, class CandidatesT> friend class SudokuSolverCommonTest;
 private:
-    static const size_t InitialRegisterNum = 1;      // 最初の行を格納するXMMレジスタ番号
-    static const size_t cellToRegisterIndex_[Sudoku::SizeOfAllCells];
-    static const size_t cellToRightShift_[Sudoku::SizeOfAllCells];
+    static constexpr size_t InitialRegisterNum = 1;  // 最初の行を格納するXMMレジスタ番号
     XmmRegisterSet xmmRegSet_;
 public:
     SudokuSseMap(void);
@@ -339,10 +346,10 @@ class SudokuSseEnumeratorMap {
     // Unit test
     friend class SudokuSseEnumeratorMapTest;
 private:
-    static const size_t InitialRegisterNum = 1;      // 最初の行を格納するXMMレジスタ番号
-    static const size_t RightColumnRegisterNum = 10; // 最右列を格納するXMMレジスタ番号
-    static const size_t CellBitWidth = 16;           // マスのbit幅
-    static const size_t BitsPerByte = 8;             // Byteのbit数
+    static constexpr size_t InitialRegisterNum = 1;      // 最初の行を格納するXMMレジスタ番号
+    static constexpr size_t RightColumnRegisterNum = 10; // 最右列を格納するXMMレジスタ番号
+    static constexpr size_t CellBitWidth = 16;           // マスのbit幅
+    static constexpr size_t BitsPerByte = 8;             // Byteのbit数
     SudokuCellCandidates rightBottomElement_;
     gRegister firstCell_;
     SudokuPatternCount patternNumber_;
@@ -415,9 +422,9 @@ private:
     int    measureCount_;   // 測定回数
     SudokuPatternCount printAllCadidate_;
     std::ostream* pSudokuOutStream_;  // 結果の出力先
-    static const SudokuTime SudokuTimeUnitInUsec = 10;       // 1usecの時間単位(100nsec*10単位)
-    static const SudokuTime SudokuTimeUsecPerSec = 1000000;  // 1秒当たり1usec
-    static const SudokuTime SudokuTimeSecPerMinute = 60;     // 1分当たり秒
+    static constexpr SudokuTime SudokuTimeUnitInUsec = 10;       // 1usecの時間単位(100nsec*10単位)
+    static constexpr SudokuTime SudokuTimeUsecPerSec = 1000000;  // 1秒当たり1usec
+    static constexpr SudokuTime SudokuTimeSecPerMinute = 60;     // 1分当たり秒
 };
 
 extern "C" {

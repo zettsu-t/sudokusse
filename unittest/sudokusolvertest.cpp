@@ -1,18 +1,20 @@
 // SudokuSolverクラスをテストする
-// Copyright (C) 2012-2013 Zettsu Tatsuya
+// Copyright (C) 2012-2015 Zettsu Tatsuya
 //
 // クラス定義は下記から流用
 // http://www.atmarkit.co.jp/fdotnet/cpptest/cpptest02/cpptest02_02.html
 
 #include <cppunit/extensions/HelperMacros.h>
 #include <cassert>
+#include <limits>
+#include <memory>
 #include "sudoku.h"
 #include "sudokutest.h"
 
 template <class TestedT, class CandidatesT>
 class SudokuSolverCommonTest {
 public:
-    SudokuSolverCommonTest(TestedT* pInst);
+    SudokuSolverCommonTest(std::shared_ptr<TestedT>& pInst);
     virtual ~SudokuSolverCommonTest();
     void test_Exec();
     void test_PrintType(const char *pExpectedStr);
@@ -20,12 +22,11 @@ public:
     void test_fillCells();
     void CheckCells(SudokuSolver *pInst, const SudokuIndex* expectedIndexes);
 
-protected:
-    TestedT* pInstance_;
-
 private:
     void checkCells(TestedT *pInst, const SudokuIndex* expectedIndexes);
     bool filterRetvalFillCells(bool original);
+
+    std::shared_ptr<TestedT> pInstance_;
 };
 
 class SudokuSolverTest : public CPPUNIT_NS::TestFixture {
@@ -37,24 +38,21 @@ class SudokuSolverTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST(test_fillCells);
     CPPUNIT_TEST_SUITE_END();
 
-protected:
-    SudokuSolver* pInstance_;   // インスタンス
-    SudokuOutStream* pSudokuOutStream_;  // 結果出力先
-    SudokuSolverCommonTest<SudokuSolver, SudokuCellCandidates> * pCommonTester_;
-
 public:
     void setUp();
     void tearDown();
-
 protected:
     void test_Constructor();
     void test_Exec();
     void test_PrintType();
     void test_solve();
     void test_fillCells();
-
 private:
     void verifyTestVector(void);
+
+    std::unique_ptr<SudokuOutStream> pSudokuOutStream_;  // 結果出力先
+    std::shared_ptr<SudokuSolver>    pInstance_;         // インスタンス
+    std::unique_ptr<SudokuSolverCommonTest<SudokuSolver, SudokuCellCandidates>> pCommonTester_;
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(SudokuSolverTest);
@@ -69,11 +67,6 @@ class SudokuSseSolverTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST(test_fillCells);
     CPPUNIT_TEST_SUITE_END();
 
-protected:
-    SudokuSseSolver* pInstance_;   // インスタンス
-    SudokuOutStream* pSudokuOutStream_;  // 結果出力先
-    SudokuSolverCommonTest<SudokuSseSolver, SudokuSseElement> * pCommonTester_;
-
 public:
     void setUp();
     void tearDown();
@@ -87,6 +80,9 @@ protected:
     void test_fillCells();
 
 private:
+    std::unique_ptr<SudokuOutStream> pSudokuOutStream_;  // 結果出力先
+    std::shared_ptr<SudokuSseSolver> pInstance_;         // インスタンス
+    std::unique_ptr<SudokuSolverCommonTest<SudokuSseSolver, SudokuSseElement>> pCommonTester_;
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(SudokuSseSolverTest);
@@ -97,13 +93,11 @@ class SudokuSseSearchStateTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST_SUITE_END();
 
 protected:
-    SudokuSseSearchState* pInstance_;    // インスタンス
-    SudokuOutStream* pSudokuOutStream_;  // 結果出力先
-
+    std::unique_ptr<SudokuSseSearchState> pInstance_;    // インスタンス
+    std::unique_ptr<SudokuOutStream> pSudokuOutStream_;  // 結果出力先
 public:
     void setUp();
     void tearDown();
-
 protected:
     void test_Print();
 
@@ -130,12 +124,12 @@ void SudokuSolverTest::verifyTestVector(void) {
 template <>
 void SudokuSolverCommonTest<SudokuSolver, SudokuCellCandidates>::checkCells(SudokuSolver *pInst, const SudokuIndex* expectedIndexes) {
     for(size_t i=0;i<arraySizeof(pInst->map_.cells_);++i) {
-        SudokuIndex index = expectedIndexes[i];
+        const auto index = expectedIndexes[i];
         if (index == SudokuTestPattern::ConflictedCell) {
             continue;
         }
 
-        SudokuCellCandidates expected = SudokuCell::SudokuAllCandidates;
+        auto expected = SudokuCell::SudokuAllCandidates;
         if ((index >= 1) && (index <= 9)) {
             expected = SudokuTestCommon::ConvertToCandidate(index);
         }
@@ -153,14 +147,14 @@ void SudokuSolverCommonTest<SudokuSseSolver, SudokuSseElement>::checkCells(Sudok
     for(SudokuIndex y=0; y < Sudoku::SizeOfCellsPerGroup; ++y) {
         for(SudokuIndex x=0; x < Sudoku::SizeOfBoxesOnEdge; ++x) {
             SudokuSseElement regval = pInst->map_.xmmRegSet_.regVal_[regIndex--];
-            SudokuIndex i=Sudoku::SizeOfCellsOnBoxEdge;
+            auto i=Sudoku::SizeOfCellsOnBoxEdge;
             do {
                 --i;
                 SudokuSseElement actual = (regval >> (i * 9)) & 0x1ff;
-                SudokuIndex index = expectedIndexes[elementIndex++];
+                auto index = expectedIndexes[elementIndex++];
                 assert(elementIndex <= Sudoku::SizeOfAllCells);
                 if (index != SudokuTestPattern::ConflictedCell) {
-                    SudokuCellCandidates expected = SudokuCell::SudokuAllCandidates;
+                    auto expected = SudokuCell::SudokuAllCandidates;
                     if ((index >= 1) && (index <= 9)) {
                         expected = 1 << (index - 1);
                     }
@@ -184,46 +178,49 @@ void SudokuSolverCommonTest<SudokuSolver, SudokuCellCandidates>::CheckCells(Sudo
 
 // 各テスト・ケースの実行直前に呼ばれる
 void SudokuSolverTest::setUp() {
-    pSudokuOutStream_ = new SudokuOutStream();
-    pInstance_ = new SudokuSolver(SudokuTestPattern::NoBacktrackString, 0, pSudokuOutStream_);
-    pCommonTester_ = new SudokuSolverCommonTest<SudokuSolver, SudokuCellCandidates>(pInstance_);
+    pSudokuOutStream_ = decltype(pSudokuOutStream_)(new SudokuOutStream());
+    pInstance_ = decltype(pInstance_)(new SudokuSolver(SudokuTestPattern::NoBacktrackString, 0, pSudokuOutStream_.get()));
+    pCommonTester_ = decltype(pCommonTester_)(new SudokuSolverCommonTest<SudokuSolver, SudokuCellCandidates>(pInstance_));
 
     CPPUNIT_ASSERT_EQUAL(static_cast<int>(0), pInstance_->count_);
-    CPPUNIT_ASSERT(pSudokuOutStream_ == pInstance_->pSudokuOutStream_);
+    CPPUNIT_ASSERT(pSudokuOutStream_.get() == pInstance_->pSudokuOutStream_);
     return;
 }
 
 // 各テスト・ケースの実行直後に呼ばれる
 void SudokuSolverTest::tearDown() {
-    delete pCommonTester_;
-    delete pInstance_;
-    pInstance_ = 0;
-    delete pSudokuOutStream_;
-    pSudokuOutStream_ = 0;
+    assert(pCommonTester_);
+    assert(pInstance_);
+    assert(pSudokuOutStream_);
+    pCommonTester_.reset();
+
+    assert(pInstance_);
+    assert(pSudokuOutStream_);
+    pInstance_.reset();
+    pSudokuOutStream_.reset();
     return;
 }
 
 // これ以降はテスト・ケースの実装内容
 template <class TestedT, class CandidatesT>
-SudokuSolverCommonTest<TestedT, CandidatesT>::SudokuSolverCommonTest(TestedT* pInst) {
-    pInstance_ = pInst;
+SudokuSolverCommonTest<TestedT, CandidatesT>::SudokuSolverCommonTest(std::shared_ptr<TestedT>& pInst)
+    : pInstance_(pInst) {
     return;
 }
 
 template <class TestedT, class CandidatesT>
 SudokuSolverCommonTest<TestedT, CandidatesT>::~SudokuSolverCommonTest() {
-    pInstance_ = 0;
     return;
 }
 
 template <class TestedT, class CandidatesT>
 void SudokuSolverCommonTest<TestedT, CandidatesT>::test_Exec() {
-    for(size_t i=0; i<arraySizeof(SudokuTestPattern::testSet); ++i) {
+    for(const auto& test : SudokuTestPattern::testSet) {
         SudokuOutStream sudokuOutStream;  // SudokuSolverインスタンスの解体後に解体する
         {
-            TestedT inst(SudokuTestPattern::testSet[i].presetStr, 0, &sudokuOutStream, 0);
-            CPPUNIT_ASSERT_EQUAL(SudokuTestPattern::testSet[i].result, inst.Exec(true, false));
-            checkCells(&inst, SudokuTestPattern::testSet[i].resultNum);
+            TestedT inst(test.presetStr, 0, &sudokuOutStream, 0);
+            CPPUNIT_ASSERT_EQUAL(test.result, inst.Exec(true, false));
+            checkCells(&inst, test.resultNum);
             CPPUNIT_ASSERT(inst.count_>=1);
         }
     }
@@ -237,19 +234,20 @@ void SudokuSolverCommonTest<TestedT, CandidatesT>::test_PrintType(const char *pE
 
     // SetUpで設定したのだから成功するはず
     SudokuOutStream* pOstream = dynamic_cast<SudokuOutStream*>(pInstance_->pSudokuOutStream_);
-    const string actualstr = pOstream->str();
-    const string expectedstr(pExpectedStr);
+    assert(pOstream != nullptr);
+    const std::string actualstr = pOstream->str();
+    const std::string expectedstr(pExpectedStr);
     CPPUNIT_ASSERT(actualstr == expectedstr);
     return;
 }
 
 template <class TestedT, class CandidatesT>
 void SudokuSolverCommonTest<TestedT, CandidatesT>::test_solve() {
-    for(size_t i=0; i<arraySizeof(SudokuTestPattern::testSet); ++i) {
+    for(const auto& test : SudokuTestPattern::testSet) {
         SudokuOutStream sudokuOutStream;  // SudokuSolverインスタンスの解体後に解体する
         {
-            TestedT inst(SudokuTestPattern::testSet[i].presetStr, 0, &sudokuOutStream, 0);
-            CPPUNIT_ASSERT_EQUAL(SudokuTestPattern::testSet[i].result, inst.solve(inst.map_, true, false));
+            TestedT inst(test.presetStr, 0, &sudokuOutStream, 0);
+            CPPUNIT_ASSERT_EQUAL(test.result, inst.solve(inst.map_, true, false));
             CPPUNIT_ASSERT(inst.count_>=1);
         }
     }
@@ -269,11 +267,11 @@ bool SudokuSolverCommonTest<SudokuSseSolver, SudokuSseElement>::filterRetvalFill
 
 template <class TestedT, class CandidatesT>
 void SudokuSolverCommonTest<TestedT, CandidatesT>::test_fillCells() {
-    for(size_t i=0; i<arraySizeof(SudokuTestPattern::testSet); ++i) {
+    for(const auto& test : SudokuTestPattern::testSet) {
         SudokuOutStream sudokuOutStream;  // SudokuSolverインスタンスの解体後に解体する
         {
-            TestedT inst(SudokuTestPattern::testSet[i].presetStr, 0, &sudokuOutStream, 0);
-            CPPUNIT_ASSERT_EQUAL(filterRetvalFillCells(SudokuTestPattern::testSet[i].result), inst.fillCells(inst.map_, true, false));
+            TestedT inst(test.presetStr, 0, &sudokuOutStream, 0);
+            CPPUNIT_ASSERT_EQUAL(filterRetvalFillCells(test.result), inst.fillCells(inst.map_, true, false));
             CPPUNIT_ASSERT_EQUAL(static_cast<int>(1), inst.count_);
         }
     }
@@ -286,6 +284,8 @@ void SudokuSolverTest::test_Constructor() {
     for(size_t i=0; i<arraySizeof(SudokuTestPattern::testSet); ++i) {
         SudokuOutStream sudokuOutStream;  // SudokuSolverインスタンスの解体後に解体する
         {
+            // キャストする前に確認する
+            assert(arraySizeof(SudokuTestPattern::testSet) < std::numeric_limits<SudokuIndex>::max());
             SudokuSolver inst(SudokuTestPattern::testSet[i].presetStr, static_cast<SudokuIndex>(i), &sudokuOutStream);
             pCommonTester_->CheckCells(&inst, SudokuTestPattern::testSet[i].presetNum);
             CPPUNIT_ASSERT(&sudokuOutStream == inst.pSudokuOutStream_);
@@ -293,9 +293,8 @@ void SudokuSolverTest::test_Constructor() {
     }
 
     SudokuOutStream sudokuOutStream;
-    const string ShortStr =  "123456789\n987...32";
+    const std::string ShortStr =  "123456789\n987...32";
     SudokuSolver inst(ShortStr, 0, &sudokuOutStream);
-
     return;
 }
 
@@ -321,22 +320,26 @@ void SudokuSolverTest::test_fillCells() {
 
 // 各テスト・ケースの実行直前に呼ばれる
 void SudokuSseSolverTest::setUp() {
-    pSudokuOutStream_ = new SudokuOutStream();
-    pInstance_ = new SudokuSseSolver(SudokuTestPattern::NoBacktrackString, pSudokuOutStream_, 0);
-    pCommonTester_ = new SudokuSolverCommonTest<SudokuSseSolver, SudokuSseElement>(pInstance_);
+    pSudokuOutStream_ = decltype(pSudokuOutStream_)(new SudokuOutStream());
+    pInstance_ = decltype(pInstance_)(new SudokuSseSolver(SudokuTestPattern::NoBacktrackString, pSudokuOutStream_.get(), 0));
+    pCommonTester_ = decltype(pCommonTester_)(new SudokuSolverCommonTest<SudokuSseSolver, SudokuSseElement>(pInstance_));
 
     CPPUNIT_ASSERT_EQUAL(static_cast<int>(0), pInstance_->count_);
-    CPPUNIT_ASSERT(pSudokuOutStream_ == pInstance_->pSudokuOutStream_);
+    CPPUNIT_ASSERT(pSudokuOutStream_.get() == pInstance_->pSudokuOutStream_);
     return;
 }
 
 // 各テスト・ケースの実行直後に呼ばれる
 void SudokuSseSolverTest::tearDown() {
-    delete pCommonTester_;
-    delete pInstance_;
-    pInstance_ = 0;
-    delete pSudokuOutStream_;
-    pSudokuOutStream_ = 0;
+    assert(pCommonTester_);
+    assert(pInstance_);
+    assert(pSudokuOutStream_);
+    pCommonTester_.reset();
+
+    assert(pInstance_);
+    assert(pSudokuOutStream_);
+    pInstance_.reset();
+    pSudokuOutStream_.reset();
     return;
 }
 
@@ -351,8 +354,9 @@ void SudokuSseSolverTest::test_Exec() {
 }
 
 void SudokuSseSolverTest::test_Enumerate() {
-    const std::string presetStr("123456789456789123789123456295874631.............................................");
-    SudokuSseSolver solver(presetStr, pSudokuOutStream_, 1);
+    const std::string presetStr = "123456789456789123789123456295874631.............................................";
+    SudokuSseSolver solver(presetStr, pSudokuOutStream_.get(), 1);
+    static_assert(sizeof(sudokuXmmPrintFunc) == sizeof(&PrintPattern), "Unexpected uintptr_t size");
     sudokuXmmPrintFunc = reinterpret_cast<uintptr_t>(&PrintPattern);
     solver.Enumerate();
 
@@ -398,8 +402,8 @@ void SudokuSseSolverTest::test_fillCells() {
 
 // 各テスト・ケースの実行直前に呼ばれる
 void SudokuSseSearchStateTest::setUp() {
-    pSudokuOutStream_ = new SudokuOutStream();
-    pInstance_ = new SudokuSseSearchState();
+    pSudokuOutStream_ = decltype(pSudokuOutStream_)(new SudokuOutStream());
+    pInstance_ = decltype(pInstance_)(new SudokuSseSearchState());
 
     CPPUNIT_ASSERT_EQUAL(static_cast<uint64_t>(0), pInstance_->member_.uniqueCandidate_);
     CPPUNIT_ASSERT_EQUAL(static_cast<uint64_t>(0), pInstance_->member_.candidateCnt_);
@@ -411,22 +415,23 @@ void SudokuSseSearchStateTest::setUp() {
 
 // 各テスト・ケースの実行直後に呼ばれる
 void SudokuSseSearchStateTest::tearDown() {
-    delete pInstance_;
-    pInstance_ = 0;
-    delete pSudokuOutStream_;
-    pSudokuOutStream_ = 0;
+    assert(pInstance_);
+    assert(pSudokuOutStream_);
+    pInstance_.reset();
+    pSudokuOutStream_.reset();
     return;
 }
 
 void SudokuSseSearchStateTest::test_Print() {
-    const SudokuSseSearchStateMember member = {64, 4, 3, 2, 1};
+    constexpr SudokuSseSearchStateMember member {64, 4, 3, 2, 1};
     pInstance_->member_ = member;
-    pInstance_->Print(pSudokuOutStream_);
+    pInstance_->Print(pSudokuOutStream_.get());
 
     // SetUpで設定したのだから成功するはず
-    SudokuOutStream* pOstream = dynamic_cast<SudokuOutStream*>(pSudokuOutStream_);
-    const string actualstr = pOstream->str();
-    string expectedstr("fill unique candidate 64, cnt 4, row 3, in 2, out 1\n");
+    SudokuOutStream* pOstream = dynamic_cast<SudokuOutStream*>(pSudokuOutStream_.get());
+    assert(pOstream != nullptr);
+    const std::string actualstr = pOstream->str();
+    std::string expectedstr("fill unique candidate 64, cnt 4, row 3, in 2, out 1\n");
     CPPUNIT_ASSERT(expectedstr == actualstr);
     return;
 }

@@ -1,11 +1,12 @@
 // SSE 4.2 ASM部テスト
-// Copyright (C) 2012-2013 Zettsu Tatsuya
+// Copyright (C) 2012-2015 Zettsu Tatsuya
 //
 // クラス定義は下記から流用
 // http://www.atmarkit.co.jp/fdotnet/cpptest/cpptest02/cpptest02_03.html
 
 #include <cppunit/extensions/HelperMacros.h>
 #include <cassert>
+#include <memory>
 #include "sudoku.h"
 #include "sudokutest.h"
 
@@ -21,6 +22,7 @@ class SudokuSseEnumeratorMapTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST(test_GetInstance);
     CPPUNIT_TEST(test_powerOfTwoPlusOne);
     CPPUNIT_TEST_SUITE_END();
+
 public:
     void setUp();
     void tearDown();
@@ -35,8 +37,8 @@ protected:
     void test_GetInstance();
     void test_powerOfTwoPlusOne();
 private:
-    SudokuSseEnumeratorMap* pInstance_;
-    SudokuOutStream* pSudokuOutStream_;
+    std::unique_ptr<SudokuSseEnumeratorMap> pInstance_;
+    std::unique_ptr<SudokuOutStream> pSudokuOutStream_;
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION( SudokuSseEnumeratorMapTest );
@@ -74,12 +76,9 @@ class SudokuSseTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST(test_FastSetUniqueCandidatesAtCellSub);
     CPPUNIT_TEST_SUITE_END();
 
-protected:
-
 public:
     void setUp();
     void tearDown();
-
 protected:
     void test_MaskLower32bit();
     void test_PowerOf2();
@@ -121,15 +120,15 @@ private:
 CPPUNIT_TEST_SUITE_REGISTRATION( SudokuSseTest );
 
 void SudokuSseEnumeratorMapTest::setUp() {
-    pSudokuOutStream_ = new SudokuOutStream();
-    pInstance_ = new SudokuSseEnumeratorMap(pSudokuOutStream_);
+    pSudokuOutStream_ = decltype(pSudokuOutStream_)(new SudokuOutStream());
+    pInstance_ = decltype(pInstance_)(new SudokuSseEnumeratorMap(pSudokuOutStream_.get()));
 }
 
 void SudokuSseEnumeratorMapTest::tearDown() {
-    delete pInstance_;
-    pInstance_ = 0;
-    delete pSudokuOutStream_;
-    pSudokuOutStream_ = 0;
+    assert(pInstance_);
+    assert(pSudokuOutStream_);
+    pInstance_.reset();
+    pSudokuOutStream_.reset();
 }
 
 void SudokuSseEnumeratorMapTest::test_Constructor() {
@@ -137,37 +136,37 @@ void SudokuSseEnumeratorMapTest::test_Constructor() {
         CPPUNIT_ASSERT_EQUAL(static_cast<SudokuCellCandidates>(0), pInstance_->rightBottomElement_);
         CPPUNIT_ASSERT_EQUAL(static_cast<gRegister>(0), pInstance_->firstCell_);
         CPPUNIT_ASSERT_EQUAL(static_cast<SudokuPatternCount>(0), pInstance_->patternNumber_);
-        CPPUNIT_ASSERT_EQUAL(pInstance_, pInstance_->pInstance_);
-        for(size_t i=0; i <arraySizeof(pInstance_->xmmRegSet_.regVal_); ++i) {
-            CPPUNIT_ASSERT_EQUAL(static_cast<SudokuSseElement>(0), pInstance_->xmmRegSet_.regVal_[i]);
+        CPPUNIT_ASSERT_EQUAL(pInstance_.get(), pInstance_->pInstance_);
+
+        for(const auto& regVal : pInstance_->xmmRegSet_.regVal_) {
+            CPPUNIT_ASSERT_EQUAL(static_cast<SudokuSseElement>(0), regVal);
         }
 
-        uint64_t actual = sudokuXmmPrintAllCandidate;
-        uint64_t expected = 0ull;
+        const uint64_t actual = sudokuXmmPrintAllCandidate;
+        constexpr decltype(actual) expected = 0ull;
         CPPUNIT_ASSERT_EQUAL(expected, actual);
     } while(0);
 
-    CPPUNIT_ASSERT_EQUAL(pInstance_, SudokuSseEnumeratorMap::pInstance_);
+    CPPUNIT_ASSERT_EQUAL(pInstance_.get(), SudokuSseEnumeratorMap::pInstance_);
 }
 
 void SudokuSseEnumeratorMapTest::test_SetToPrint() {
-    const SudokuPatternCount testSet[] = {0, 1, 0xffffffff, 0x1000000000ull, 0xffffffffffffffffull};
+    constexpr SudokuPatternCount testSet[] {0, 1, 0xffffffff, 0x1000000000ull, 0xffffffffffffffffull};
 
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        SudokuPatternCount expected = testSet[i];
+    for(const auto& expected : testSet) {
         pInstance_->SetToPrint(expected);
-        SudokuPatternCount actual = sudokuXmmPrintAllCandidate;
+        const auto actual = sudokuXmmPrintAllCandidate;
         CPPUNIT_ASSERT_EQUAL(expected, actual);
     }
 }
 
 void SudokuSseEnumeratorMapTest::test_presetCell() {
-    struct testcase {
+    struct TestSet {
         size_t pos;
         size_t shift;
     };
 
-    const testcase testSet[] = {
+    constexpr TestSet testSet[] {
         {4,  0}, {4,  16}, {5,  0}, {5,  16}, {6,  0}, {6,  16}, {7,  0}, {7,  16}, {40, 0},
         {8,  0}, {8,  16}, {9,  0}, {9,  16}, {10, 0}, {10, 16}, {11, 0}, {11, 16}, {40, 16},
         {12, 0}, {12, 16}, {13, 0}, {13, 16}, {14, 0}, {14, 16}, {15, 0}, {15, 16}, {41, 0},
@@ -180,7 +179,7 @@ void SudokuSseEnumeratorMapTest::test_presetCell() {
 
     for(SudokuLoopIndex num=0; num<=Sudoku::SizeOfCandidates; ++num) {
         for(SudokuLoopIndex cellIndex=0; cellIndex<arraySizeof(testSet); ++cellIndex) {
-            const testcase test = testSet[cellIndex];
+            const auto test = testSet[cellIndex];
             SudokuSseElement expected = (num) ? (1 << (test.shift + num - 1)) : 0;
 
             SudokuOutStream sudokuOutStream;
@@ -205,7 +204,7 @@ struct EnumeratorTestCase {
     const char* expctedPrintSolved;
 };
 
-const EnumeratorTestCase EnumeratorTestCaseSet[] = {
+constexpr EnumeratorTestCase EnumeratorTestCaseSet[] {
     {"", 0, 0, {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
                 0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
                 0, 0, 0, 0,  0, 0, 0, 0},
@@ -240,17 +239,16 @@ const EnumeratorTestCase EnumeratorTestCaseSet[] = {
 };
 
 void SudokuSseEnumeratorMapTest::test_Preset() {
-    for(size_t i=0; i <arraySizeof(EnumeratorTestCaseSet); ++i) {
+    for(const auto& test : EnumeratorTestCaseSet) {
         SudokuOutStream sudokuOutStream;
         SudokuSseEnumeratorMap map(&sudokuOutStream);
 
-        EnumeratorTestCase test = EnumeratorTestCaseSet[i];
         map.Preset(test.arg);
         CPPUNIT_ASSERT_EQUAL(test.firstCell, map.firstCell_);
         CPPUNIT_ASSERT_EQUAL(test.rightBottomElement, map.rightBottomElement_);
         CPPUNIT_ASSERT(sizeof(test.expextedRegVal) < sizeof(map.xmmRegSet_));
 
-        const size_t offset = SudokuSseEnumeratorMap::InitialRegisterNum * SudokuSse::RegisterWordCnt;
+        constexpr size_t offset = SudokuSseEnumeratorMap::InitialRegisterNum * SudokuSse::RegisterWordCnt;
         for(size_t j=0; j <arraySizeof(test.expextedRegVal); ++j) {
             if (j < sizeof(map.xmmRegSet_)) {
                 CPPUNIT_ASSERT_EQUAL(test.expextedRegVal[j], map.xmmRegSet_.regVal_[j + offset]);
@@ -260,19 +258,14 @@ void SudokuSseEnumeratorMapTest::test_Preset() {
 }
 
 void SudokuSseEnumeratorMapTest::test_Print() {
-    for(size_t i=0; i <arraySizeof(EnumeratorTestCaseSet); ++i) {
+    for(const auto& test : EnumeratorTestCaseSet) {
         SudokuOutStream sudokuOutStream;
         SudokuSseEnumeratorMap map(&sudokuOutStream);
-        EnumeratorTestCase test = EnumeratorTestCaseSet[i];
-
         XmmRegisterSet xmmRegSet;
         ::memset(&xmmRegSet, 0, sizeof(xmmRegSet));
 
-        CPPUNIT_ASSERT(sizeof(test.expextedRegVal) < sizeof(map.xmmRegSet_));
-        if (sizeof(test.expextedRegVal) >= sizeof(map.xmmRegSet_)) {
-            break;
-        }
-
+        static_assert(sizeof(test.expextedRegVal) < sizeof(map.xmmRegSet_),
+                      "Unexpected test.expextedRegVal and map.xmmRegSet_ size");
         ::memmove(&(xmmRegSet.regXmmVal_[SudokuSseEnumeratorMap::InitialRegisterNum]),
                   test.expextedRegVal, sizeof(test.expextedRegVal));
         sudokuXmmRightBottomSolved = test.rightBottomElement;
@@ -283,7 +276,7 @@ void SudokuSseEnumeratorMapTest::test_Print() {
         CPPUNIT_ASSERT(expected == actual);
 
         map.rightBottomElement_ = test.rightBottomElement;
-        std::string::size_type pos = expected.find_last_of(':');
+        auto pos = expected.find_last_of(':');
         CPPUNIT_ASSERT(pos != std::string::npos);
         if (pos == std::string::npos) {
             continue;
@@ -308,7 +301,7 @@ void SudokuSseEnumeratorMapTest::test_Print() {
 }
 
 void SudokuSseEnumeratorMapTest::test_PrintFromAsm() {
-    const SudokuPatternCount maxCount = 100;
+    constexpr SudokuPatternCount maxCount = 100;
     XmmRegisterSet xmmRegSet;
 
     for(SudokuPatternCount i = maxCount - 1; i < maxCount + 2; ++i) {
@@ -326,18 +319,13 @@ void SudokuSseEnumeratorMapTest::test_PrintFromAsm() {
         }
     }
 
-    for(size_t i=0; i <arraySizeof(EnumeratorTestCaseSet); ++i) {
+    for(const auto& test : EnumeratorTestCaseSet) {
         SudokuOutStream sudokuOutStream;
         SudokuSseEnumeratorMap map(&sudokuOutStream);
         map.patternNumber_ = 9875;
         sudokuXmmPrintAllCandidate = 10000;
 
-        EnumeratorTestCase test = EnumeratorTestCaseSet[i];
-
-        CPPUNIT_ASSERT(sizeof(test.expextedRegVal) < sizeof(xmmRegSet));
-        if (sizeof(test.expextedRegVal) >= sizeof(xmmRegSet)) {
-            break;
-        }
+        static_assert(sizeof(test.expextedRegVal) < sizeof(xmmRegSet), "Unexpected test.expextedRegVal and xmmRegSet");
         ::memmove(&(xmmRegSet.regXmmVal_[SudokuSseEnumeratorMap::InitialRegisterNum]),
                   test.expextedRegVal, sizeof(test.expextedRegVal));
         sudokuXmmRightBottomSolved = test.rightBottomElement;
@@ -351,35 +339,34 @@ void SudokuSseEnumeratorMapTest::test_PrintFromAsm() {
 }
 
 void SudokuSseEnumeratorMapTest::test_Enumerate() {
-    const SudokuPatternCount expectedSet[] = {1, 1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,2,2,4, 4,4,4,4,8,12,48,96,288};
+    constexpr SudokuPatternCount expectedSet[] {1, 1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,2,2,4, 4,4,4,4,8,12,48,96,288};
     std::string presetStr = "835126749416397258792548631643912875981754362527683194269835417178469523354271986";
 
-    for(size_t i=0; i <arraySizeof(expectedSet); ++i) {
+    for(const auto& expected : expectedSet) {
         SudokuOutStream sudokuOutStream;
         SudokuSseEnumeratorMap map(&sudokuOutStream);
         map.Preset(presetStr);
-        SudokuPatternCount expected = expectedSet[i];
         CPPUNIT_ASSERT_EQUAL(expected, map.Enumerate());
         presetStr.erase(presetStr.size() - 1);
     }
 }
 
 void SudokuSseEnumeratorMapTest::test_GetInstance() {
-    CPPUNIT_ASSERT_EQUAL(pInstance_, SudokuSseEnumeratorMap::GetInstance());
+    CPPUNIT_ASSERT_EQUAL(pInstance_.get(), SudokuSseEnumeratorMap::GetInstance());
 }
 
 void SudokuSseEnumeratorMapTest::test_powerOfTwoPlusOne() {
-    struct testcase {
+    struct TestSet {
         SudokuSseElement arg;
         size_t expected;
     };
 
-    const testcase testSet[] = {
+    constexpr TestSet testSet[] {
         {1, 1}, {2, 2}, {4, 3}, {8, 4},
         {0x10, 5}, {0x20, 6}, {0x40, 7}, {0x80, 8}, {0x100, 9}};
 
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        CPPUNIT_ASSERT_EQUAL(testSet[i].expected, pInstance_->powerOfTwoPlusOne(testSet[i].arg));
+    for(const auto& test : testSet) {
+        CPPUNIT_ASSERT_EQUAL(test.expected, pInstance_->powerOfTwoPlusOne(test.arg));
     }
 }
 
@@ -396,17 +383,17 @@ void SudokuSseTest::tearDown()
 }
 
 // これ以降はテスト・ケースの実装内容
-enum shiftpos {
-    POSMIN,
-    POS0 = POSMIN,
-    POS1,
-    POS2,
-    POSCNT,
+enum class Shiftpos {
+    SHIFT_POSMIN,
+    SHIFT_POS0 = SHIFT_POSMIN,
+    SHIFT_POS1,
+    SHIFT_POS2,
+    SHIFT_POSCNT,
 };
 
 gRegister SudokuSseTest::rotateRowPart(gRegister arg)
 {
-    gRegister argleftmost = (arg >> 18) & 0x1ff;
+    const gRegister argleftmost = (arg >> 18) & 0x1ff;
     return ((arg & 0x3ffff) << 9) | argleftmost;
 }
 
@@ -425,42 +412,41 @@ void SudokuSseTest::rotateRow(uint64_t row[2])
 
 void SudokuSseTest::test_MaskLower32bit()
 {
-    struct testcase {
+    struct TestSet {
         gRegister arg;
         gRegister result;
         gRegister resulthigh;
         gRegister resultlow;
     };
 
-    enum func {
+    enum class Func {
         MINFUNC,
         MASK = MINFUNC,
         SPLIT,
         MAXFUNC,
     };
 
-    const testcase testSet[] = {
+    constexpr TestSet testSet[] {
         {0, 0},
         {0x87654321, 0x87654321, 0, 0x87654321},
         {0x1234567800000000, 0, 0x12345678, 0},
         {0xA1B2C3D4E5F67890, 0xE5F67890, 0xA1B2C3D4, 0xE5F67890}
     };
 
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        for(int e=static_cast<int>(MINFUNC); e<MAXFUNC; ++e) {
-            const testcase test = testSet[i];
+    for(const auto& test : testSet) {
+        for(Func e=Func::MINFUNC; e<Func::MAXFUNC; e=static_cast<Func>(static_cast<int>(e)+1)) {
             gRegister arg = test.arg;
             gRegister result = 0;
             gRegister resulthigh;
             gRegister resultlow;
             switch(e) {
-            case MASK:
+            case Func::MASK:
                 asm volatile (
                     "call testMaskLower32bit\n\t"
                     :"=b"(result):"a"(arg));
                 CPPUNIT_ASSERT_EQUAL(test.result, result);
                 break;
-            case SPLIT:
+            case Func::SPLIT:
                 asm volatile (
                     "call testSplitRowLowParts\n\t"
                     :"=b"(resulthigh),"=c"(resultlow):"a"(arg));
@@ -502,8 +488,8 @@ void SudokuSseTest::callPowerOf2orAll1(gRegister& arg, gRegister& result)
 
 void SudokuSseTest::test_PowerOf2()
 {
-    const gRegister expectedAll0 = 0;
-    const gRegister expectedAll1 = ~0;
+    constexpr gRegister expectedAll0 = 0;
+    constexpr gRegister expectedAll1 = ~0;
     gRegister arg = 0;
     gRegister result = 0;
     gRegister expected = 1;
@@ -548,12 +534,12 @@ void SudokuSseTest::test_PowerOf2()
 
 void SudokuSseTest::test_MergeThreeElements()
 {
-    struct testcase {
+    struct TestSet {
         gRegister arg;
         gRegister expected;
     };
 
-    const testcase testSet[] = {
+    constexpr TestSet testSet[] {
         {0, 0},
         {0x1, 0x1},
         {0x200, 0x1},
@@ -562,9 +548,9 @@ void SudokuSseTest::test_MergeThreeElements()
         {0x4020000, 0x100},
         {0x3c0000f, 0xff},
         {0x7ffffff, 0x1ff}};
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        const testcase test = testSet[i];
-        gRegister arg = test.arg;
+
+    for(const auto& test : testSet) {
+        const gRegister arg = test.arg;
         gRegister result = 0;
         asm volatile (
             "call testMergeThreeElements\n\t"
@@ -581,7 +567,7 @@ void SudokuSseTest::test_MergeThreeElements()
 
 void SudokuSseTest::test_OrThreeXmmRegs()
 {
-    struct testcase {
+    struct TestSet {
         union {
             struct {
                 uint64_t  arg[6];
@@ -591,13 +577,12 @@ void SudokuSseTest::test_OrThreeXmmRegs()
         };
     };
 
-    const testcase testSet[] = {
+    constexpr TestSet testSet[] {
         {{{{0, 0, 0, 0, 0, 0}, {0, 0}}}},
         {{{{0x76543210, 1, 0xfecdba9800000000, 0, 0xf, 0x123456789abcdef0}, {0xfecdba987654321f, 0x123456789abcdef1}}}},
     };
 
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        const testcase test = testSet[i];
+    for(const auto& test : testSet) {
         xmmRegister xactual;
         asm volatile (
             "xorps   xmm1, xmm1\n\t"
@@ -608,8 +593,8 @@ void SudokuSseTest::test_OrThreeXmmRegs()
             "movdqa  xmmword ptr [%1], xmm1\n\t"
             ::"r"(test.arg),"r"(&xactual));
 
-        int actual = memcmp(test.expected, &xactual, sizeof(xactual));
-        int expected = 0;
+        auto actual = memcmp(test.expected, &xactual, sizeof(xactual));
+        constexpr decltype(actual) expected = 0;
         CPPUNIT_ASSERT_EQUAL(expected, actual);
     }
 
@@ -618,13 +603,13 @@ void SudokuSseTest::test_OrThreeXmmRegs()
 
 void SudokuSseTest::test_FilterUniqueCandidatesInRowPartSub()
 {
-    struct testcase {
+    struct TestSet {
         gRegister bitmask;
         gRegister src;
         gRegister expected;
     };
 
-    const testcase testSet[] = {
+    constexpr TestSet testSet[] {
         {0x1ff, 0, 0},
         {0x1ff, 0x300, 0x300},
         {0x1ff, 0xc08, 0x8},
@@ -634,11 +619,11 @@ void SudokuSseTest::test_FilterUniqueCandidatesInRowPartSub()
         {0x1ff << 9, 0x140804, 0x804},
         {0x1ff << 9, 0x400080, 0x400080},
         {0x1ff << 9, 0x600100, 0x100}};
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        const testcase test = testSet[i];
-        gRegister bitmask = test.bitmask;
-        gRegister src = test.src;
-        gRegister preset = src & (~(bitmask << 9));
+
+    for(const auto& test : testSet) {
+        const gRegister bitmask = test.bitmask;
+        const gRegister src = test.src;
+        const gRegister preset = src & (~(bitmask << 9));
         gRegister result = 0;
         asm volatile (
             "call testFilterUniqueCandidatesInRowPartSub\n\t"
@@ -651,20 +636,20 @@ void SudokuSseTest::test_FilterUniqueCandidatesInRowPartSub()
 
 void SudokuSseTest::test_FilterUniqueCandidatesInRowPart()
 {
-    struct testcase {
+    struct TestSet {
         gRegister arg;
         gRegister expected;
     };
 
-    const testcase testSet[] = {
+    constexpr TestSet testSet[] {
         {0, 0},
         {0x40201, 0x40201},
         {0x402010, 0x402010},
         {0x4020100, 0x4020100},
         {0x1101010, 0x1010},
         {0x1011011, 0x1000000}};
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        const testcase test = testSet[i];
+
+    for(const auto& test : testSet) {
         gRegister arg = test.arg;
         gRegister expected = test.expected;
         gRegister result = 0;
@@ -685,13 +670,13 @@ void SudokuSseTest::test_FilterUniqueCandidatesInRowPart()
 
 void SudokuSseTest::test_CollectUniqueCandidatesInRowPart()
 {
-    struct testcase {
+    struct TestSet {
         gRegister arg;
         gRegister sum;
         gRegister haszero;
     };
 
-    const testcase testSet[] = {
+    constexpr TestSet testSet[] {
         {0, 0, 1},
         {0x200100, 0x108, 1},
         {0x200800, 0xc, 1},
@@ -702,9 +687,9 @@ void SudokuSseTest::test_CollectUniqueCandidatesInRowPart()
         {0x004c010, 0x11,  0},
         {0x4000210, 0x111, 0},
     };
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        const testcase test = testSet[i];
-        gRegister arg = test.arg;
+
+    for(const auto& test : testSet) {
+        const gRegister arg = test.arg;
         gRegister sum = 0;
         gRegister haszero = 0;
         asm volatile (
@@ -720,7 +705,7 @@ void SudokuSseTest::test_CollectUniqueCandidatesInRowPart()
 
 void SudokuSseTest::test_CollectUniqueCandidatesInLine()
 {
-    struct testcase {
+    struct TestSet {
         gRegister   arghigh;
         gRegister   arglow;
         gRegister   sum;
@@ -729,14 +714,14 @@ void SudokuSseTest::test_CollectUniqueCandidatesInLine()
         uint64_t    aborted;
     };
 
-    enum func {
+    enum class Func {
         MINFUNC,
         COLLECT = MINFUNC,
         FILTER,
         MAXFUNC,
     };
 
-    const testcase testSet[] = {
+    constexpr TestSet testSet[] {
         {0, 0, 0, 0, 0, 1},
         {0x7ffffff, 0x7fffff07fffe01,         1, 0, 0x1,  0},
         {0x7ffffff, 0x7fffff07fc0401,       0x3, 0, 0x401,  0},
@@ -751,20 +736,23 @@ void SudokuSseTest::test_CollectUniqueCandidatesInLine()
         {0x4010040, 0x80200f003c1e0f,  0x1f0, 0x4010040, 0x80200000000000, 0},
         {0x4010040, 0x802000003c1e0f,  0x1f0, 0x4010040, 0x80200000000000, 1},
     };
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        for(int e=static_cast<int>(MINFUNC); e<MAXFUNC; ++e) {
-            const testcase test = testSet[i];
+
+    for(const auto& test : testSet) {
+        for(Func e=Func::MINFUNC; e<Func::MAXFUNC; e=static_cast<Func>(static_cast<int>(e)+1)) {
             xmmRegister arg;
+            static_assert(sizeof(arg) == (sizeof(test.arglow) + sizeof(test.arghigh)),
+                          "Unexpected xmmRegister size");
             *(reinterpret_cast<gRegister*>(&arg)) = test.arglow;
             *(reinterpret_cast<gRegister*>(&arg) + 1) = test.arghigh;
+
             gRegister sum = 0;
             xmmRegister result;
-            uint64_t actual;
+            uint64_t  actual;
             gRegister resulthigh;
             gRegister resultlow;
 
             switch(e) {
-            case COLLECT:
+            case Func::COLLECT:
                 asm volatile (
                     "movdqa  xmm1, xmmword ptr [%0]\n\t"
                     "call testCollectUniqueCandidatesInLine\n\t"
@@ -773,14 +761,17 @@ void SudokuSseTest::test_CollectUniqueCandidatesInLine()
                 CPPUNIT_ASSERT_EQUAL(test.sum, sum);
                 CPPUNIT_ASSERT_EQUAL(test.aborted, actual);
                 break;
-            case FILTER:
+            case Func::FILTER:
                 asm volatile (
                     "movdqa  xmm1, xmmword ptr [%1]\n\t"
                     "call testFilterUniqueCandidatesInLine\n\t"
                     "movdqa  xmmword ptr [%0], xmm14\n\t"
                     ::"r"(&result),"r"(&arg):"r8","r9","r10","r11","r12","r13","r14","r15");
+                static_assert(sizeof(result) == (sizeof(resulthigh) + sizeof(resultlow)),
+                              "Unexpected xmmRegister size");
                 resulthigh = *(reinterpret_cast<gRegister*>(&result) + 1);
                 resultlow = *(reinterpret_cast<gRegister*>(&result));
+
                 CPPUNIT_ASSERT_EQUAL(test.resulthigh, resulthigh);
                 CPPUNIT_ASSERT_EQUAL(test.resultlow, resultlow);
                 break;
@@ -795,18 +786,18 @@ void SudokuSseTest::test_CollectUniqueCandidatesInLine()
 
 void SudokuSseTest::test_CollectUniqueCandidatesInThreeLine()
 {
-    struct testcase {
+    struct TestSet {
         uint64_t  arg[6];
         uint64_t  expected[2];
     };
 
-    const testcase testSet[] = {
+    constexpr TestSet testSet[] {
         {{0, 0, 0, 0, 0, 0}, {0, 0}},
         {{0x7ffffff07ffffff, 0x100401, 0x7ffffff00804008, 0x7ffffff, 0x402010007ffffff}, {0x402010000804008, 0x100401}},
         {{0x3f9fcfe03f9fcfe, 0x4000000, 0x3f9fcfe00000001, 0x3f9fcfe, 0x3f9fcfe03f9fcfe, 0x3f9fcfe}, {1, 0x4000000}}
     };
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        const testcase test = testSet[i];
+
+    for(const auto& test : testSet) {
         xmmRegister xmmreg[4];
         uint64_t    actual[2];
 
@@ -820,7 +811,7 @@ void SudokuSseTest::test_CollectUniqueCandidatesInThreeLine()
             "movdqa  xmmword ptr [%0+48], xmm10\n\t"
             ::"r"(xmmreg):"r8","r9","r10","r11","r12","r13","r14","r15");
 
-        assert(sizeof(actual) >= sizeof(xmmreg[3]));
+        static_assert(sizeof(actual) >= sizeof(xmmreg[3]), "Unexpected actual and xmmreg[] size");
         memmove(actual, &(xmmreg[3]), sizeof(actual));
         CPPUNIT_ASSERT_EQUAL(test.expected[0], actual[0]);
         CPPUNIT_ASSERT_EQUAL(test.expected[1], actual[1]);
@@ -831,7 +822,7 @@ void SudokuSseTest::test_CollectUniqueCandidatesInThreeLine()
 
 void SudokuSseTest::test_SelectRowParts()
 {
-    struct testcase {
+    struct TestSet {
         gRegister   arghigh;
         gRegister   arglow;
         gRegister   resultrowpart2;
@@ -842,7 +833,7 @@ void SudokuSseTest::test_SelectRowParts()
         gRegister   iszero;
     };
 
-    enum func {
+    enum class Func {
         MINFUNC,
         SELECT0 = MINFUNC,
         SELECT1,
@@ -851,17 +842,19 @@ void SudokuSseTest::test_SelectRowParts()
         MAXFUNC,
     };
 
-    const testcase testSet[] = {
+    constexpr TestSet testSet[] {
         {0, 0, 0, 0, 0, 0, 0, 0},
         {0x7ffffff, 0x7ffffff07ffffff,   0x7ffffff, 0x7ffffff, 0x7ffffff, 0x7ffffff, 0x7ffffff07ffffff, 0},
         {0x4010040, 0x80200800100401, 0x4010040, 0x802008, 0x100401, 0x4010040, 0x80200800100401, 1},
         {0x4010040, 0x80200f003c1e0f, 0x4010040, 0x80200f, 0x3c1e0f, 0x4010040, 0x80200f003c1e0f, 0},
         {0x4010040, 0x802000003c1e0f, 0x4010040, 0x802000, 0x3c1e0f, 0x4010040, 0x802000003c1e0f, 0},
     };
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        for(int e=static_cast<int>(MINFUNC); e<MAXFUNC; ++e) {
-            const testcase test = testSet[i];
+
+    for(const auto& test : testSet) {
+        for(Func e=Func::MINFUNC; e<Func::MAXFUNC; e=static_cast<Func>(static_cast<int>(e)+1)) {
             xmmRegister arg;
+            static_assert(sizeof(arg) == (sizeof(test.arglow) + sizeof(test.arghigh)),
+                          "Unexpected xmmRegister size");
             *(reinterpret_cast<gRegister*>(&arg)) = test.arglow;
             *(reinterpret_cast<gRegister*>(&arg) + 1) = test.arghigh;
             gRegister   resultrowpart;
@@ -870,28 +863,28 @@ void SudokuSseTest::test_SelectRowParts()
             gRegister   iszero;
 
             switch(e) {
-            case SELECT0:
+            case Func::SELECT0:
                 asm volatile (
                     "movdqa  xmm1, xmmword ptr [%0]\n\t"
                     "call testSelectRowParts0\n\t"
                     :"=a"(resultrowpart):"r"(&arg):"r15");
                 CPPUNIT_ASSERT_EQUAL(test.resultrowpart0, resultrowpart);
                 break;
-            case SELECT1:
+            case Func::SELECT1:
                 asm volatile (
                     "movdqa  xmm1, xmmword ptr [%0]\n\t"
                     "call testSelectRowParts1\n\t"
                     :"=a"(resultrowpart):"r"(&arg):"r15");
                 CPPUNIT_ASSERT_EQUAL(test.resultrowpart1, resultrowpart);
                 break;
-            case SELECT2:
+            case Func::SELECT2:
                 asm volatile (
                     "movdqa  xmm1, xmmword ptr [%0]\n\t"
                     "call testSelectRowParts2\n\t"
                     :"=a"(resultrowpart):"r"(&arg):"r15");
                 CPPUNIT_ASSERT_EQUAL(test.resultrowpart2, resultrowpart);
                 break;
-            case COUNT:
+            case Func::COUNT:
                 asm volatile (
                     "movdqa  xmm1, xmmword ptr [%0]\n\t"
                     "call testSelectRowAndCount\n\t"
@@ -911,14 +904,14 @@ void SudokuSseTest::test_SelectRowParts()
 
 void SudokuSseTest::test_SelectElementInRowParts()
 {
-    struct testcase {
+    struct TestSet {
         gRegister   arg;
         gRegister   result2;
         gRegister   result1;
         gRegister   result0;
     };
 
-    enum func {
+    enum class Func {
         MINFUNC,
         SELECT0 = MINFUNC,
         SELECT1,
@@ -926,33 +919,33 @@ void SudokuSseTest::test_SelectElementInRowParts()
         MAXFUNC,
     };
 
-    const testcase testSet[] = {
+    constexpr TestSet testSet[] {
         {0, 0, 0, 0},
         {0x7ffffff, 0x1ff, 0x1ff, 0x1ff},
         {0x40201,   1, 1, 1},
         {0x4020100, 0x100, 0x100, 0x100},
         {0x7007007, 0x1c0, 0x38,  7},
     };
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        for(int e=static_cast<int>(MINFUNC); e<MAXFUNC; ++e) {
-            const testcase test = testSet[i];
-            gRegister   arg = test.arg;
-            gRegister   result;
+
+    for(const auto& test : testSet) {
+        for(Func e=Func::MINFUNC; e<Func::MAXFUNC; e = static_cast<Func>(static_cast<int>(e)+1)) {
+            gRegister arg = test.arg;
+            gRegister result;
 
             switch(e) {
-            case SELECT0:
+            case Func::SELECT0:
                 asm volatile (
                     "call testSelectElementInRowParts0\n\t"
                     :"=b"(result):"a"(arg):"r15");
                 CPPUNIT_ASSERT_EQUAL(test.result0, result);
                 break;
-            case SELECT1:
+            case Func::SELECT1:
                 asm volatile (
                     "call testSelectElementInRowParts1\n\t"
                     :"=b"(result):"a"(arg):"r15");
                 CPPUNIT_ASSERT_EQUAL(test.result1, result);
                 break;
-            case SELECT2:
+            case Func::SELECT2:
                 asm volatile (
                     "call testSelectElementInRowParts2\n\t"
                     :"=b"(result):"a"(arg):"r15");
@@ -969,7 +962,7 @@ void SudokuSseTest::test_SelectElementInRowParts()
 
 void SudokuSseTest::test_FillUniqueElement()
 {
-    struct testcase {
+    struct TestSet {
         bool       alreadyunique;
         gRegister  prerowpart;
         gRegister  precolumn;
@@ -980,7 +973,7 @@ void SudokuSseTest::test_FillUniqueElement()
         gRegister  expectedrowpart;
     };
 
-    enum func {
+    enum class Func {
         MINFUNC,
         UNIQUE0 = MINFUNC,
         UNIQUE1,
@@ -992,14 +985,14 @@ void SudokuSseTest::test_FillUniqueElement()
         MAXFUNC,
     };
 
-    const testcase testSet[] = {
+    constexpr TestSet testSet[] {
         {false, 0x7ffffff, 0, 0, 0, 0, 0, 0x7ffffff},
         {false, 0x7ffffff, 0x8001c0, 0x38, 0x6,  0x1fe, 1, 0x7fffe01},
         {false, 0x7fffff7, 0x800008, 0x10, 0x30, 0x38,  0, 0x7ffffc7},
         {true,  0x7fff010, 0x10,     0x10, 0x10, 0x10,  0, 0x7fff010}
     };
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        const testcase test = testSet[i];
+
+    for(const auto& test : testSet) {
         gRegister  prerowpart = test.prerowpart;
         gRegister  precolumn = test.precolumn;
         gRegister  prebox = test.prebox;
@@ -1009,16 +1002,17 @@ void SudokuSseTest::test_FillUniqueElement()
         gRegister  expectedcolumn = 0;
         gRegister  expectedbox = 0;
         gRegister  expectedrow = 0;
-        for(int e=static_cast<int>(MINFUNC); e<MAXFUNC; ++e) {
-            if ((e <= MAXUNIQUE) && test.alreadyunique) {
+
+        for(Func e=Func::MINFUNC; e<Func::MAXFUNC; e = static_cast<Func>(static_cast<int>(e)+1)) {
+            if ((e <= Func::MAXUNIQUE) && test.alreadyunique) {
                 continue;
             }
 
-            gRegister   candidateset = test.candidateset;
-            gRegister   actualrowpart = 0;
-            gRegister   column = 0;
-            gRegister   mergedbox = 0;
-            gRegister   mergedrow = 0;
+            gRegister candidateset = test.candidateset;
+            gRegister actualrowpart = 0;
+            gRegister column = 0;
+            gRegister mergedbox = 0;
+            gRegister mergedrow = 0;
 
             testFillUniqueElementPreRowPart = prerowpart;
             testFillUniqueElementPreColumn = precolumn;
@@ -1026,32 +1020,32 @@ void SudokuSseTest::test_FillUniqueElement()
             testFillUniqueElementPreRow = prerow;
 
             switch(e) {
-            case UNIQUE0:
+            case Func::UNIQUE0:
                 asm volatile (
                     "call testFillUniqueElement0\n\t"
                     :"=b"(actualrowpart),"=c"(column),"=d"(mergedbox),"=S"(mergedrow):"a"(candidateset):"r10","r11","r12","r13","r14","r15");
                 break;
-            case UNIQUE1:
+            case Func::UNIQUE1:
                 asm volatile (
                     "call testFillUniqueElement1\n\t"
                     :"=b"(actualrowpart),"=c"(column),"=d"(mergedbox),"=S"(mergedrow):"a"(candidateset):"r10","r11","r12","r13","r14","r15");
                 break;
-            case UNIQUE2:
+            case Func::UNIQUE2:
                 asm volatile (
                     "call testFillUniqueElement2\n\t"
                     :"=b"(actualrowpart),"=c"(column),"=d"(mergedbox),"=S"(mergedrow):"a"(candidateset):"r10","r11","r12","r13","r14","r15");
                 break;
-            case ONE0:
+            case Func::ONE0:
                 asm volatile (
                     "call testFillOneUniqueCandidates0\n\t"
                     :"=a"(actualrowpart),"=b"(column),"=c"(mergedbox),"=d"(mergedrow)::"r9","r10","r11","r12","r13","r14","r15");
                 break;
-            case ONE1:
+            case Func::ONE1:
                 asm volatile (
                     "call testFillOneUniqueCandidates1\n\t"
                     :"=a"(actualrowpart),"=b"(column),"=c"(mergedbox),"=d"(mergedrow)::"r9","r10","r11","r12","r13","r14","r15");
                 break;
-            case ONE2:
+            case Func::ONE2:
                 asm volatile (
                     "call testFillOneUniqueCandidates2\n\t"
                     :"=a"(actualrowpart),"=b"(column),"=c"(mergedbox),"=d"(mergedrow)::"r9","r10","r11","r12","r13","r14","r15");
@@ -1084,11 +1078,10 @@ void SudokuSseTest::test_FillOneUniqueCandidates()
     return;
 }
 
-
 void SudokuSseTest::test_SaveLineSet()
 {
-    struct testcase {
-        shiftpos   pos;
+    struct TestSet {
+        Shiftpos   pos;
         gRegister  prerowhigh;
         gRegister  prerowlow;
         gRegister  preallhigh;
@@ -1104,42 +1097,50 @@ void SudokuSseTest::test_SaveLineSet()
         gRegister  expectedboxlow;
     };
 
-    const testcase testSet[] = {
-        {POS0,      0x7ffffff, 0x7ffffff07ffffff, 0x4000000, 0x200000000000000, 0x4000000, 0x200000000000000,
+    constexpr TestSet testSet[] {
+        {Shiftpos::SHIFT_POS0, 0x7ffffff, 0x7ffffff07ffffff, 0x4000000, 0x200000000000000, 0x4000000, 0x200000000000000,
          0x1f03c0f, 0x7ffffff, 0x7ffffff01f03c0f, 0x4000000, 0x200000000000000, 0x4000000, 0x200000000000000},
-        {POS0,   0x7ffffff, 0x7ffffff07ffffff, 0x4000000,    0x200000000000000, 0x4000000, 0x200000000000000,
+        {Shiftpos::SHIFT_POS0, 0x7ffffff, 0x7ffffff07ffffff, 0x4000000,    0x200000000000000, 0x4000000, 0x200000000000000,
          0x40404, 0x7ffffff, 0x7ffffff00040404, 0x4000000, 0x200000000040404, 0x4000000, 0x200000000040404},
-        {POS1,      0x7ffffff, 0x7ffffff07ffffff, 3, 0xc, 3, 0xc,
+        {Shiftpos::SHIFT_POS1, 0x7ffffff, 0x7ffffff07ffffff, 3, 0xc, 3, 0xc,
          0x40100c0, 0x7ffffff, 0x40100c007ffffff, 3, 0xc, 3, 0xc},
-        {POS1,      0x7ffffff, 0x7ffffff07ffffff, 3, 0xc, 3, 0xc,
+        {Shiftpos::SHIFT_POS1, 0x7ffffff, 0x7ffffff07ffffff, 3, 0xc, 3, 0xc,
          0x4010080, 0x7ffffff, 0x401008007ffffff, 3, 0x40100800000000c, 3, 0x40100800000000c},
-        {POS2,      0x7ffffff, 0x7ffffff07ffffff, 8, 0x200000000000000, 8, 0x200000000000000,
+        {Shiftpos::SHIFT_POS2, 0x7ffffff, 0x7ffffff07ffffff, 8, 0x200000000000000, 8, 0x200000000000000,
          0x0c00608, 0xc00608,  0x7ffffff07ffffff, 8, 0x200000000000000, 8, 0x200000000000000},
-        {POS2,      0x7ffffff, 0x7ffffff07ffffff, 8, 0x200000000000000, 8, 0x200000000000000,
+        {Shiftpos::SHIFT_POS2, 0x7ffffff, 0x7ffffff07ffffff, 8, 0x200000000000000, 8, 0x200000000000000,
          0x80808,   0x80808,   0x7ffffff07ffffff, 0x80808, 0x200000000000000, 0x80808, 0x200000000000000},
     };
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        const testcase test = testSet[i];
+    for(const auto& test : testSet) {
         xmmRegister row;
         xmmRegister all;
         xmmRegister box;
+
+        static_assert(sizeof(row) == (sizeof(test.prerowlow) + sizeof(test.prerowhigh)),
+                      "Unexpected xmmRegister size");
         *(reinterpret_cast<gRegister*>(&row)) = test.prerowlow;
         *(reinterpret_cast<gRegister*>(&row) + 1) = test.prerowhigh;
+
+        static_assert(sizeof(all) == (sizeof(test.prerowlow) + sizeof(test.prerowhigh)),
+                      "Unexpected xmmRegister size");
         *(reinterpret_cast<gRegister*>(&all)) = test.prealllow;
         *(reinterpret_cast<gRegister*>(&all) + 1) = test.preallhigh;
+
+        static_assert(sizeof(box) == (sizeof(test.prerowlow) + sizeof(test.prerowhigh)),
+                      "Unexpected xmmRegister size");
         *(reinterpret_cast<gRegister*>(&box)) = test.preboxlow;
         *(reinterpret_cast<gRegister*>(&box) + 1) = test.preboxhigh;
 
-        gRegister expectedrowhigh = test.expectedrowhigh;
-        gRegister expectedrowlow = test.expectedrowlow;
-        gRegister expectedallhigh = test.expectedallhigh;
-        gRegister expectedalllow = test.expectedalllow;
-        gRegister expectedboxhigh = test.expectedboxhigh;
-        gRegister expectedboxlow = test.expectedboxlow;
+        const gRegister expectedrowhigh = test.expectedrowhigh;
+        const gRegister expectedrowlow = test.expectedrowlow;
+        const gRegister expectedallhigh = test.expectedallhigh;
+        const gRegister expectedalllow = test.expectedalllow;
+        const gRegister expectedboxhigh = test.expectedboxhigh;
+        const gRegister expectedboxlow = test.expectedboxlow;
 
-        gRegister arg = test.arg;
+        const gRegister arg = test.arg;
         switch(test.pos) {
-        case POS0:
+        case Shiftpos::SHIFT_POS0:
             asm volatile (
                 "movdqa  xmm1,  xmmword ptr [%0]\n\t"
                 "movdqa  xmm0,  xmmword ptr [%1]\n\t"
@@ -1150,7 +1151,7 @@ void SudokuSseTest::test_SaveLineSet()
                 "movdqa  xmmword ptr [%2], xmm10\n\t"
                 ::"r"(&row),"r"(&all),"r"(&box),"a"(arg):"r11","r12","r13","r14","r15");
             break;
-        case POS1:
+        case Shiftpos::SHIFT_POS1:
             asm volatile (
                 "movdqa  xmm1,  xmmword ptr [%0]\n\t"
                 "movdqa  xmm0,  xmmword ptr [%1]\n\t"
@@ -1161,7 +1162,7 @@ void SudokuSseTest::test_SaveLineSet()
                 "movdqa  xmmword ptr [%2], xmm10\n\t"
                 ::"r"(&row),"r"(&all),"r"(&box),"a"(arg):"r11","r12","r13","r14","r15");
             break;
-        case POS2:
+        case Shiftpos::SHIFT_POS2:
             asm volatile (
                 "movdqa  xmm1,  xmmword ptr [%0]\n\t"
                 "movdqa  xmm0,  xmmword ptr [%1]\n\t"
@@ -1178,14 +1179,18 @@ void SudokuSseTest::test_SaveLineSet()
 
         gRegister high = *(reinterpret_cast<gRegister*>(&row) + 1);
         gRegister low = *(reinterpret_cast<gRegister*>(&row));
+        static_assert(sizeof(row) == (sizeof(high) + sizeof(low)), "Unexpected xmmRegister size");
+
         CPPUNIT_ASSERT_EQUAL(expectedrowhigh, high);
         CPPUNIT_ASSERT_EQUAL(expectedrowlow, low);
 
+        static_assert(sizeof(all) == (sizeof(high) + sizeof(low)), "Unexpected xmmRegister size");
         high = *(reinterpret_cast<gRegister*>(&all) + 1);
         low = *(reinterpret_cast<gRegister*>(&all));
         CPPUNIT_ASSERT_EQUAL(expectedallhigh, high);
         CPPUNIT_ASSERT_EQUAL(expectedalllow, low);
 
+        static_assert(sizeof(box) == (sizeof(high) + sizeof(low)), "Unexpected xmmRegister size");
         high = *(reinterpret_cast<gRegister*>(&box) + 1);
         low = *(reinterpret_cast<gRegister*>(&box));
         CPPUNIT_ASSERT_EQUAL(expectedboxhigh, high);
@@ -1197,33 +1202,33 @@ void SudokuSseTest::test_SaveLineSet()
 
 void SudokuSseTest::test_MaskElementCandidates()
 {
-    struct testcase {
-        shiftpos  pos;
+    struct TestSet {
+        Shiftpos  pos;
         gRegister arg;
         gRegister sum;
     };
 
-    const testcase testSet[] = {
-        {POS0, 0x48007ff, 0x123},
-        {POS1, 0x352fe0c, 0xdc},
-        {POS2, 0x7fc1f81f, 0xff},
+    constexpr TestSet testSet[] {
+        {Shiftpos::SHIFT_POS0, 0x48007ff, 0x123},
+        {Shiftpos::SHIFT_POS1, 0x352fe0c, 0xdc},
+        {Shiftpos::SHIFT_POS2, 0x7fc1f81f, 0xff},
     };
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        const testcase test = testSet[i];
-        gRegister arg = test.arg;
+
+    for(const auto& test : testSet) {
+        const gRegister arg = test.arg;
         gRegister sum = 0;
         switch(test.pos) {
-        case POS0:
+        case Shiftpos::SHIFT_POS0:
             asm volatile (
                 "call testMergeTwoElements0\n\t"
                 :"=b"(sum):"a"(arg):"r14","r15");
             break;
-        case POS1:
+        case Shiftpos::SHIFT_POS1:
             asm volatile (
                 "call testMergeTwoElements1\n\t"
                 :"=b"(sum):"a"(arg):"r14","r15");
             break;
-        case POS2:
+        case Shiftpos::SHIFT_POS2:
             asm volatile (
                 "call testMergeTwoElements2\n\t"
                 :"=b"(sum):"a"(arg):"r14","r15");
@@ -1239,38 +1244,38 @@ void SudokuSseTest::test_MaskElementCandidates()
 
 void SudokuSseTest::test_MergeTwoElements()
 {
-    struct testcase {
-        shiftpos  pos;
+    struct TestSet {
+        Shiftpos  pos;
         gRegister arg;
         gRegister candidates;
         gRegister result;
     };
 
-    const testcase testSet[] = {
-        {POS0, 0x7ffffff, 0x1fe, 0x7fffe01},
-        {POS0, 0x7ffffff, 1, 0x7ffffff},
-        {POS1, 0x7ffffff, 0x1ef, 0x7fc21ff},
-        {POS1, 0x7ffffff, 1, 0x7ffffff},
-        {POS2, 0x7ffffff, 0xff, 0x403ffff},
-        {POS2, 0x7ffffff, 1, 0x7ffffff},
+    constexpr TestSet testSet[] {
+        {Shiftpos::SHIFT_POS0, 0x7ffffff, 0x1fe, 0x7fffe01},
+        {Shiftpos::SHIFT_POS0, 0x7ffffff, 1, 0x7ffffff},
+        {Shiftpos::SHIFT_POS1, 0x7ffffff, 0x1ef, 0x7fc21ff},
+        {Shiftpos::SHIFT_POS1, 0x7ffffff, 1, 0x7ffffff},
+        {Shiftpos::SHIFT_POS2, 0x7ffffff, 0xff, 0x403ffff},
+        {Shiftpos::SHIFT_POS2, 0x7ffffff, 1, 0x7ffffff},
     };
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        const testcase test = testSet[i];
-        gRegister arg = test.arg;
-        gRegister candidates = test.candidates;
+
+    for(const auto& test : testSet) {
+        const gRegister arg = test.arg;
+        const gRegister candidates = test.candidates;
         gRegister result = 0;
         switch(test.pos) {
-        case POS0:
+        case Shiftpos::SHIFT_POS0:
             asm volatile (
                 "call testMaskElementCandidates0\n\t"
                 :"=c"(result):"a"(arg),"b"(candidates):"r12","r13","r14","r15");
             break;
-        case POS1:
+        case Shiftpos::SHIFT_POS1:
             asm volatile (
                 "call testMaskElementCandidates1\n\t"
                 :"=c"(result):"a"(arg),"b"(candidates):"r12","r13","r14","r15");
             break;
-        case POS2:
+        case Shiftpos::SHIFT_POS2:
             asm volatile (
                 "call testMaskElementCandidates2\n\t"
                 :"=c"(result):"a"(arg),"b"(candidates):"r12","r13","r14","r15");
@@ -1286,7 +1291,7 @@ void SudokuSseTest::test_MergeTwoElements()
 
 void SudokuSseTest::test_FindElementCandidates()
 {
-    struct testcase {
+    struct TestSet {
         gRegister  prerowpart;
         gRegister  prerowcandidates;
         gRegister  prebox;
@@ -1295,7 +1300,7 @@ void SudokuSseTest::test_FindElementCandidates()
         gRegister  expectedthree;
     };
 
-    enum func {
+    enum class Func {
         POSMIN,
         POS0 = POSMIN,
         POS1,
@@ -1303,7 +1308,7 @@ void SudokuSseTest::test_FindElementCandidates()
         POSMAX,
     };
 
-    const testcase testSet[] = {
+    constexpr TestSet testSet[] {
         {0x7fffe01, 0x100, 0x80, 0x40,  0x7fffe01, 0x7fffe01},
         {0x40407,   0x1f8, 0,    0,     0x40404,   0x40404},
         {0x40101ff, 0,     0x3f, 0,     0x4010040, 0x4010040},
@@ -1311,33 +1316,32 @@ void SudokuSseTest::test_FindElementCandidates()
         {0x7ffffff, 1,     0x10, 0x100, 0x7ffffff, 0x7ffffff},
     };
 
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        const testcase test = testSet[i];
-        gRegister  prerowpart = test.prerowpart;
-        gRegister  prerowcandidates = test.prerowcandidates;
-        gRegister  prebox = test.prebox;
-        gRegister  precolumnrowpart = test.precolumnrowpart;
-        gRegister  expected = test.expected;
-        gRegister  actual = 0;
+    for(const auto& test : testSet) {
+        gRegister prerowpart = test.prerowpart;
+        const gRegister prerowcandidates = test.prerowcandidates;
+        const gRegister prebox = test.prebox;
+        gRegister precolumnrowpart = test.precolumnrowpart;
+        gRegister expected = test.expected;
+        gRegister actual = 0;
 
         asm volatile (
             "call testFindThreePartsCandidates\n\t"
             :"=S"(actual):"a"(test.prerowpart),"b"(test.prerowcandidates),"c"(test.prebox),"d"(test.precolumnrowpart):"r10","r11","r12","r13","r14","r15");
         CPPUNIT_ASSERT_EQUAL(test.expectedthree, actual);
 
-        for(int e=static_cast<int>(POSMIN); e<POSCNT; ++e) {
+        for(Func e=Func::POSMIN; e<Func::POSMAX; e=static_cast<Func>(static_cast<int>(e)+1)) {
             switch(e) {
-            case POS0:
+            case Func::POS0:
                 asm volatile (
                     "call testFindElementCandidates0\n\t"
                     :"=S"(actual):"a"(prerowpart),"b"(prerowcandidates),"c"(prebox),"d"(precolumnrowpart):"r10","r11","r12","r13","r14","r15");
                 break;
-            case POS1:
+            case Func::POS1:
                 asm volatile (
                     "call testFindElementCandidates1\n\t"
                     :"=S"(actual):"a"(prerowpart),"b"(prerowcandidates),"c"(prebox),"d"(precolumnrowpart):"r10","r11","r12","r13","r14","r15");
                 break;
-            case POS2:
+            case Func::POS2:
                 asm volatile (
                     "call testFindElementCandidates2\n\t"
                     :"=S"(actual):"a"(prerowpart),"b"(prerowcandidates),"c"(prebox),"d"(precolumnrowpart):"r10","r11","r12","r13","r14","r15");
@@ -1350,7 +1354,7 @@ void SudokuSseTest::test_FindElementCandidates()
             prerowpart = rotateRowPart(prerowpart);
             precolumnrowpart = rotateRowPart(precolumnrowpart);
             expected = rotateRowPart(expected);
-                break;
+            break;
         }
     }
 
@@ -1359,7 +1363,7 @@ void SudokuSseTest::test_FindElementCandidates()
 
 void SudokuSseTest::test_FindThreePartsCandidates()
 {
-    struct testcase {
+    struct TestSet {
         gRegister  prerowpart;
         gRegister  prerowcandidates;
         gRegister  prebox;
@@ -1367,15 +1371,13 @@ void SudokuSseTest::test_FindThreePartsCandidates()
         gRegister  expected;
     };
 
-
-    const testcase testSet[] = {
+    constexpr TestSet testSet[] {
         {0xc0604,   0x1fc, 0, 0x7f80000, 0x40404},
         {0x7f00603, 0, 0x1fc, 0x3fc00, 0x7f00202},
     };
 
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        const testcase test = testSet[i];
-        gRegister  actual = 0;
+    for(const auto& test : testSet) {
+        gRegister actual = 0;
 
         asm volatile (
             "call testFindThreePartsCandidates\n\t"
@@ -1388,7 +1390,7 @@ void SudokuSseTest::test_FindThreePartsCandidates()
 
 void SudokuSseTest::test_FillThreePartsUniqueCandidates()
 {
-    struct testcase {
+    struct TestSet {
         union {
             struct {
                 uint64_t   prerow0[2];
@@ -1411,7 +1413,7 @@ void SudokuSseTest::test_FillThreePartsUniqueCandidates()
         };
     };
 
-    enum func {
+    enum class Func {
         FUNCMIN,
         PART2 = FUNCMIN, // 左、右、中の順
         PART0,
@@ -1424,7 +1426,7 @@ void SudokuSseTest::test_FillThreePartsUniqueCandidates()
         FUNCCNT,
     };
 
-    const testcase testSet[] = {
+    constexpr TestSet testSet[] {
         /* 1行目 : *,  *, 3,   4,5,6, 7,8,9,
            2行目 : 4,  5, 6,   0,0,0, 0,0,0,
            3行目 : 7,  8, 9,   0,0,0, 0,0,0,
@@ -1458,9 +1460,9 @@ void SudokuSseTest::test_FillThreePartsUniqueCandidates()
            0x1ff}}}
     };
 
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        testcase test = testSet[i];
-        for(int e=static_cast<int>(FUNCMIN); e<FUNCCNT; ++e) {
+    for(const auto& testOriginal : testSet) {
+        auto test = testOriginal;
+        for(Func e=Func::FUNCMIN; e<Func::FUNCCNT; e=static_cast<Func>(static_cast<int>(e)+1)) {
             // memsetはvolatile*を受け付けない
             memset(const_cast<void*>(static_cast<volatile void*>(&testFillNineUniqueCandidatesRowX)),
                    0, sizeof(testFillNineUniqueCandidatesRowX));
@@ -1474,7 +1476,7 @@ void SudokuSseTest::test_FillThreePartsUniqueCandidates()
             const uint64_t* expectedcolumn = test.column;
 
             switch(e) {
-            case PART0:
+            case Func::PART0:
                 asm volatile (
                     "movdqa  xmm1,  xmmword ptr [rdi]\n\t"
                     "movdqa  xmm2,  xmmword ptr [rdi+16]\n\t"
@@ -1484,7 +1486,7 @@ void SudokuSseTest::test_FillThreePartsUniqueCandidates()
                     "call testFillThreePartsUniqueCandidates0\n\t"
                     ::"D"(test.xarg),"a"(test.argrow):"rdx","rsi","r8","r9","r10","r11","r12","r13","r14","r15");
                 break;
-            case PART1:
+            case Func::PART1:
                 asm volatile (
                     "movdqa  xmm1,  xmmword ptr [rdi]\n\t"
                     "movdqa  xmm2,  xmmword ptr [rdi+16]\n\t"
@@ -1494,7 +1496,7 @@ void SudokuSseTest::test_FillThreePartsUniqueCandidates()
                     "call testFillThreePartsUniqueCandidates1\n\t"
                     ::"D"(test.xarg),"a"(test.argrow):"rdx","rsi","r8","r9","r10","r11","r12","r13","r14","r15");
                 break;
-            case PART2:
+            case Func::PART2:
                 asm volatile (
                     "movdqa  xmm1,  xmmword ptr [rdi]\n\t"
                     "movdqa  xmm2,  xmmword ptr [rdi+16]\n\t"
@@ -1504,7 +1506,7 @@ void SudokuSseTest::test_FillThreePartsUniqueCandidates()
                     "call testFillThreePartsUniqueCandidates2\n\t"
                     ::"D"(test.xarg),"a"(test.argrow):"rdx","rsi","r8","r9","r10","r11","r12","r13","r14","r15");
                 break;
-            case ROW0:
+            case Func::ROW0:
                 testFillNineUniqueCandidatesPreRow = test.argrow;
                 asm volatile (
                     "movdqa  xmm1,  xmmword ptr [rdi]\n\t"
@@ -1515,7 +1517,7 @@ void SudokuSseTest::test_FillThreePartsUniqueCandidates()
                     "call testTestFillRowPartCandidates0\n\t"
                     ::"D"(test.xarg):"rax","rbx","rcx","rdx","rsi","r8","r9","r10","r11","r12","r13","r14","r15");
                 break;
-            case ROW1:
+            case Func::ROW1:
                 testFillNineUniqueCandidatesPreRow = test.argrow;
                 asm volatile (
                     "movdqa  xmm1,  xmmword ptr [rdi]\n\t"
@@ -1526,7 +1528,7 @@ void SudokuSseTest::test_FillThreePartsUniqueCandidates()
                     "call testTestFillRowPartCandidates1\n\t"
                     ::"D"(test.xarg):"rax","rbx","rcx","rdx","rsi","r8","r9","r10","r11","r12","r13","r14","r15");
                 break;
-            case ROW2:
+            case Func::ROW2:
                 testFillNineUniqueCandidatesPreRow = test.argrow;
                 asm volatile (
                     "movdqa  xmm1,  xmmword ptr [rdi]\n\t"
@@ -1537,7 +1539,7 @@ void SudokuSseTest::test_FillThreePartsUniqueCandidates()
                     "call testTestFillRowPartCandidates2\n\t"
                     ::"D"(test.xarg):"rax","rbx","rcx","rdx","rsi","r8","r9","r10","r11","r12","r13","r14","r15");
                 break;
-            case FILLNINE:
+            case Func::FILLNINE:
                 asm volatile (
                     "movdqa  xmm1,  xmmword ptr [rdi]\n\t"
                     "movdqa  xmm2,  xmmword ptr [rdi+16]\n\t"
@@ -1550,7 +1552,7 @@ void SudokuSseTest::test_FillThreePartsUniqueCandidates()
                 expectedbox = test.boxfillnine;
                 expectedcolumn = test.columnfillnine;
                 break;
-            case FINDNINE:
+            case Func::FINDNINE:
                 asm volatile (
                     "movdqa  xmm1,  xmmword ptr [rdi]\n\t"
                     "movdqa  xmm2,  xmmword ptr [rdi+16]\n\t"
@@ -1567,19 +1569,19 @@ void SudokuSseTest::test_FillThreePartsUniqueCandidates()
                 break;
             }
 
-            xmmRegister actualrow = testFillNineUniqueCandidatesRowX;
-            xmmRegister actualbox = testFillNineUniqueCandidatesBoxX;
-            xmmRegister actualcolumn = testFillNineUniqueCandidatesColumnX;
+            const xmmRegister actualrow = testFillNineUniqueCandidatesRowX;
+            const xmmRegister actualbox = testFillNineUniqueCandidatesBoxX;
+            const xmmRegister actualcolumn = testFillNineUniqueCandidatesColumnX;
 
             int cmpactual = memcmp(expectedrow, &actualrow, sizeof(actualrow));
-            int cmpexpected = 0;
+            const decltype(cmpactual) cmpexpected = 0;
             CPPUNIT_ASSERT_EQUAL(cmpexpected, cmpactual);
             cmpactual = memcmp(expectedbox, &actualbox, sizeof(actualbox));
             CPPUNIT_ASSERT_EQUAL(cmpexpected, cmpactual);
             cmpactual = memcmp(expectedcolumn, &actualcolumn, sizeof(actualcolumn));
             CPPUNIT_ASSERT_EQUAL(cmpexpected, cmpactual);
 
-            if (e >= FILLNINE) {
+            if (e >= Func::FILLNINE) {
                 continue;
             }
 
@@ -1600,7 +1602,7 @@ void SudokuSseTest::test_FillThreePartsUniqueCandidates()
 
 void SudokuSseTest::test_FindRowPartCandidates()
 {
-    struct testcase {
+    struct TestSet {
         union {
             struct {
                 uint64_t   prebox[2];
@@ -1624,7 +1626,7 @@ void SudokuSseTest::test_FindRowPartCandidates()
         };
     };
 
-    const testcase testSet[] = {
+    constexpr TestSet testSet[] {
         {{{{0,0},{0,0},{0,0},{0,0}, 0x7ffffff, 0, 0,
            0, 0, 0, 0,  0x7ffffff, 0, 0}}},
         {{{{0,0},{0,0},{0,0},{0,0}, 0x1c0401, 0, 0,          // 行で絞る
@@ -1635,9 +1637,9 @@ void SudokuSseTest::test_FindRowPartCandidates()
            0, 0, 0, 0,  0x4000220, 0, 0x1df}}},
     };
 
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        testcase test = testSet[i];
-        for(int e=static_cast<int>(POSMIN); e<POSCNT; ++e) {
+    for(const auto& testOriginal : testSet) {
+        auto test = testOriginal;
+        for(Shiftpos e=Shiftpos::SHIFT_POSMIN; e<Shiftpos::SHIFT_POSCNT; e=static_cast<Shiftpos>(static_cast<int>(e)+1)) {
             gRegister  argrowparttarget = test.argrowparttarget;
             gRegister  argrowcandidates = test.argrowcandidates;
             gRegister  argbox = test.argbox;
@@ -1649,7 +1651,7 @@ void SudokuSseTest::test_FindRowPartCandidates()
             testFindRowPartCandidatesBox = 0;
 
             switch(e) {
-            case POS0:
+            case Shiftpos::SHIFT_POS0:
                 asm volatile (
                     "movdqa  xmm10, xmmword ptr [rdi]\n\t"
                     "movdqa  xmm0,  xmmword ptr [rdi+16]\n\t"
@@ -1657,7 +1659,7 @@ void SudokuSseTest::test_FindRowPartCandidates()
                     ::"D"(test.xarg),"a"(test.rowpartleft),"b"(test.candidatestarget),"c"(test.candidatesleft),"d"(test.candidatesother):
                      "rsi","r8","r9","r10","r11","r12","r13","r14","r15");
                 break;
-            case POS1:
+            case Shiftpos::SHIFT_POS1:
                 asm volatile (
                     "movdqa  xmm10, xmmword ptr [rdi]\n\t"
                     "movdqa  xmm0,  xmmword ptr [rdi+16]\n\t"
@@ -1666,7 +1668,7 @@ void SudokuSseTest::test_FindRowPartCandidates()
                      "rsi","r8","r9","r10","r11","r12","r13","r14","r15");
                 break;
                 break;
-            case POS2:
+            case Shiftpos::SHIFT_POS2:
                 asm volatile (
                     "movdqa  xmm10, xmmword ptr [rdi]\n\t"
                     "movdqa  xmm0,  xmmword ptr [rdi+16]\n\t"
@@ -1679,9 +1681,9 @@ void SudokuSseTest::test_FindRowPartCandidates()
                 break;
             }
 
-            gRegister  actualrowparttarget = testFindRowPartCandidatesRowPartTarget;
-            gRegister  actualrowcandidates = testFindRowPartCandidatesRowCandidates;
-            gRegister  actualbox = testFindRowPartCandidatesBox;
+            const gRegister actualrowparttarget = testFindRowPartCandidatesRowPartTarget;
+            const gRegister actualrowcandidates = testFindRowPartCandidatesRowCandidates;
+            const gRegister actualbox = testFindRowPartCandidatesBox;
             CPPUNIT_ASSERT_EQUAL(test.expectedrowparttarget, actualrowparttarget);
             CPPUNIT_ASSERT_EQUAL(test.expectedrowcandidates, actualrowcandidates);
             CPPUNIT_ASSERT_EQUAL(test.expectedbox, actualbox);
@@ -1697,39 +1699,40 @@ void SudokuSseTest::test_FindRowPartCandidates()
 
 void SudokuSseTest::test_CountRowPartElements()
 {
-    struct testcase {
+    struct TestSet {
         gRegister arg;
         gRegister count;
         gRegister element;
         gRegister isequal;
     };
 
-    const testcase testSet[] = {
+    constexpr TestSet testSet[] {
         {0x20081ff, 2, 0x1ff, 0},
         {0x2008101, 2, 0x101, 1},
         {0x2008101, 3, 0x101, 0},
         {0x2008111, 3, 0x111, 1},
         {0x20081ff, 9, 0x1ff, 1},
     };
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        const testcase test = testSet[i];
+
+    for(const auto& test : testSet) {
         gRegister arg = test.arg;
-        gRegister count = test.count;
-        for(int e=static_cast<int>(POSMIN); e<POSCNT; ++e) {
+        const gRegister count = test.count;
+
+        for(Shiftpos e=Shiftpos::SHIFT_POSMIN; e<Shiftpos::SHIFT_POSCNT; e=static_cast<Shiftpos>(static_cast<int>(e)+1)) {
             gRegister element = 0;
             gRegister isequal = 0;
             switch(e) {
-            case POS0:
+            case Shiftpos::SHIFT_POS0:
                 asm volatile (
                     "call testCountRowPartElements0\n\t"
                     :"=c"(element),"=d"(isequal):"a"(arg),"b"(count):"r14","r15");
                 break;
-            case POS1:
+            case Shiftpos::SHIFT_POS1:
                 asm volatile (
                     "call testCountRowPartElements1\n\t"
                     :"=c"(element),"=d"(isequal):"a"(arg),"b"(count):"r14","r15");
                 break;
-            case POS2:
+            case Shiftpos::SHIFT_POS2:
                 asm volatile (
                     "call testCountRowPartElements2\n\t"
                     :"=c"(element),"=d"(isequal):"a"(arg),"b"(count):"r14","r15");
@@ -1748,7 +1751,7 @@ void SudokuSseTest::test_CountRowPartElements()
 
 void SudokuSseTest::test_CountFilledElements()
 {
-    struct testcase {
+    struct TestSet {
         gRegister prevpopcnt;
         gRegister loopcnt;
         gRegister preallhigh;
@@ -1756,23 +1759,28 @@ void SudokuSseTest::test_CountFilledElements()
         gRegister expectedpopcnt;
     };
 
-    const testcase testSet[] = {
+    constexpr TestSet testSet[] {
         {0, 0, 0, 0, 0},
         {1, 2, 0xca, 0xedb7, 16},
         {80, 50, 0x7ffffff, 0x7ffffff07ffffff, 81}
     };
 
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        const testcase test = testSet[i];
+    for(const auto& test : testSet) {
         gRegister loopcnt = 0;
         gRegister actualpopcnt = 0;
         gRegister actualprevpopcnt = 0;
         xmmRegister looppopcnt;
+
         gRegister* pLooppopcntlow = reinterpret_cast<gRegister*>(&looppopcnt);
         gRegister* pLooppopcnthigh = pLooppopcntlow + 1;
+        static_assert(sizeof(looppopcnt) == (sizeof(*pLooppopcntlow) + sizeof(*pLooppopcnthigh)),
+                      "Unexpected xmmRegister size");
         *pLooppopcntlow = test.prevpopcnt;
         *pLooppopcnthigh = test.loopcnt;
+
         xmmRegister all;
+        static_assert(sizeof(all) == (sizeof(test.prealllow) + sizeof(test.preallhigh)),
+                      "Unexpected xmmRegister size");
         *(reinterpret_cast<gRegister*>(&all)) = test.prealllow;
         *(reinterpret_cast<gRegister*>(&all) + 1) = test.preallhigh;
 
@@ -1799,7 +1807,7 @@ void SudokuSseTest::test_CountFilledElements()
 
 void SudokuSseTest::test_ChooseNextCadidate()
 {
-    struct testcase {
+    struct TestSet {
         gRegister argrowpart;
         gRegister arguniquecandidate;
         gRegister expectedrowpart;
@@ -1807,7 +1815,7 @@ void SudokuSseTest::test_ChooseNextCadidate()
         gRegister chosen;
     };
 
-    const testcase testSet[] = {
+    constexpr TestSet testSet[] {
         {0x7fffe03, 0, 0x7fffe01, 1, 1},
         {0x7fffe03, 1, 0x7fffe02, 2, 1},
         {0x7fffe03, 2, 0x7fffe03, 0, 0},
@@ -1816,28 +1824,28 @@ void SudokuSseTest::test_ChooseNextCadidate()
         {0x7ffff42, 0x40,  0x7ffff00, 0x100, 1},
         {0x7ffff42, 0x100, 0x7ffff42, 0, 0},
     };
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        const testcase test = testSet[i];
+
+    for(const auto& test : testSet) {
         gRegister argrowpart = test.argrowpart;
         gRegister arguniquecandidate = test.arguniquecandidate;
         gRegister expectedrowpart = test.expectedrowpart;
-        for(int e=static_cast<int>(POSMIN); e<POSCNT; ++e) {
+        for(Shiftpos e=Shiftpos::SHIFT_POSMIN; e<Shiftpos::SHIFT_POSCNT; e=static_cast<Shiftpos>(static_cast<int>(e)+1)) {
             gRegister searched = 0;
             gRegister actualrowpart = 0;
             gRegister actualuniquecandidate = 0;
             gRegister chosen = 0;
             switch(e) {
-            case POS0:
+            case Shiftpos::SHIFT_POS0:
                 asm volatile (
                     "call testChooseNextCadidate0\n\t"
                     :"=c"(searched),"=d"(actualrowpart),"=S"(actualuniquecandidate),"=D"(chosen):"a"(argrowpart),"b"(arguniquecandidate):"r11","r12","r13","r14","r15");
                 break;
-            case POS1:
+            case Shiftpos::SHIFT_POS1:
                 asm volatile (
                     "call testChooseNextCadidate1\n\t"
                     :"=c"(searched),"=d"(actualrowpart),"=S"(actualuniquecandidate),"=D"(chosen):"a"(argrowpart),"b"(arguniquecandidate):"r11","r12","r13","r14","r15");
                 break;
-            case POS2:
+            case Shiftpos::SHIFT_POS2:
                 asm volatile (
                     "call testChooseNextCadidate2\n\t"
                     :"=c"(searched),"=d"(actualrowpart),"=S"(actualuniquecandidate),"=D"(chosen):"a"(argrowpart),"b"(arguniquecandidate):"r11","r12","r13","r14","r15");
@@ -1859,7 +1867,7 @@ void SudokuSseTest::test_ChooseNextCadidate()
 
 void SudokuSseTest::test_SearchRowPartElements()
 {
-    struct testcase {
+    struct TestSet {
         gRegister candidatecnt;
         gRegister prerowpart;
         gRegister preuniquecandidate;
@@ -1872,7 +1880,7 @@ void SudokuSseTest::test_SearchRowPartElements()
         gRegister expectedoutboxshift;
     };
 
-    const testcase testSet[] = {
+    constexpr TestSet testSet[] {
         // 91-91-91
         {2, 0x4060301,     0, 0, 0,  1,     0x4060201, 1,     0, 0},
         {2, 0x4060301,     1, 0, 0,  0x100, 0x4060300, 0x100, 0, 0},
@@ -1897,8 +1905,8 @@ void SudokuSseTest::test_SearchRowPartElements()
         // *-*-*
         {3, 0x0f0f0f0,     0, 0, 2,  0,     0x0f0f0f0, 0,     0, 3},
     };
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        const testcase test = testSet[i];
+
+    for(const auto& test : testSet) {
         gRegister candidatecnt = test.candidatecnt;
         gRegister searched = 0;
         gRegister actualrowpart = 0;
@@ -1925,7 +1933,7 @@ void SudokuSseTest::test_SearchRowPartElements()
 
 void SudokuSseTest::test_SearchRowElements()
 {
-    struct testcase {
+    struct TestSet {
         gRegister candidatecnt;
         gRegister arghigh;
         gRegister arglow;
@@ -1939,7 +1947,7 @@ void SudokuSseTest::test_SearchRowElements()
         gRegister expectedoutboxshift;
     };
 
-    const testcase testSet[] = {
+    constexpr TestSet testSet[] {
         // 1(45)2-(45)36-789
         {2, 0x43002, 0x60082001010100, 0,    0, 0, 0,  8,    0,  2, 1},
         {2, 0x43002, 0x60082001010100, 8,    1, 2, 1,  0x10, 1,  2, 1},
@@ -1953,8 +1961,8 @@ void SudokuSseTest::test_SearchRowElements()
         {4, 0x7fffff, 0x7ffffff07fffeaa, 0x20, 1, 0, 0,  0x80, 1,  0, 0},
         {4, 0x7fffff, 0x7ffffff07fffeaa, 0x80, 8, 0, 0,  0,    9,  0, 0},
     };
-    for(size_t i=0; i <arraySizeof(testSet); ++i) {
-        const testcase test = testSet[i];
+
+    for(const auto& test : testSet) {
         gRegister candidatecnt = test.candidatecnt;
         gRegister actualuniquecandidate = 0;
         gRegister actualcandidaterow = 0;
@@ -1964,7 +1972,10 @@ void SudokuSseTest::test_SearchRowElements()
         testSearchRowElementsPreCandidateRow = test.precandidaterow;
         testSearchRowElementsPreInBoxShift = test.preinboxshift;
         testSearchRowElementsPreOutBoxShift = test.preoutboxshift;
+
         xmmRegister arg;
+        static_assert(sizeof(arg) == (sizeof(test.arglow) + sizeof(test.arghigh)),
+                      "Unexpected xmmRegister size");
         *(reinterpret_cast<gRegister*>(&arg)) = test.arglow;
         *(reinterpret_cast<gRegister*>(&arg) + 1) = test.arghigh;
 
@@ -1982,7 +1993,7 @@ void SudokuSseTest::test_SearchRowElements()
 }
 
 void SudokuSseTest::test_FastCollectCandidatesAtRow() {
-    struct testcase {
+    struct TestSet {
         gRegister arghigh;
         gRegister arglow;
         gRegister righttop;
@@ -1991,7 +2002,7 @@ void SudokuSseTest::test_FastCollectCandidatesAtRow() {
         gRegister expectedtarget;
     };
 
-    enum Target {
+    enum class Target {
         POS_MIN,
         POS_0_0 = POS_MIN,
         POS_1_0,
@@ -2006,75 +2017,77 @@ void SudokuSseTest::test_FastCollectCandidatesAtRow() {
         POS_CNT
     };
 
-    const testcase testSet00[] = {{0, 0, 0, 0, 0, 0},
-                                  {0, 0x100, 0, 0, 0, 0x100},
-                                  {0, 0, 0x100, 0, 0x100, 0},
-                                  {0, 0x1000200040008ull, 0x100, 0x1ff, 0x107, 0x8},
-                                  {0x80004000200010, 0x8000400020001ull, 0x100, 0x1ff, 0x1fe, 0x1},
+    constexpr TestSet testSet00[] {
+        {0, 0, 0, 0, 0, 0},
+        {0, 0x100, 0, 0, 0, 0x100},
+        {0, 0, 0x100, 0, 0x100, 0},
+        {0, 0x1000200040008ull, 0x100, 0x1ff, 0x107, 0x8},
+        {0x80004000200010, 0x8000400020001ull, 0x100, 0x1ff, 0x1fe, 0x1},
     };
 
-    const testcase testSet10[] = {{0x80004000200010, 0x8000400020001, 0x100, 0x1ff, 0x1fd, 0x2}};
-    const testcase testSet20[] = {{0x80004000200010, 0x8000400020001, 0x100, 0x1ff, 0x1fb, 0x4}};
-    const testcase testSet30[] = {{0x80004000200010, 0x8000400020001, 0x100, 0x1ff, 0x1f7, 0x8}};
-    const testcase testSet40[] = {{0x80004000200010, 0x8000400020001, 0x100, 0x1ff, 0x1ef, 0x10}};
-    const testcase testSet50[] = {{0x80004000200010, 0x8000400020001, 0x100, 0x1ff, 0x1df, 0x20}};
-    const testcase testSet60[] = {{0x80004000200010, 0x8000400020001, 0x100, 0x1ff, 0x1bf, 0x40}};
-    const testcase testSet70[] = {{0x80004000200010, 0x8000400020001, 0x100, 0x1ff, 0x17f, 0x80}};
+    constexpr TestSet testSet10[] {{0x80004000200010, 0x8000400020001, 0x100, 0x1ff, 0x1fd, 0x2}};
+    constexpr TestSet testSet20[] {{0x80004000200010, 0x8000400020001, 0x100, 0x1ff, 0x1fb, 0x4}};
+    constexpr TestSet testSet30[] {{0x80004000200010, 0x8000400020001, 0x100, 0x1ff, 0x1f7, 0x8}};
+    constexpr TestSet testSet40[] {{0x80004000200010, 0x8000400020001, 0x100, 0x1ff, 0x1ef, 0x10}};
+    constexpr TestSet testSet50[] {{0x80004000200010, 0x8000400020001, 0x100, 0x1ff, 0x1df, 0x20}};
+    constexpr TestSet testSet60[] {{0x80004000200010, 0x8000400020001, 0x100, 0x1ff, 0x1bf, 0x40}};
+    constexpr TestSet testSet70[] {{0x80004000200010, 0x8000400020001, 0x100, 0x1ff, 0x17f, 0x80}};
 
-    const testcase testSet80[] = {{0, 0, 0, 0, 0, 0},
-                                  {0, 0, 0x100, 0, 0, 0x100},
-                                  {0, 0x1000200040008ull, 0x100, 0x1ff, 0xf, 0x100},
-                                  {0x100004000200010, 0x8000400020001, 0x80, 0x1ff, 0x17f, 0x80},
+    constexpr TestSet testSet80[] {
+        {0, 0, 0, 0, 0, 0},
+        {0, 0, 0x100, 0, 0, 0x100},
+        {0, 0x1000200040008ull, 0x100, 0x1ff, 0xf, 0x100},
+        {0x100004000200010, 0x8000400020001, 0x80, 0x1ff, 0x17f, 0x80},
     };
 
-    const testcase testSet88[] = {{0, 0, 0, 0, 0, 0},
-                                  {0, 0, 0x100, 0x100, 0, 0x100},
-                                  {0, 0x1000200040008ull, 0x100, 0x100, 0xf, 0x100},
-                                  {0x100004000200010, 0x8000400020001, 0x80, 0x80, 0x17f, 0x80},
+    constexpr TestSet testSet88[] {
+        {0, 0, 0, 0, 0, 0},
+        {0, 0, 0x100, 0x100, 0, 0x100},
+        {0, 0x1000200040008ull, 0x100, 0x100, 0xf, 0x100},
+        {0x100004000200010, 0x8000400020001, 0x80, 0x80, 0x17f, 0x80},
     };
 
-    for(int i=0; i<static_cast<int>(POS_CNT); ++i) {
-        Target target = static_cast<Target>(i);
+    for(Target target=Target::POS_MIN; target<Target::POS_CNT; target=static_cast<Target>(static_cast<int>(target)+1)) {
         size_t numberOfCases = 0;
-        const testcase* testSet = 0;
+        const TestSet* testSet = nullptr;
         switch(target) {
-        case POS_0_0:
+        case Target::POS_0_0:
             numberOfCases = arraySizeof(testSet00);
             testSet = testSet00;
             break;
-        case POS_1_0:
+        case Target::POS_1_0:
             numberOfCases = arraySizeof(testSet10);
             testSet = testSet10;
             break;
-        case POS_2_0:
+        case Target::POS_2_0:
             numberOfCases = arraySizeof(testSet20);
             testSet = testSet20;
             break;
-        case POS_3_0:
+        case Target::POS_3_0:
             numberOfCases = arraySizeof(testSet30);
             testSet = testSet30;
             break;
-        case POS_4_0:
+        case Target::POS_4_0:
             numberOfCases = arraySizeof(testSet40);
             testSet = testSet40;
             break;
-        case POS_5_0:
+        case Target::POS_5_0:
             numberOfCases = arraySizeof(testSet50);
             testSet = testSet50;
             break;
-        case POS_6_0:
+        case Target::POS_6_0:
             numberOfCases = arraySizeof(testSet60);
             testSet = testSet60;
             break;
-        case POS_7_0:
+        case Target::POS_7_0:
             numberOfCases = arraySizeof(testSet70);
             testSet = testSet70;
             break;
-        case POS_8_0:
+        case Target::POS_8_0:
             numberOfCases = arraySizeof(testSet80);
             testSet = testSet80;
             break;
-        case POS_8_8:
+        case Target::POS_8_8:
             numberOfCases = arraySizeof(testSet88);
             testSet = testSet88;
             break;
@@ -2083,15 +2096,18 @@ void SudokuSseTest::test_FastCollectCandidatesAtRow() {
         }
 
         for(size_t i=0; i <numberOfCases; ++i) {
-            testcase test = testSet[i];
+            TestSet test = testSet[i];
             gRegister actualsum;
             gRegister actualtarget;
+
             xmmRegister arg;
+            static_assert(sizeof(arg) == (sizeof(test.arglow) + sizeof(test.arghigh)),
+                          "Unexpected xmmRegister size");
             *(reinterpret_cast<gRegister*>(&arg)) = test.arglow;
             *(reinterpret_cast<gRegister*>(&arg) + 1) = test.arghigh;
 
             switch(target) {
-            case POS_0_0:
+            case Target::POS_0_0:
                 asm volatile (
                     "movdqa  xmm1, xmmword ptr [rdi]\n\t"
                     "xorps   xmm10, xmm10\n\t"
@@ -2099,7 +2115,7 @@ void SudokuSseTest::test_FastCollectCandidatesAtRow() {
                     "call testFastCollectCandidatesAtRow00\n\t"
                     :"=a"(actualsum),"=b"(actualtarget):"c"(test.rightbottom),"d"(test.righttop),"D"(&arg):"r8","r9","r10","r11","r12","r13","r14","r15");
                 break;
-            case POS_1_0:
+            case Target::POS_1_0:
                 asm volatile (
                     "movdqa  xmm1, xmmword ptr [rdi]\n\t"
                     "xorps   xmm10, xmm10\n\t"
@@ -2107,7 +2123,7 @@ void SudokuSseTest::test_FastCollectCandidatesAtRow() {
                     "call testFastCollectCandidatesAtRow10\n\t"
                     :"=a"(actualsum),"=b"(actualtarget):"c"(test.rightbottom),"d"(test.righttop),"D"(&arg):"r8","r9","r10","r11","r12","r13","r14","r15");
                 break;
-            case POS_2_0:
+            case Target::POS_2_0:
                 asm volatile (
                     "movdqa  xmm1, xmmword ptr [rdi]\n\t"
                     "xorps   xmm10, xmm10\n\t"
@@ -2115,7 +2131,7 @@ void SudokuSseTest::test_FastCollectCandidatesAtRow() {
                     "call testFastCollectCandidatesAtRow20\n\t"
                     :"=a"(actualsum),"=b"(actualtarget):"c"(test.rightbottom),"d"(test.righttop),"D"(&arg):"r8","r9","r10","r11","r12","r13","r14","r15");
                 break;
-            case POS_3_0:
+            case Target::POS_3_0:
                 asm volatile (
                     "movdqa  xmm1, xmmword ptr [rdi]\n\t"
                     "xorps   xmm10, xmm10\n\t"
@@ -2123,7 +2139,7 @@ void SudokuSseTest::test_FastCollectCandidatesAtRow() {
                     "call testFastCollectCandidatesAtRow30\n\t"
                     :"=a"(actualsum),"=b"(actualtarget):"c"(test.rightbottom),"d"(test.righttop),"D"(&arg):"r8","r9","r10","r11","r12","r13","r14","r15");
                 break;
-            case POS_4_0:
+            case Target::POS_4_0:
                 asm volatile (
                     "movdqa  xmm1, xmmword ptr [rdi]\n\t"
                     "xorps   xmm10, xmm10\n\t"
@@ -2131,7 +2147,7 @@ void SudokuSseTest::test_FastCollectCandidatesAtRow() {
                     "call testFastCollectCandidatesAtRow40\n\t"
                     :"=a"(actualsum),"=b"(actualtarget):"c"(test.rightbottom),"d"(test.righttop),"D"(&arg):"r8","r9","r10","r11","r12","r13","r14","r15");
                 break;
-            case POS_5_0:
+            case Target::POS_5_0:
                 asm volatile (
                     "movdqa  xmm1, xmmword ptr [rdi]\n\t"
                     "xorps   xmm10, xmm10\n\t"
@@ -2139,7 +2155,7 @@ void SudokuSseTest::test_FastCollectCandidatesAtRow() {
                     "call testFastCollectCandidatesAtRow50\n\t"
                     :"=a"(actualsum),"=b"(actualtarget):"c"(test.rightbottom),"d"(test.righttop),"D"(&arg):"r8","r9","r10","r11","r12","r13","r14","r15");
                 break;
-            case POS_6_0:
+            case Target::POS_6_0:
                 asm volatile (
                     "movdqa  xmm1, xmmword ptr [rdi]\n\t"
                     "xorps   xmm10, xmm10\n\t"
@@ -2147,7 +2163,7 @@ void SudokuSseTest::test_FastCollectCandidatesAtRow() {
                     "call testFastCollectCandidatesAtRow60\n\t"
                     :"=a"(actualsum),"=b"(actualtarget):"c"(test.rightbottom),"d"(test.righttop),"D"(&arg):"r8","r9","r10","r11","r12","r13","r14","r15");
                 break;
-            case POS_7_0:
+            case Target::POS_7_0:
                 asm volatile (
                     "movdqa  xmm1, xmmword ptr [rdi]\n\t"
                     "xorps   xmm10, xmm10\n\t"
@@ -2155,7 +2171,7 @@ void SudokuSseTest::test_FastCollectCandidatesAtRow() {
                     "call testFastCollectCandidatesAtRow70\n\t"
                     :"=a"(actualsum),"=b"(actualtarget):"c"(test.rightbottom),"d"(test.righttop),"D"(&arg):"r8","r9","r10","r11","r12","r13","r14","r15");
                 break;
-            case POS_8_0:
+            case Target::POS_8_0:
                 asm volatile (
                     "movdqa  xmm1, xmmword ptr [rdi]\n\t"
                     "xorps   xmm10, xmm10\n\t"
@@ -2163,7 +2179,7 @@ void SudokuSseTest::test_FastCollectCandidatesAtRow() {
                     "call testFastCollectCandidatesAtRow80\n\t"
                     :"=a"(actualsum),"=b"(actualtarget):"c"(test.rightbottom),"d"(test.righttop),"D"(&arg):"r8","r9","r10","r11","r12","r13","r14","r15");
                 break;
-            case POS_8_8:
+            case Target::POS_8_8:
                 asm volatile (
                     "movdqa  xmm9, xmmword ptr [rdi]\n\t"
                     "xorps   xmm10, xmm10\n\t"
@@ -2180,11 +2196,12 @@ void SudokuSseTest::test_FastCollectCandidatesAtRow() {
 }
 
 void SudokuSseTest::test_FastCollectCandidatesAtBox() {
-    const gRegister expectedSet[] = {0x110, 0x11, 0x11};
+    constexpr gRegister expectedSet[] {0x110, 0x11, 0x11};
 
     for(size_t i=0; i <arraySizeof(expectedSet); ++i) {
         gRegister actualsum = 0;
         xmmRegister arg;
+        static_assert(sizeof(arg) >= (sizeof(gRegister) * 2), "Unexpected xmmRegister size");
         *(reinterpret_cast<gRegister*>(&arg)) = 0;
         *(reinterpret_cast<gRegister*>(&arg) + 1) = 0x10010000000000ull;
         switch(i) {
@@ -2215,7 +2232,7 @@ void SudokuSseTest::test_FastCollectCandidatesAtBox() {
 }
 
 void SudokuSseTest::test_FastCollectCandidatesAtColumn() {
-    const gRegister expectedSet[] = {0x1, 0x80, 0x1fd, 0xff};
+    constexpr gRegister expectedSet[] {0x1, 0x80, 0x1fd, 0xff};
 
     for(size_t i=0; i <arraySizeof(expectedSet); ++i) {
         gRegister actualsum = 0;
@@ -2249,7 +2266,7 @@ void SudokuSseTest::test_FastCollectCandidatesAtColumn() {
 }
 
 void SudokuSseTest::test_FastSetUniqueCandidatesAtCellSub() {
-    struct testcase {
+    struct TestSet {
         gRegister rowHigh;
         gRegister rowLow;
         gRegister columnHigh;
@@ -2257,10 +2274,10 @@ void SudokuSseTest::test_FastSetUniqueCandidatesAtCellSub() {
         gRegister rightBottom;
     };
 
-    const testcase expectedSet[] = {{0, 1, 0, 0, 0}, {0, 0, 0, 1, 0}, {0, 1, 0, 0, 0}, {0, 0, 0, 0, 1}};
+    constexpr TestSet expectedSet[] {{0, 1, 0, 0, 0}, {0, 0, 0, 1, 0}, {0, 1, 0, 0, 0}, {0, 0, 0, 0, 1}};
 
     for(size_t i=0; i <arraySizeof(expectedSet); ++i) {
-        testcase test = expectedSet[i];
+        const auto test = expectedSet[i];
         gRegister rowHigh;
         gRegister rowLow;
         gRegister columnHigh;

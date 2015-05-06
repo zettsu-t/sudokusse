@@ -1,12 +1,14 @@
 # Makefile
 #
-# add path to CppUnit 1.13.1 for MinGW-w64 + Msys
+# Available Cygwin only (MinGW with CppUnit not supported)
+# Add path /local/... to CppUnit 1.13.1 for MinGW-w64 + Msys
 INCLUDES=-I. -I.. -I/local/include
 LIBPATH=-L/local/lib
 
-# set link options to link c/c++ libraries statically
+# Only a DLL is available for CppUnit on Cygwin
 LIBCFLAGS=
-CPPFLAGS=-g -Wall -masm=intel -DUNITTEST $(INCLUDES)
+LIBS= -lcppunit
+CPPFLAGS= -std=c++11 -g -Wall -masm=intel -m64 -msse4.2 -DUNITTEST $(INCLUDES) $(LIBCFLAGS)
 LDFLAGS= $(LIBCFLAGS) -mcmodel=small
 
 CELLS_UNPACKED_TARGET= unittest.exe
@@ -14,52 +16,67 @@ CELLS_PACKED_TARGET= unittest_cells_packed.exe
 TARGETS = $(CELLS_UNPACKED_TARGET) $(CELLS_PACKED_TARGET)
 
 TESTEROBJS= main.o sudokussetest.o sudokutest.o sudokucelltest.o \
-			sudokumaptest.o sudokusolvertest.o sudokuloadertest.o
+            sudokumaptest.o sudokusolvertest.o sudokuloadertest.o
 
-TESTEDOBJS= sudoku.o sudokuxmmreg.o sudokumap.o
+TESTEDOBJS= sudoku.o sudokuxmmreg.o
 
 CELLS_UNPACKED_OBJS= $(TESTEROBJS) $(TESTEDOBJS) sudokusse_cells_unpacked.o
 CELLS_PACKED_OBJS=   $(TESTEROBJS) $(TESTEDOBJS) sudokusse_cells_packed.o
 
 HEADERS = ../sudoku.h sudokutest.h
-
-GENERATED_CODE=sudokumap.cpp
-GENERATOR_SCRIPT=../sudokumap.rb
+GENERATED_CODES = sudokuConstAll.h
+GENERATOR_SCRIPT= ../sudokumap.rb
 
 .PHONY: all clean
 
 all: $(TARGETS)
 
 $(CELLS_UNPACKED_TARGET): $(CELLS_UNPACKED_OBJS)
-	$(CXX) $(LIBPATH) -o $@ $(LDFLAGS) $^ -lcppunit
+	$(CXX) $(LIBPATH) -o $@ $(LDFLAGS) $^ $(LIBS)
 	./$(CELLS_UNPACKED_TARGET)
 
 $(CELLS_PACKED_TARGET): $(CELLS_PACKED_OBJS)
-	$(CXX) $(LIBPATH) -o $@ $(LDFLAGS) $^ -lcppunit
+	$(CXX) $(LIBPATH) -o $@ $(LDFLAGS) $^ $(LIBS)
 	./$(CELLS_PACKED_TARGET)
 
-$(CELLS_UNPACKED_OBJS): $(HEADERS) Makefile
-
-$(CELLS_PACKED_OBJS): $(HEADERS) Makefile
-
 # no inlining
-sudoku.o: ../sudoku.cpp Makefile
-	$(CXX) $(CPPFLAGS) -c $<
+main.o : main.cpp $(HEADERS) $(GENERATED_CODES)
+	$(CXX) -c $(CPPFLAGS) $< -o $@
 
-sudokuxmmreg.o: ../sudokuxmmreg.cpp Makefile
-	$(CXX) $(CPPFLAGS) -c $<
+sudokussetest.o : sudokussetest.cpp $(HEADERS) $(GENERATED_CODES)
+	$(CXX) -c $(CPPFLAGS) $< -o $@
 
-sudokumap.o: sudokumap.cpp Makefile
-	$(CXX) $(CPPFLAGS) -c $<
+sudokutest.o : sudokutest.cpp $(HEADERS) $(GENERATED_CODES)
+	$(CXX) -c $(CPPFLAGS) $< -o $@
 
-sudokusse_cells_unpacked.o : ../sudokusse.s Makefile
+sudokucelltest.o : sudokucelltest.cpp $(HEADERS) $(GENERATED_CODES)
+	$(CXX) -c $(CPPFLAGS) $< -o $@
+
+sudokumaptest.o : sudokumaptest.cpp $(HEADERS) $(GENERATED_CODES)
+	$(CXX) -c $(CPPFLAGS) $< -o $@
+
+sudokusolvertest.o : sudokusolvertest.cpp $(HEADERS) $(GENERATED_CODES)
+	$(CXX) -c $(CPPFLAGS) $< -o $@
+
+sudokuloadertest.o : sudokuloadertest.cpp $(HEADERS) $(GENERATED_CODES)
+	$(CXX) -c $(CPPFLAGS) $< -o $@
+
+sudoku.o : ../sudoku.cpp $(HEADERS) $(GENERATED_CODES)
+	$(CXX) -c $(CPPFLAGS) $< -o $@
+
+sudokuxmmreg.o : ../sudokuxmmreg.cpp $(HEADERS) $(GENERATED_CODES)
+	$(CXX) -c $(CPPFLAGS) $< -o $@
+
+sudokusse_cells_unpacked.o : ../sudokusse.s
 	$(AS) -defsym CellsPacked=0 -o $@ $<
 
-sudokusse_cells_packed.o : ../sudokusse.s Makefile
+sudokusse_cells_packed.o : ../sudokusse.s
 	$(AS) -defsym CellsPacked=1 -o $@ $<
 
-$(GENERATED_CODE): $(GENERATOR_SCRIPT) Makefile
-	ruby $< > $@
+$(GENERATED_CODES) : $(GENERATOR_SCRIPT)
+	ruby $(GENERATOR_SCRIPT)
+
+$(HEADERS):
 
 clean:
-	rm -f $(TARGETS) $(CELLS_UNPACKED_OBJS) $(CELLS_PACKED_OBJS) $(GENERATED_CODE)
+	$(RM) $(TARGETS) $(CELLS_UNPACKED_OBJS) $(CELLS_PACKED_OBJS) $(GENERATED_CODES)
