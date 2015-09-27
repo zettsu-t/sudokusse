@@ -9,9 +9,11 @@
 class SudokuMacroTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST_SUITE(SudokuMacroTest);
     CPPUNIT_TEST(test_arraySizeof);
+    CPPUNIT_TEST(test_useAvx);
     CPPUNIT_TEST_SUITE_END();
 protected:
     void test_arraySizeof();
+    void test_useAvx();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(SudokuMacroTest);
@@ -27,6 +29,12 @@ void SudokuMacroTest::test_arraySizeof() {
     };
     static LocalStruct structArray[expected];
     CPPUNIT_ASSERT_EQUAL(expected, arraySizeof(structArray));
+}
+
+void SudokuMacroTest::test_useAvx() {
+    constexpr uint64_t expected = SUDOKU_USE_AVX;
+    const uint64_t actual = sudokuXmmUseAvx;
+    CPPUNIT_ASSERT_EQUAL(expected, actual);
 }
 
 SudokuCellCandidates SudokuTestCommon::ConvertToCandidate(char index) {

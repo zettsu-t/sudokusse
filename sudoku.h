@@ -1,4 +1,4 @@
-// Sudoku solver with SSE 4.2
+// Sudoku solver with SSE 4.2 / AVX
 // Copyright (C) 2012-2015 Zettsu Tatsuya
 
 #include <stdint.h>
@@ -34,12 +34,13 @@ using SudokuNumber = int;                    // マスの初期設定の候補�
 using SudokuTime = unsigned long long;       // 時刻と時間
 using SudokuSseElement = uint32_t;           // SSE4.2命令で解く場合のN byteデータアクセス単位(3マス分)
 using gRegister = uint64_t;                                // 汎用レジスタ(必ず符号なし)
-using xmmRegister = __m128 __attribute__((aligned(16)));   // XMMレジスタ
+using xmmRegister = __m128;                  // XMMレジスタ
 using SudokuPatternCount = uint64_t;         // 解の数
 
 static_assert(sizeof(SudokuTime) == 8, "Unexpected SudokuTime size");
 static_assert(sizeof(SudokuSseElement) == 4, "Unexpected SudokuSseElement size");
 static_assert(sizeof(xmmRegister) == 16, "Unexpected xmmRegister size");
+static_assert((alignof(xmmRegister) % 16) == 0, "Unexpected xmmRegister alignment");
 
 // SSE4.2設定
 namespace SudokuSse {
@@ -244,8 +245,8 @@ public:
     SudokuSolver(const std::string& presetStr, SudokuIndex seed, std::ostream* pSudokuOutStream);
     SudokuSolver(const std::string& presetStr, SudokuIndex seed, std::ostream* pSudokuOutStream, SudokuPatternCount printAllCadidate);
     virtual ~SudokuSolver();
-    virtual bool Exec(bool silent, bool verbose);
-    virtual void PrintType(void);
+    virtual bool Exec(bool silent, bool verbose) override;
+    virtual void PrintType(void) override;
 private:
     bool solve(SudokuMap& map, bool topLevel, bool verbose);
     bool fillCells(SudokuMap& map, bool topLevel, bool verbose);
@@ -317,6 +318,7 @@ extern "C" {
     extern volatile uint64_t sudokuXmmAllPatternCnt;
     extern volatile uint64_t sudokuXmmPrintFunc;
     extern volatile uint64_t sudokuXmmAssumeCellsPacked;
+    extern volatile uint64_t sudokuXmmUseAvx;
     extern volatile uint64_t sudokuXmmDebug;
     extern XmmRegisterSet sudokuXmmToPrint;
 }
@@ -382,9 +384,9 @@ public:
     SudokuSseSolver(const std::string& presetStr, std::ostream* pSudokuOutStream, SudokuPatternCount printAllCadidate);
     SudokuSseSolver(const std::string& presetStr, SudokuIndex seed, std::ostream* pSudokuOutStream, SudokuPatternCount printAllCadidate);
     virtual ~SudokuSseSolver();
-    virtual bool Exec(bool silent, bool verbose);
+    virtual bool Exec(bool silent, bool verbose) override;
     virtual void Enumerate(void);
-    virtual void PrintType(void);
+    virtual void PrintType(void) override;
 private:
     void initialize(const std::string& presetStr, std::ostream* pSudokuOutStream);
     bool solve(SudokuSseMap& map, bool topLevel, bool verbose);

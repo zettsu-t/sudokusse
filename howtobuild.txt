@@ -1,15 +1,15 @@
-SSE4.2版 数独solver ビルドおよび実行方法
+SSE4.2 / AVX版 数独solver ビルドおよび実行方法
 Copyright (C) 2012-2015 Zettsu Tatsuya (是津達也)
 
 [ビルド環境]
 Windows 8.1 64 bit版
 
-Cygwin 64bit version (1.7.34)
-+ GNU Make 4.0
-+ g++ 4.9.2
+Cygwin 64bit version (2.2.1)
++ GNU Make 4.1
++ g++ 4.9.3
 + GNU assembler 2.25
-+ Ruby 2.0.0p598
-+ Perl 5.14.4
++ Ruby 2.2.2p95
++ Perl 5.22.0
 
 MinGW-w64 for 64 bit Windows でもビルドできますが、
 CppUnitと合わせてテストをビルドできることは確認していません。
@@ -42,6 +42,12 @@ CppUnit 1.12.1 (Cygwinのみ, MinGWは未対応)
   sudokusse_cells_packed.exe : 一部計算を簡略化したもの
 
 MinGWでビルドするときは、makeの代わりにmingw32-makeを使う。
+
+
+[SSE4.2とAVXの使い分け]
+
+変数EnableAvxの値が0の場合はSSE4.2, 1の場合はAVXを使用する。
+実行時ではなくビルド時に指定するので、Makefileにasの起動オプションとして指定する。
 
 
 [数独の初期ファイルを用意する]

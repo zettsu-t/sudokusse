@@ -1,4 +1,4 @@
-// Sudoku solver with SSE 4.2
+// Sudoku solver with SSE 4.2 / AVX
 // Copyright (C) 2012-2015 Zettsu Tatsuya
 
 #include "sudoku.h"

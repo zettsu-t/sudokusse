@@ -1,4 +1,4 @@
-// Sudoku solver with SSE 4.2
+// Sudoku solver with SSE 4.2 / AVX
 // Copyright (C) 2012-2015 Zettsu Tatsuya
 //
 // 数独を解く
@@ -1093,7 +1093,7 @@ SudokuSolver::~SudokuSolver() {
 
 // 解いて結果を出力する
 bool SudokuSolver::Exec(bool silent, bool verbose) {
-    auto result = solve(map_, true, verbose);
+    const auto result = solve(map_, true, verbose);
     if (silent == false) {
         map_.Print(pSudokuOutStream_);
     }

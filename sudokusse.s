@@ -1,8 +1,13 @@
-# Sudoku solver with SSE 4.2
-# Copyright (C) 2012-2013 Zettsu Tatsuya
+# Sudoku solver with SSE 4.2 / AVX
+# Copyright (C) 2012-2015 Zettsu Tatsuya
 
 .intel_syntax noprefix
 .file   "sudokuxmm.s"
+        # ビルド設定
+        # 1にするとAVX、0にするとSSEを使う
+        # Makefileで指定するのでここでは指定しない
+        # .set      EnableAvx, 1
+
         # 動作設定
         # 1にすると、すでに埋まっているマスは左上に固まっていると仮定する
         # Makefileで指定するのでここでは指定しない
@@ -30,6 +35,7 @@
         .global sudokuXmmPrintFunc
         .global sudokuXmmReturnAddr
         .global sudokuXmmAssumeCellsPacked
+        .global sudokuXmmUseAvx
         .global sudokuXmmDebug
         .global sudokuXmmToPrint
 
@@ -75,6 +81,7 @@ sudokuXmmPrintFunc:             .quad 0    # 表示関数のアドレス
 sudokuXmmStackPointer:          .quad 0    # 表示関数を呼び出す前のrsp
 sudokuXmmReturnAddr:            .quad 0    # return先アドレス
 sudokuXmmAssumeCellsPacked:     .quad CellsPacked    # マスは左上に固まっていると仮定する
+sudokuXmmUseAvx:                .quad EnableAvx      # SSE命令の代わりにAVX命令を使う
 sudokuXmmDebug:                 .quad 0    # デバッグ用
 
 # 81の繰り返し中のマスの候補
@@ -176,6 +183,105 @@ testFillNineUniqueCandidatesColumnX:          .quad 0, 0
         mov     gRegBitMask, elementBitMask
 .endm
 
+# SSEとAVXでオペランド数が変わらない命令
+.macro MacroMovq op1, op2
+.if (EnableAvx != 0)
+    vmovq \op1, \op2
+.else
+    movq  \op1, \op2
+.endif
+.endm
+
+.macro MacroMovdqa op1, op2
+.if (EnableAvx != 0)
+    vmovdqa \op1, \op2
+.else
+    movdqa  \op1, \op2
+.endif
+.endm
+
+.macro MacroPextrq op1, op2, op3
+.if (EnableAvx != 0)
+    vpextrq \op1, \op2, \op3
+.else
+    pextrq  \op1, \op2, \op3
+.endif
+.endm
+
+.macro MacroPextrw op1, op2, op3
+.if (EnableAvx != 0)
+    vpextrw \op1, \op2, \op3
+.else
+    pextrw  \op1, \op2, \op3
+.endif
+.endm
+
+# SSEとAVXでオペランド数が変わる命令
+.macro MacroPinsrq regDstX, regSrcX, op3
+.if (EnableAvx != 0)
+    vpinsrq \regDstX, \regDstX, \regSrcX, \op3
+.else
+    pinsrq  \regDstX, \regSrcX, \op3
+.endif
+.endm
+
+.macro MacroPinsrw regDstX, regSrcX, op3
+.if (EnableAvx != 0)
+    vpinsrw \regDstX, \regDstX, \regSrcX, \op3
+.else
+    pinsrw  \regDstX, \regSrcX, \op3
+.endif
+.endm
+
+.macro MacroAndnps regX, op2
+.if (EnableAvx != 0)
+    vandnps \regX, \regX, \op2
+.else
+    andnps  \regX, \op2
+.endif
+.endm
+
+.macro MacroAndps regX, op2
+.if (EnableAvx != 0)
+    vandps \regX, \regX, \op2
+.else
+    andps  \regX, \op2
+.endif
+.endm
+
+.macro MacroOrps regX, op2
+.if (EnableAvx != 0)
+    vorps \regX, \regX, \op2
+.else
+    orps  \regX, \op2
+.endif
+.endm
+
+.macro MacroOrps3op regDstX, regSrcX1, regSrcX2
+.if (EnableAvx != 0)
+    vorps \regDstX, \regSrcX1, \regSrcX2
+.else
+    MacroMovdqa \regDstX, \regSrcX1
+    MacroOrps   \regDstX, \regSrcX2
+.endif
+.endm
+
+.macro MacroXorps regX, op2
+.if (EnableAvx != 0)
+    vxorps \regX, \regX, \op2
+.else
+    xorps  \regX, \op2
+.endif
+.endm
+
+.macro MacroPhaddw regX, op2
+.if (EnableAvx != 0)
+    vphaddw \regX, \regX, \op2
+.else
+    phaddw  \regX, \op2
+.endif
+.endm
+
 # 0回シフトを防ぐ
 .macro ShlNonZero reg, count
 .if (\count != 0)
@@ -197,13 +303,21 @@ testFillNineUniqueCandidatesColumnX:          .quad 0, 0
 
 .macro PslldqNonZero regX, count
 .if (\count != 0)
-        pslldq \regX, \count
+   .if (EnableAvx != 0)
+        vpslldq \regX, \regX, \count
+   .else
+        pslldq  \regX, \count
+   .endif
 .endif
 .endm
 
 .macro PsrldqNonZero regX, count
 .if (\count != 0)
+   .if (EnableAvx != 0)
+        vpsrldq \regX, \regX, \count
+   .else
         psrldq \regX, \count
+   .endif
 .endif
 .endm
 
@@ -325,9 +439,14 @@ testMergeThreeElements2:
 
 # 3行ごとに候補をまとめる
 .macro OrThreeXmmRegs xRegDst, xRegSrc1, xRegSrc2, xRegSrc3
-        movdqa \xRegDst, \xRegSrc1
-        orps   \xRegDst, \xRegSrc2
-        orps   \xRegDst, \xRegSrc3
+.if (EnableAvx != 0)
+        vorps  \xRegDst, \xRegSrc1, \xRegSrc2
+        vorps  \xRegDst, \xRegDst,  \xRegSrc3
+.else
+        MacroMovdqa \xRegDst, \xRegSrc1
+        MacroOrps   \xRegDst, \xRegSrc2
+        MacroOrps   \xRegDst, \xRegSrc3
+.endif
 .endm
 
         .global testOrThreeXmmRegs
@@ -442,11 +561,11 @@ testCollectUniqueCandidatesInRowPart:
         .set   regSixToThreeElements,  \regWork3
         .set   regUniqueThreeElements, \regWork4
 
-        pextrq  regThreeElements, \regSrcX, 1
+        MacroPextrq regThreeElements, \regSrcX, 1
         xor     regHasZero, regHasZero
         CollectUniqueCandidatesInRowPart \regDst, regHasZero, regThreeElements, \regWork5, \regWork6, \regWork7, \regWork8, \regWork9
 
-        pextrq  regSixToThreeElements, \regSrcX, 0
+        MacroPextrq regSixToThreeElements, \regSrcX, 0
         mov     regThreeElements, regSixToThreeElements
         MaskLower32bit  regThreeElements
         CollectUniqueCandidatesInRowPart regUniqueThreeElements, regHasZero, regThreeElements, \regWork5, \regWork6, \regWork7, \regWork8, \regWork9
@@ -476,16 +595,16 @@ testCollectUniqueCandidatesInLine:
         .set    regElements1,    \regWork3
         .set    regElements2,    \regWork4
 
-        pextrq  regRowPartLow, \regSrcX, 1
+        MacroPextrq regRowPartLow, \regSrcX, 1
         FilterUniqueCandidatesInRowPart regElements1, regRowPartLow, 0, \regWork4, \regWork5, \regWork6, \regWork7
-        pinsrq  \regDstX,  regElements1, 1
+        MacroPinsrq \regDstX,  regElements1, 1
 
-        pextrq  regRowPartHigh, \regSrcX, 0
+        MacroPextrq regRowPartHigh, \regSrcX, 0
         mov     regRowPartLow, regRowPartHigh
         FilterUniqueCandidatesInRowPart regElements1, regRowPartLow,  0, \regWork4, \regWork5, \regWork6, \regWork7
         FilterUniqueCandidatesInRowPart regElements2, regRowPartHigh, 1, regRowPartLow, \regWork5, \regWork6, \regWork7
         or     regElements2, regElements1
-        pinsrq \regDstX, regElements2, 0
+        MacroPinsrq \regDstX, regElements2, 0
 .endm
 
         .global testFilterUniqueCandidatesInLine
@@ -515,15 +634,15 @@ testFCollectUniqueCandidatesInThreeLine:
 .macro SelectRowParts regDst, regRowX, outBoxShift
         .if (\outBoxShift == 0)
         # もっといい方法があるはず
-        pextrq \regDst, \regRowX, 0
+        MacroPextrq \regDst, \regRowX, 0
         MaskLower32bit  \regDst
 
         .elseif (\outBoxShift == 1)
-        pextrq \regDst, \regRowX, 0
+        MacroPextrq \regDst, \regRowX, 0
         ShrNonZero  \regDst, (boxRowByteSize * bitPerByte)
 
         .elseif (\outBoxShift == 2)
-        pextrq \regDst, \regRowX, 1
+        MacroPextrq \regDst, \regRowX, 1
         .endif
 .endm
 
@@ -545,9 +664,9 @@ testSelectRowParts2:
 
 # 指定列の行を取り出してすべて確定しているかどうかをフラグを立てる(確定してたらZF=1)
 .macro SelectRowAndCount regDstHigh, regDstLow, regRowX, regWork
-        pextrq  \regDstHigh, \regRowX, 1
+        MacroPextrq \regDstHigh, \regRowX, 1
         mov     \regWork,    \regDstHigh
-        pextrq  \regDstLow,  \regRowX, 0
+        MacroPextrq \regDstLow,  \regRowX, 0
         or      \regWork,    \regDstLow
         popcnt  \regWork,    \regWork
         cmp     \regWork, 9
@@ -687,29 +806,33 @@ testFillOneUniqueCandidates2:
         .set  regBitmaskX,   \regWork2X
 
         # 全bitを1にする
-        pcmpeqw \regWork1X, \regWork1X
+.if (EnableAvx != 0)
+        vpcmpeqw \regWork1X, \regWork1X, \regWork1X
+.else
+        pcmpeqw  \regWork1X, \regWork1X
+.endif
 
         # ビットマスク
         mov    regBitmask,  rowPartBitMask
-        movq   regBitmaskX, regBitmask
+        MacroMovq regBitmaskX, regBitmask
         PslldqNonZero regBitmaskX, (boxRowByteSize * \outBoxShift)
-        andnps regBitmaskX, \regWork1X
+        MacroAndnps regBitmaskX, \regWork1X
 
         mov    regCandidate, \regNewElement
-        movq   regCandidateX, regCandidate
+        MacroMovq regCandidateX, regCandidate
         PslldqNonZero regCandidateX, (boxRowByteSize * \outBoxShift)
-        orps   regBitmaskX, regCandidateX
-        andps  \regResultRowX, regBitmaskX
+        MacroOrps  regBitmaskX, regCandidateX
+        MacroAndps \regResultRowX, regBitmaskX
 
         popcnt \regWork4, \regNewElement
         cmp    \regWork4, 3
         # cmovで0を代入するより、分岐したほうが速い
         ja     1121f
 
-        movq   regCandidateX, \regNewElement
+        MacroMovq regCandidateX, \regNewElement
         PslldqNonZero regCandidateX, (boxRowByteSize * \outBoxShift)
-        orps   xRegRowAll, regCandidateX
-        orps   \regResultBoxX, regCandidateX
+        MacroOrps xRegRowAll, regCandidateX
+        MacroOrps \regResultBoxX, regCandidateX
 1121:
 .endm
 
@@ -907,9 +1030,9 @@ testFindThreePartsCandidates:
 .macro TestFillThreePartsUniqueCandidates outBoxShift
         InitMaskRegister
         FillThreePartsUniqueCandidates rax, xRegRow1to3, xRegRow1, xRegRowAll, \outBoxShift, rdx, rsi, r8, r9, r10, r11, r12, r13, r14, xRegWork1, xRegWork2
-        movdqa  [rip + testFillNineUniqueCandidatesRowX],    xmm1
-        movdqa  [rip + testFillNineUniqueCandidatesBoxX],    xmm10
-        movdqa  [rip + testFillNineUniqueCandidatesColumnX], xmm0
+        MacroMovdqa ([rip + testFillNineUniqueCandidatesRowX]),    xmm1
+        MacroMovdqa ([rip + testFillNineUniqueCandidatesBoxX]),    xmm10
+        MacroMovdqa ([rip + testFillNineUniqueCandidatesColumnX]), xmm0
         ret
 .endm
 
@@ -932,9 +1055,9 @@ testFillThreePartsUniqueCandidates2:
         InitMaskRegister
         mov     rax, [rip + testFillNineUniqueCandidatesPreRow]
         FillRowPartCandidates rax, xRegRow1to3, xRegRow1, xRegRowAll, \outBoxShiftTarget, \outBoxShiftOtherA, \outBoxShiftOtherB, rbx, rcx, rdx, rsi, r8, r9, r10, r11, r12, r13, r14, xRegWork1, xRegWork2
-        movdqa  [rip + testFillNineUniqueCandidatesRowX],    xmm1
-        movdqa  [rip + testFillNineUniqueCandidatesBoxX],    xmm10
-        movdqa  [rip + testFillNineUniqueCandidatesColumnX], xmm0
+        MacroMovdqa ([rip + testFillNineUniqueCandidatesRowX]),    xmm1
+        MacroMovdqa ([rip + testFillNineUniqueCandidatesBoxX]),    xmm10
+        MacroMovdqa ([rip + testFillNineUniqueCandidatesColumnX]), xmm0
         ret
 .endm
 
@@ -968,9 +1091,9 @@ testTestFillRowPartCandidates2:
 testFillNineUniqueCandidates:
         InitMaskRegister
         FillNineUniqueCandidates xRegRow1to3, xRegRow1, xRegRowAll, rax, rbx, rcx, rdx, rsi, r8, r9, r10, r11, r12, r13, r14, xRegWork1, xRegWork2
-        movdqa  [rip + testFillNineUniqueCandidatesRowX],    xmm1
-        movdqa  [rip + testFillNineUniqueCandidatesBoxX],    xmm10
-        movdqa  [rip + testFillNineUniqueCandidatesColumnX], xmm0
+        MacroMovdqa ([rip + testFillNineUniqueCandidatesRowX]),    xmm1
+        MacroMovdqa ([rip + testFillNineUniqueCandidatesBoxX]),    xmm10
+        MacroMovdqa ([rip + testFillNineUniqueCandidatesColumnX]), xmm0
         ret
 
 .macro Collect27UniqueCandidates regBoxX, regRow1X, regRow2X, regRow3X, regColumnX, regWork1, regWork2, regWork3, regWork4, regWork5, regWork6, regWork7, regWork8, regWork9, regWork10, regWork11, regWork12, regWork13, regWork1X, regWork2X
@@ -1032,8 +1155,7 @@ testFindRowPartCandidates2:
         .set  regRowCandidates, \regWork7
         .set  regBox, \regWork8
 
-        movdqa \regBoxX, \regRow1X
-        orps   \regBoxX, \regRow2X
+        MacroOrps3op \regBoxX, \regRow1X, \regRow2X
         OrThreeXmmRegs \regColumnX, \regBoxX, \regThreeRow1X, \regThreeRow2X
 
         # selectRowPartsの繰り返しをまとめる
@@ -1057,22 +1179,22 @@ testFindRowPartCandidates2:
         FindRowPartCandidates  regRowPart1, regRowPart2, regRowPartCandidates1, regRowPartCandidates2, regRowPartCandidates0, regRowCandidates, regBox, \regBoxX, \regColumnX, 1, \regWork9, \regWork10, \regWork11, \regWork12, \regWork13, \regWork1X, \regWork2X
         FindRowPartCandidates  regRowPart0, regRowPart1, regRowPartCandidates0, regRowPartCandidates1, regRowPartCandidates2, regRowCandidates, regBox, \regBoxX, \regColumnX, 0, \regWork9, \regWork10, \regWork11, \regWork12, \regWork13, \regWork1X, \regWork2X
 
-        pinsrq  \regTargetRowX, regRowPart2, 1
+        MacroPinsrq \regTargetRowX, regRowPart2, 1
         ShlNonZero  regRowPart1, (boxRowByteSize * bitPerByte)
         or      regRowPart1, regRowPart0
-        pinsrq  \regTargetRowX, regRowPart1, 0
+        MacroPinsrq \regTargetRowX, regRowPart1, 0
 1001:
 .endm
 
         .global testFindNineCandidates
 testFindNineCandidates:
         InitMaskRegister
-        xorps   xRegRow4to6, xRegRow4to6
-        xorps   xRegRow7to9, xRegRow7to9
+        MacroXorps xRegRow4to6, xRegRow4to6
+        MacroXorps xRegRow7to9, xRegRow7to9
         FindNineCandidates xRegRow1, xRegRow2, xRegRow3, xRegRow1to3, xRegRow4to6, xRegRow7to9, xRegRowAll, rax, rbx, rcx, rdx, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, xRegWork1, xRegWork2
-        movdqa  [rip + testFillNineUniqueCandidatesRowX],    xmm1
-        movdqa  [rip + testFillNineUniqueCandidatesBoxX],    xmm10
-        movdqa  [rip + testFillNineUniqueCandidatesColumnX], xmm0
+        MacroMovdqa ([rip + testFillNineUniqueCandidatesRowX]),    xmm1
+        MacroMovdqa ([rip + testFillNineUniqueCandidatesBoxX]),    xmm10
+        MacroMovdqa ([rip + testFillNineUniqueCandidatesColumnX]), xmm0
         ret
 
 .macro Find27UniqueCandidates regRow1X, regRow2X, regRow3X, regBoxX, regThreeRow1X, regThreeRow2X, regColumnX, regWork1, regWork2, regWork3, regWork4, regWork5, regWork6, regWork7, regWork8, regWork9, regWork10, regWork11, regWork12, regWork13, regWork1X, regWork2X
@@ -1097,10 +1219,10 @@ testFindNineCandidates:
 # 何マス埋まったか調べる(前回の結果をregPrevPopcntに退避する)
 .macro CountFilledElements reg64LoopCnt, reg64CurrentPopcnt, reg64PrevPopcnt, regWork
         # もしかしたらメモリの方が速いかもしれない
-        pextrq  \reg64PrevPopcnt, xLoopPopCnt, 0
-        pextrq  \reg64LoopCnt,    xLoopPopCnt, 1
-        pextrq  \reg64CurrentPopcnt, xRegRowAll, 0
-        pextrq  \regWork,            xRegRowAll, 1
+        MacroPextrq \reg64PrevPopcnt, xLoopPopCnt, 0
+        MacroPextrq \reg64LoopCnt,    xLoopPopCnt, 1
+        MacroPextrq \reg64CurrentPopcnt, xRegRowAll, 0
+        MacroPextrq \regWork,            xRegRowAll, 1
         popcnt  \reg64CurrentPopcnt, \reg64CurrentPopcnt
         popcnt  \regWork, \regWork
         add     \reg64CurrentPopcnt, \regWork
@@ -1112,9 +1234,9 @@ testCountFilledElements:
         ret
 
 # 前回の結果を保存する
-.macro SaveLoopCnt reg64LoopCnt, regCurrentPopcnt
-        pinsrq  xLoopPopCnt, \regCurrentPopcnt, 0
-        pinsrq  xLoopPopCnt, \reg64LoopCnt, 1
+    .macro SaveLoopCnt reg64LoopCnt, regCurrentPopcnt
+        MacroPinsrq xLoopPopCnt, \regCurrentPopcnt, 0
+        MacroPinsrq xLoopPopCnt, \reg64LoopCnt, 1
 .endm
 
         .global testSaveLoopCnt
@@ -1297,8 +1419,8 @@ testSearchRowPartElements:
         .set  regRowPart2, \regWork3
         .set  regSearched, \regWork4
 
-        pextrq  regRowPart2, \regRowX, 1
-        pextrq  regRowPart1, \regRowX, 0
+        MacroPextrq regRowPart2, \regRowX, 1
+        MacroPextrq regRowPart1, \regRowX, 0
         SplitRowLowParts regRowPart0, regRowPart1
 
         or      \regOutBoxShift, \regOutBoxShift
@@ -1322,7 +1444,7 @@ testSearchRowPartElements:
         # メモリに書き込んで終了
         ShlNonZero  regRowPart1, (boxRowByteSize * bitPerByte)
         or      regRowPart1, regRowPart0
-        pinsrq  \regRowX, regRowPart1, 0
+        MacroPinsrq \regRowX, regRowPart1, 0
         jmp     endSearchNextCandidate
 
 111:
@@ -1334,7 +1456,7 @@ testSearchRowPartElements:
         jz      121f
 
         # メモリに書き込んで終了
-        pinsrq  \regRowX, regRowPart2, 1
+        MacroPinsrq \regRowX, regRowPart2, 1
         jmp     endSearchNextCandidate
 
 121:
@@ -1511,42 +1633,42 @@ endSearchNextCandidate:
 
         .global loadXmmRegisters
 loadXmmRegisters:
-        movdqa xmm0,  xmmword ptr [rsi]
-        movdqa xmm1,  xmmword ptr [rsi+16]
-        movdqa xmm2,  xmmword ptr [rsi+32]
-        movdqa xmm3,  xmmword ptr [rsi+48]
-        movdqa xmm4,  xmmword ptr [rsi+64]
-        movdqa xmm5,  xmmword ptr [rsi+80]
-        movdqa xmm6,  xmmword ptr [rsi+96]
-        movdqa xmm7,  xmmword ptr [rsi+112]
-        movdqa xmm8,  xmmword ptr [rsi+128]
-        movdqa xmm9,  xmmword ptr [rsi+144]
-        movdqa xmm10, xmmword ptr [rsi+160]
-        movdqa xmm11, xmmword ptr [rsi+176]
-        movdqa xmm12, xmmword ptr [rsi+192]
-        movdqa xmm13, xmmword ptr [rsi+208]
-        movdqa xmm14, xmmword ptr [rsi+224]
-        movdqa xmm15, xmmword ptr [rsi+240]
+        MacroMovdqa xmm0,  (xmmword ptr [rsi])
+        MacroMovdqa xmm1,  (xmmword ptr [rsi+16])
+        MacroMovdqa xmm2,  (xmmword ptr [rsi+32])
+        MacroMovdqa xmm3,  (xmmword ptr [rsi+48])
+        MacroMovdqa xmm4,  (xmmword ptr [rsi+64])
+        MacroMovdqa xmm5,  (xmmword ptr [rsi+80])
+        MacroMovdqa xmm6,  (xmmword ptr [rsi+96])
+        MacroMovdqa xmm7,  (xmmword ptr [rsi+112])
+        MacroMovdqa xmm8,  (xmmword ptr [rsi+128])
+        MacroMovdqa xmm9,  (xmmword ptr [rsi+144])
+        MacroMovdqa xmm10, (xmmword ptr [rsi+160])
+        MacroMovdqa xmm11, (xmmword ptr [rsi+176])
+        MacroMovdqa xmm12, (xmmword ptr [rsi+192])
+        MacroMovdqa xmm13, (xmmword ptr [rsi+208])
+        MacroMovdqa xmm14, (xmmword ptr [rsi+224])
+        MacroMovdqa xmm15, (xmmword ptr [rsi+240])
         ret
 
         .global saveXmmRegisters
 saveXmmRegisters:
-        movdqa xmmword ptr [rdi],     xmm0
-        movdqa xmmword ptr [rdi+16],  xmm1
-        movdqa xmmword ptr [rdi+32],  xmm2
-        movdqa xmmword ptr [rdi+48],  xmm3
-        movdqa xmmword ptr [rdi+64],  xmm4
-        movdqa xmmword ptr [rdi+80],  xmm5
-        movdqa xmmword ptr [rdi+96],  xmm6
-        movdqa xmmword ptr [rdi+112], xmm7
-        movdqa xmmword ptr [rdi+128], xmm8
-        movdqa xmmword ptr [rdi+144], xmm9
-        movdqa xmmword ptr [rdi+160], xmm10
-        movdqa xmmword ptr [rdi+176], xmm11
-        movdqa xmmword ptr [rdi+192], xmm12
-        movdqa xmmword ptr [rdi+208], xmm13
-        movdqa xmmword ptr [rdi+224], xmm14
-        movdqa xmmword ptr [rdi+240], xmm15
+        MacroMovdqa (xmmword ptr [rdi]),     xmm0
+        MacroMovdqa (xmmword ptr [rdi+16]),  xmm1
+        MacroMovdqa (xmmword ptr [rdi+32]),  xmm2
+        MacroMovdqa (xmmword ptr [rdi+48]),  xmm3
+        MacroMovdqa (xmmword ptr [rdi+64]),  xmm4
+        MacroMovdqa (xmmword ptr [rdi+80]),  xmm5
+        MacroMovdqa (xmmword ptr [rdi+96]),  xmm6
+        MacroMovdqa (xmmword ptr [rdi+112]), xmm7
+        MacroMovdqa (xmmword ptr [rdi+128]), xmm8
+        MacroMovdqa (xmmword ptr [rdi+144]), xmm9
+        MacroMovdqa (xmmword ptr [rdi+160]), xmm10
+        MacroMovdqa (xmmword ptr [rdi+176]), xmm11
+        MacroMovdqa (xmmword ptr [rdi+192]), xmm12
+        MacroMovdqa (xmmword ptr [rdi+208]), xmm13
+        MacroMovdqa (xmmword ptr [rdi+224]), xmm14
+        MacroMovdqa (xmmword ptr [rdi+240]), xmm15
         ret
 
 # 数独の個数を数える
@@ -1604,32 +1726,45 @@ saveXmmRegisters:
 
 .macro FastCollectCandidatesAtRow regSum, regTarget, regWork1, regWork2, xRegSrc, columnNumber, rowNumber
         .if ((\columnNumber + 1) == candidatesNum)
+         .if (EnableAvx != 0)
+        vphaddw xRegWork1, \xRegSrc,  xRegWork2
+        vphaddw xRegWork1, xRegWork1, xRegWork2
+        vphaddw xRegWork1, xRegWork1, xRegWork2
+        MacroPextrw \regSum, xRegWork1, 0
+         .else
         movdqa  xRegWork1, \xRegSrc
         phaddw  xRegWork1, xRegWork2
         phaddw  xRegWork1, xRegWork2
         phaddw  xRegWork1, xRegWork2
         pextrw  \regSum, xRegWork1, 0
+         .endif
 
          .if ((\rowNumber + 1) == candidatesNum)
         mov     \regTarget, gRightBottomElement
          .else
-        pextrw  \regTarget, xRightestColumn, \rowNumber
+        MacroPextrw \regTarget, xRightestColumn, \rowNumber
          .endif
 
         .else
-        movdqa  xRegWork1, \xRegSrc
-        phaddw  xRegWork1, xRegWork2
-        phaddw  xRegWork1, xRegWork2
-        phaddw  xRegWork1, xRegWork2
+         .if (EnableAvx != 0)
+        vphaddw xRegWork1, \xRegSrc,  xRegWork2
+        vphaddw xRegWork1, xRegWork1, xRegWork2
+        vphaddw xRegWork1, xRegWork1, xRegWork2
+         .else
+        MacroMovdqa xRegWork1, \xRegSrc
+        MacroPhaddw xRegWork1, xRegWork2
+        MacroPhaddw xRegWork1, xRegWork2
+        MacroPhaddw xRegWork1, xRegWork2
+         .endif
 
-        pextrw  \regTarget, \xRegSrc, \columnNumber
+        MacroPextrw \regTarget, \xRegSrc, \columnNumber
          .if ((\rowNumber + 1) == candidatesNum)
         mov     \regSum, gRightBottomElement
          .else
-        pextrw  \regSum, xRightestColumn, \rowNumber
+        MacroPextrw \regSum, xRightestColumn, \rowNumber
          .endif
 
-        pextrw  \regWork1, xRegWork1, 0
+        MacroPextrw \regWork1, xRegWork1, 0
         or      \regSum, \regWork1
         xor     \regSum, \regTarget
         .endif
@@ -1682,16 +1817,16 @@ testFastCollectCandidatesAtRow88:
 
 .macro FastCollectCandidatesAtBox regSum, xRowSrc, regWork, columnNumber1, columnNumber2, rowNumber
         .if ((\columnNumber2 + 1) == candidatesNum)
-        pextrw  \regSum,  \xRowSrc, \columnNumber1
+        MacroPextrw \regSum,  \xRowSrc, \columnNumber1
          .if ((\rowNumber + 1) == candidatesNum)
         mov     \regWork, gRightBottomElement
          .else
-        pextrw  \regWork, xRightestColumn, \rowNumber
+        MacroPextrw \regWork, xRightestColumn, \rowNumber
          .endif
 
         .else
-        pextrw  \regSum,  \xRowSrc, \columnNumber1
-        pextrw  \regWork, \xRowSrc, \columnNumber2
+        MacroPextrw \regSum,  \xRowSrc, \columnNumber1
+        MacroPextrw \regWork, \xRowSrc, \columnNumber2
         .endif
 
         or      \regSum,  \regWork
@@ -1699,9 +1834,9 @@ testFastCollectCandidatesAtRow88:
 
 .macro testFastCollectCandidatesAtBox xRegSrc, columnNumber1, columnNumber2, rowNumber
         InitRegisterBeforeTesting
-        xorps   xRightestColumn, xRightestColumn
+        MacroXorps xRightestColumn, xRightestColumn
         mov     gRegWork64, 1
-        pinsrq  xRightestColumn, gRegWork64, 0
+        MacroPinsrq xRightestColumn, gRegWork64, 0
         mov     gRightBottomElement, gRegOne
 
         xor     rax, rax
@@ -1725,30 +1860,36 @@ testFastCollectCandidatesAtBox788:
 
 .macro FastCollectCandidatesAtColumn regSum, regWork1, columnNumber, rowNumber
         .if ((\columnNumber + 1) == candidatesNum)
-        movdqa  xRegWork1, xRightestColumn
-        phaddw  xRegWork1, xRegWork2
-        phaddw  xRegWork1, xRegWork2
-        phaddw  xRegWork1, xRegWork2
-        pextrw  \regSum, xRegWork1, 0
+         .if (EnableAvx != 0)
+        vphaddw xRegWork1, xRightestColumn, xRegWork2
+        vphaddw xRegWork1, xRegWork1, xRegWork2
+        vphaddw xRegWork1, xRegWork1, xRegWork2
+        MacroPextrw \regSum, xRegWork1, 0
+         .else
+        MacroMovdqa xRegWork1, xRightestColumn
+        MacroPhaddw xRegWork1, xRegWork2
+        MacroPhaddw xRegWork1, xRegWork2
+        MacroPhaddw xRegWork1, xRegWork2
+        MacroPextrw \regSum, xRegWork1, 0
+         .endif
 
          .if ((\rowNumber + 1) < candidatesNum)
         or      \regSum, gRightBottomElement
-        pextrw  \regWork1, xRightestColumn, \rowNumber
+        MacroPextrw \regWork1, xRightestColumn, \rowNumber
         xor     \regSum, \regWork1
          .endif
 
         .else
-        xorps   xRegWork2, xRegWork2
-        xorps   xRegWork3, xRegWork3
+        MacroXorps xRegWork2, xRegWork2
+        MacroXorps xRegWork3, xRegWork3
 
          .if (CellsPacked != 0)
           .if (\rowNumber == 0)
-        xorps  xRegWork1, xRegWork1
+        MacroXorps xRegWork1, xRegWork1
           .elseif (\rowNumber == 1)
-        movdqa xRegWork1, xRegRow1
+        MacroMovdqa xRegWork1, xRegRow1
           .elseif (\rowNumber >= 2)
-        movdqa xRegWork1, xRegRow1
-        orps   xRegWork1, xRegRow2
+        MacroOrps3op xRegWork1, xRegRow1, xRegRow2
           .endif
 
          .else
@@ -1757,56 +1898,51 @@ testFastCollectCandidatesAtBox788:
           .elseif (\rowNumber == 1)
         movdqa xRegWork1, xRegRow1
           .else
-        movdqa xRegWork1, xRegRow1
-        orps   xRegWork1, xRegRow2
+        MacroOrps3op xRegWork1, xRegRow1, xRegRow2
           .endif
          .endif
 
          .if ((CellsPacked == 0) || (\rowNumber >= 2))
           .if (\rowNumber != 2)
-        orps   xRegWork1, xRegRow3
+        MacroOrps xRegWork1, xRegRow3
           .endif
 
           .if ((CellsPacked != 0) && (\rowNumber <= 3))
           .elseif ((CellsPacked != 0) && (\rowNumber == 4))
-        movdqa xRegWork2, xRegRow4
+        MacroMovdqa xRegWork2, xRegRow4
           .elseif ((CellsPacked != 0) && (\rowNumber == 5))
-        movdqa xRegWork2, xRegRow4
-        orps   xRegWork2, xRegRow5
+        MacroOrps3op xRegWork2, xRegRow4, xRegRow5
           .else
            .if (\rowNumber == 3)
-        movdqa xRegWork2, xRegRow5
+        MacroMovdqa xRegWork2, xRegRow5
            .elseif (\rowNumber == 4)
-        movdqa xRegWork2, xRegRow4
+        MacroMovdqa xRegWork2, xRegRow4
            .else
-        movdqa xRegWork2, xRegRow4
-        orps   xRegWork2, xRegRow5
+        MacroOrps3op xRegWork2, xRegRow4, xRegRow5
            .endif
 
            .if ((CellsPacked == 0) || (\rowNumber >= 5))
             .if (\rowNumber != 5)
-        orps   xRegWork2, xRegRow6
+        MacroOrps xRegWork2, xRegRow6
             .endif
 
             .if ((CellsPacked != 0) && (\rowNumber <= 6))
             .elseif ((CellsPacked != 0) && (\rowNumber == 7))
-        movdqa xRegWork3, xRegRow7
+        MacroMovdqa xRegWork3, xRegRow7
             .elseif ((CellsPacked != 0) && (\rowNumber == 8))
-        movdqa xRegWork3, xRegRow7
-        orps   xRegWork3, xRegRow8
+        MacroOrps3op xRegWork3, xRegRow7, xRegRow8
             .else
              .if (\rowNumber == 6)
-        movdqa xRegWork3, xRegRow8
+        MacroMovdqa xRegWork3, xRegRow8
              .elseif (\rowNumber == 7)
-        movdqa xRegWork3, xRegRow7
+        MacroMovdqa xRegWork3, xRegRow7
              .else
-        movdqa xRegWork3, xRegRow7
-        orps   xRegWork3, xRegRow8
+        MacroOrps3op xRegWork3, xRegRow7, xRegRow8
              .endif
 
              .if ((CellsPacked == 0) || (\rowNumber >= 8))
               .if (\rowNumber != 8)
-        orps   xRegWork3, xRegRow9
+        MacroOrps xRegWork3, xRegRow9
               .endif
              .endif
             .endif
@@ -1814,9 +1950,10 @@ testFastCollectCandidatesAtBox788:
           .endif
          .endif
 
-        orps   xRegWork1, xRegWork2
-        orps   xRegWork1, xRegWork3
-        pextrw  \regSum, xRegWork1, \columnNumber
+        # xRegWork1も反映させる
+        MacroOrps xRegWork1, xRegWork2
+        MacroOrps xRegWork1, xRegWork3
+        MacroPextrw \regSum, xRegWork1, \columnNumber
         .endif
 .endm
 
@@ -1825,26 +1962,26 @@ testFastCollectCandidatesAtBox788:
         xor     rax, rax
         mov     gRightBottomElement, 0x100
 
-        xorps   xRegRow1, xRegRow1
+        MacroXorps xRegRow1, xRegRow1
         mov     gRegWork64, 1
-        pinsrq  xRegRow1, gRegWork64, 0
+        MacroPinsrq xRegRow1, gRegWork64, 0
         mov     gRegWork64, 0x80000000000000
-        pinsrq  xRegRow1, gRegWork64, 1
-        xorps   xRegRow2, xRegRow2
+        MacroPinsrq xRegRow1, gRegWork64, 1
+        MacroXorps xRegRow2, xRegRow2
 
-        xorps   xRegRow3, xRegRow3
-        xorps   xRegRow4, xRegRow4
-        xorps   xRegRow5, xRegRow5
-        xorps   xRegRow6, xRegRow6
-        xorps   xRegRow7, xRegRow7
-        xorps   xRegRow8, xRegRow8
-        xorps   xRegRow9, xRegRow9
-        xorps   xRightestColumn, xRightestColumn
+        MacroXorps xRegRow3, xRegRow3
+        MacroXorps xRegRow4, xRegRow4
+        MacroXorps xRegRow5, xRegRow5
+        MacroXorps xRegRow6, xRegRow6
+        MacroXorps xRegRow7, xRegRow7
+        MacroXorps xRegRow8, xRegRow8
+        MacroXorps xRegRow9, xRegRow9
+        MacroXorps xRightestColumn, xRightestColumn
 
         mov     gRegWork64, 0x80004000200010
-        pinsrq  xRightestColumn, gRegWork64, 1
+        MacroPinsrq xRightestColumn, gRegWork64, 1
         mov     gRegWork64, 0x8000400020001
-        pinsrq  xRightestColumn, gRegWork64, 0
+        MacroPinsrq xRightestColumn, gRegWork64, 0
 
         xor     rax, rax
         .if (UseReg64Most != 0)
@@ -1941,27 +2078,27 @@ testFastCollectCandidatesAtColumn88:
 .macro FastSetUniqueCandidatesAtCellSub regCandidate, xRegSrcTarget, columnNumber, rowNumber
         .if ((\columnNumber + 1) == candidatesNum)
          .if ((\rowNumber + 1) < candidatesNum)
-        pinsrw xRightestColumn, \regCandidate, \rowNumber
+        MacroPinsrw xRightestColumn, \regCandidate, \rowNumber
          .else
         mov  gRightBottomElement, \regCandidate
          .endif
 
         .else
-        pinsrw \xRegSrcTarget, \regCandidate, \columnNumber
+        MacroPinsrw \xRegSrcTarget, \regCandidate, \columnNumber
         .endif
 .endm
 
 .macro testFastSetUniqueCandidatesAtCellSub xRegSrcTarget, columnNumber, rowNumber
         InitRegisterBeforeTesting
-        xorps  \xRegSrcTarget, \xRegSrcTarget
-        xorps  xRightestColumn, xRightestColumn
+        MacroXorps \xRegSrcTarget, \xRegSrcTarget
+        MacroXorps xRightestColumn, xRightestColumn
         mov    gRegWork1, 1
         FastSetUniqueCandidatesAtCellSub gRegWork1, \xRegSrcTarget, \columnNumber, \rowNumber
 
-        pextrq  rax, \xRegSrcTarget, 1
-        pextrq  rbx, \xRegSrcTarget, 0
-        pextrq  rcx, xRightestColumn, 1
-        pextrq  rdx, xRightestColumn, 0
+        MacroPextrq rax, \xRegSrcTarget, 1
+        MacroPextrq rbx, \xRegSrcTarget, 0
+        MacroPextrq rcx, xRightestColumn, 1
+        MacroPextrq rdx, xRightestColumn, 0
 
         xor     rsi, rsi
         .if (UseReg64Most != 0)
@@ -2029,22 +2166,22 @@ testFastSetUniqueCandidatesAtCellSub88:
 .endm
 
 .macro FastPrintAllCells
-        movdqa  xmmword ptr [rip + sudokuXmmToPrint],     xmm0
-        movdqa  xmmword ptr [rip + sudokuXmmToPrint+16],  xmm1
-        movdqa  xmmword ptr [rip + sudokuXmmToPrint+32],  xmm2
-        movdqa  xmmword ptr [rip + sudokuXmmToPrint+48],  xmm3
-        movdqa  xmmword ptr [rip + sudokuXmmToPrint+64],  xmm4
-        movdqa  xmmword ptr [rip + sudokuXmmToPrint+80],  xmm5
-        movdqa  xmmword ptr [rip + sudokuXmmToPrint+96],  xmm6
-        movdqa  xmmword ptr [rip + sudokuXmmToPrint+112], xmm7
-        movdqa  xmmword ptr [rip + sudokuXmmToPrint+128], xmm8
-        movdqa  xmmword ptr [rip + sudokuXmmToPrint+144], xmm9
-        movdqa  xmmword ptr [rip + sudokuXmmToPrint+160], xmm10
-        movdqa  xmmword ptr [rip + sudokuXmmToPrint+176], xmm11
-        movdqa  xmmword ptr [rip + sudokuXmmToPrint+192], xmm12
-        movdqa  xmmword ptr [rip + sudokuXmmToPrint+208], xmm13
-        movdqa  xmmword ptr [rip + sudokuXmmToPrint+224], xmm14
-        movdqa  xmmword ptr [rip + sudokuXmmToPrint+240], xmm15
+        MacroMovdqa  (xmmword ptr [rip + sudokuXmmToPrint]),     xmm0
+        MacroMovdqa  (xmmword ptr [rip + sudokuXmmToPrint+16]),  xmm1
+        MacroMovdqa  (xmmword ptr [rip + sudokuXmmToPrint+32]),  xmm2
+        MacroMovdqa  (xmmword ptr [rip + sudokuXmmToPrint+48]),  xmm3
+        MacroMovdqa  (xmmword ptr [rip + sudokuXmmToPrint+64]),  xmm4
+        MacroMovdqa  (xmmword ptr [rip + sudokuXmmToPrint+80]),  xmm5
+        MacroMovdqa  (xmmword ptr [rip + sudokuXmmToPrint+96]),  xmm6
+        MacroMovdqa  (xmmword ptr [rip + sudokuXmmToPrint+112]), xmm7
+        MacroMovdqa  (xmmword ptr [rip + sudokuXmmToPrint+128]), xmm8
+        MacroMovdqa  (xmmword ptr [rip + sudokuXmmToPrint+144]), xmm9
+        MacroMovdqa  (xmmword ptr [rip + sudokuXmmToPrint+160]), xmm10
+        MacroMovdqa  (xmmword ptr [rip + sudokuXmmToPrint+176]), xmm11
+        MacroMovdqa  (xmmword ptr [rip + sudokuXmmToPrint+192]), xmm12
+        MacroMovdqa  (xmmword ptr [rip + sudokuXmmToPrint+208]), xmm13
+        MacroMovdqa  (xmmword ptr [rip + sudokuXmmToPrint+224]), xmm14
+        MacroMovdqa  (xmmword ptr [rip + sudokuXmmToPrint+240]), xmm15
 
         push    rbp
         mov     qword ptr [rip + sudokuXmmStackPointer], rsp
@@ -2062,22 +2199,22 @@ testFastSetUniqueCandidatesAtCellSub88:
         mov     rsp, qword ptr [rip + sudokuXmmStackPointer]
         pop     rbp
 
-        movdqa  xmm0,  xmmword ptr [rip + sudokuXmmToPrint]
-        movdqa  xmm1,  xmmword ptr [rip + sudokuXmmToPrint+16]
-        movdqa  xmm2,  xmmword ptr [rip + sudokuXmmToPrint+32]
-        movdqa  xmm3,  xmmword ptr [rip + sudokuXmmToPrint+48]
-        movdqa  xmm4,  xmmword ptr [rip + sudokuXmmToPrint+64]
-        movdqa  xmm5,  xmmword ptr [rip + sudokuXmmToPrint+80]
-        movdqa  xmm6,  xmmword ptr [rip + sudokuXmmToPrint+96]
-        movdqa  xmm7,  xmmword ptr [rip + sudokuXmmToPrint+112]
-        movdqa  xmm8,  xmmword ptr [rip + sudokuXmmToPrint+128]
-        movdqa  xmm9,  xmmword ptr [rip + sudokuXmmToPrint+144]
-        movdqa  xmm10, xmmword ptr [rip + sudokuXmmToPrint+160]
-        movdqa  xmm11, xmmword ptr [rip + sudokuXmmToPrint+176]
-        movdqa  xmm12, xmmword ptr [rip + sudokuXmmToPrint+192]
-        movdqa  xmm13, xmmword ptr [rip + sudokuXmmToPrint+208]
-        movdqa  xmm14, xmmword ptr [rip + sudokuXmmToPrint+224]
-        movdqa  xmm15, xmmword ptr [rip + sudokuXmmToPrint+240]
+        MacroMovdqa  xmm0,  (xmmword ptr [rip + sudokuXmmToPrint])
+        MacroMovdqa  xmm1,  (xmmword ptr [rip + sudokuXmmToPrint+16])
+        MacroMovdqa  xmm2,  (xmmword ptr [rip + sudokuXmmToPrint+32])
+        MacroMovdqa  xmm3,  (xmmword ptr [rip + sudokuXmmToPrint+48])
+        MacroMovdqa  xmm4,  (xmmword ptr [rip + sudokuXmmToPrint+64])
+        MacroMovdqa  xmm5,  (xmmword ptr [rip + sudokuXmmToPrint+80])
+        MacroMovdqa  xmm6,  (xmmword ptr [rip + sudokuXmmToPrint+96])
+        MacroMovdqa  xmm7,  (xmmword ptr [rip + sudokuXmmToPrint+112])
+        MacroMovdqa  xmm8,  (xmmword ptr [rip + sudokuXmmToPrint+128])
+        MacroMovdqa  xmm9,  (xmmword ptr [rip + sudokuXmmToPrint+144])
+        MacroMovdqa  xmm10, (xmmword ptr [rip + sudokuXmmToPrint+160])
+        MacroMovdqa  xmm11, (xmmword ptr [rip + sudokuXmmToPrint+176])
+        MacroMovdqa  xmm12, (xmmword ptr [rip + sudokuXmmToPrint+192])
+        MacroMovdqa  xmm13, (xmmword ptr [rip + sudokuXmmToPrint+208])
+        MacroMovdqa  xmm14, (xmmword ptr [rip + sudokuXmmToPrint+224])
+        MacroMovdqa  xmm15, (xmmword ptr [rip + sudokuXmmToPrint+240])
 .endm
 
 .macro CountUniqueCandidatesAtCellLoop outBoxShift, inBoxShift, cellCount, xRegSrcTarget, xRegSrcOther1, xRegSrcOther2, rowNumber

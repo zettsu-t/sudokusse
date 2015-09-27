@@ -119,7 +119,7 @@ void SudokuLoaderTest::test_Exec() {
         }
         auto pSudokuInStream = createSudokuStream(SudokuTestPattern::testSet[streamIndex].presetStr);
         SudokuLoader inst(test.argc, test.argv, pSudokuInStream.get(), pSudokuOutStream_.get());
-        int expected = 0;
+        constexpr int expected = 0;
         CPPUNIT_ASSERT_EQUAL(expected, inst.Exec());
         streamIndex = (streamIndex + 1) % arraySizeof(SudokuTestPattern::testSet);
     }
@@ -143,7 +143,7 @@ void SudokuLoaderTest::test_CanLaunch() {
         {2, {"commandName", "a"},  true}};
 
     for(const auto& test : testSet) {
-        auto expected = (sudokuXmmAssumeCellsPacked) ? test.expected : true;
+        const auto expected = (sudokuXmmAssumeCellsPacked) ? test.expected : true;
         CPPUNIT_ASSERT_EQUAL(expected, SudokuLoader::CanLaunch(test.argc, test.argv));
     }
     return;
