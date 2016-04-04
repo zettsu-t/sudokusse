@@ -37,8 +37,8 @@ CppUnit 1.12.1
 
   $ make (or mingw32-make in MinGW)
 
-After built successfully, these two executable files generated.
-(call them Sudoku.exe in this document)
+After built successfully, these two executable files are generated.
+(I call them Sudoku.exe in this document)
 
   sudokusse.exe (standard)
   sudokusse_cells_packed.exe (special ; explained later)
@@ -182,7 +182,8 @@ is not allowed and
 
     movdqa  xmm0,  xmmword ptr [rip + sudokuXmmToPrint]
 
-is right. MinGW-w64 may accept RIP-relative but Cygwin causes link errors.
+is right. MinGW-w64 may accept non-RIP-relative addressing but Cygwin
+causes link errors.
 
 
 [[Execution time]]
@@ -217,7 +218,7 @@ Each line matches a line of an input puzzle and ":" splits cells in
 a line. Numbers in a cell means candidates of the cell at a step.
 
 For example ":123:" means the cell contains 1 or 2 or 3 but cannot
-contain 4 to 9 (Sudoku.exe judged so at the step). When the puzzle
+contain 4 to 9 (Sudoku.exe judges so at the step). When the puzzle
 solved completely, each cell has a unique number.
 
 
@@ -232,12 +233,12 @@ The member candidates_ contains candidate number set.
 Candidate number set as a bitmap.
 
 Set bit 0 (0x01) of the bitmap when 1 is a candidate and reset bit 0
-when is not a candidate. Set and reset in the manner bit 1 for bit 1
+when is not a candidate. Set and reset in the manner 2 for bit 1
 (0x02) ...  9 for bit 8 (0x100). If all 1 to 9 are candidates, the
 bitmap has 0x1ff.
 
-I define this type as unsigned int. Unsigned short can hold the bitmap
-but is slow to calculate.
+I define this type as unsigned int (uint32_t). Unsigned short
+(uint16_t) can hold the bitmap but is slow to calculate.
 
 <SudokuMap>
 All cells in a Sudoku puzzle. Numbered left to right, top to bottom,
@@ -250,14 +251,15 @@ All cells in a Sudoku puzzle. Numbered left to right, top to bottom,
 <SudokuMap::Group_>
 <SudokuMap::ReverseGroup_>
 Look up table in which each cell is in which row, column, or 3x3 box.
-Group_ looks up forward (a cell to 9 cells) and ReverseGroup_ looks up
-reverse (9 cells to a cell).
+Group_ looks up forward (a 9 cells group to cells) and ReverseGroup_
+looks up reverse (a cell to 9 cells groups).
 
-Rows are numbered top to bottom, columns are numbered left to right, and
+Rows are numbered top to bottom, columns are numbered left to right,
+and boxes are placed as shown below.
   0, 1, 2
   3, 4, 5
   6, 7, 8
-for boxes. sudokumap.rb generates these tables as sudokumap.cpp.
+sudokumap.rb generates these tables as sudokuConstAll.h.
 
 <SudokuCellLookUp>
 SudokuCellLookUp checks properties of SudokuCellCandidates to avoid
@@ -356,9 +358,9 @@ To find a unique candidate of a cell, collect numbers in cells of
 a row, column and box that the cell belongs. For example, size of
 the number is 8, the rest is the unique candidate.
 
-A row has cells *23456789, set 1 to *.
+When a row has cells *23456789, set 1 to *.
 
-A row, column and box have cells such as,
+When a row, column and box have cells as shown below,
   *..123...
   456
   7
@@ -372,7 +374,7 @@ cell belongs. For example,
   3456
   7
 we apply * to logical AND {8,9}. In other words, we mask * by
-complementary set of {1..7}.
+the complementary set of {1..7}.
 
 [Step 2]
 For a cell, if there is a number that cannot be set in a row, column
@@ -411,7 +413,7 @@ cells.
 
 Before starting backtracking, Sudoku.exe makes a copy of the sudoku
 map to rewind backtracking. The map has only primitives so we can use
-compiler-generated copying and avoid object aliasing.
+compiler-generated copying (trivial copy) and avoid object aliasing.
 
 
 [[Algorithm to count]]
@@ -449,9 +451,9 @@ a profiler to Sudoku.exe.
   destructor. If you can define virtual destructor as a good practice,
   undefine NO_DESTRUCTOR_AND_VTABLE macro.
 
-* Define aliases all integer primitives to switch a bit width of a
-  data easily. Performance varies along with the bit width and I hope
-  this combination of bit width make Sudoku.exe fastest. Different
+* Declare aliases all integer primitives to switch their bit width
+  easily. Performance depends on the bit width and I hope current
+  combination of bit width makes Sudoku.exe fastest. Different
   processors and compilers may need different bit width.
 
 * Use const and constexpr as much as possible. This is useful to set a
@@ -462,7 +464,7 @@ a profiler to Sudoku.exe.
 
 * Unroll loops if appropriate. If a loop has complex branch
   conditions, unrolling the loop can disturb branch prediction of a
-  processor and make it run slower.
+  processor and makes it run slower.
 
 * Unroll loops with member function templates and recursive call.
   I hope compilers expand the recursive call and there is no overhead
@@ -488,7 +490,7 @@ Dennis E. Shasha (May 2007), "Puzzles for Programmers and Pros", Wrox
 (I read its Japanese translation published by Ohmsha. See my Japanese
 howtobuild.txt.)
 
-2. I use CppUnit code from the website.
+2. I use CppUnit code on the website.
 
 http://www.atmarkit.co.jp/fdotnet/cpptest/cpptest02/cpptest02_02.html
 

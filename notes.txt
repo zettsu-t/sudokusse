@@ -95,8 +95,8 @@ usecはmicro second(マイクロ秒=百万分の1秒)の略である。
  0, 1, 2
  3, 4, 5
  6, 7, 8
-である。手計算では大変なので、sudokumap.rbに計算させて、sudokumap.cppに
-出力する。
+である。手計算では大変なので、sudokumap.rbに計算させて、sudokuConstAll.h
+に出力する。
 
 <SudokuCellLookUp>
 マスの候補SudokuCellCandidatesを与えられたとき、その属性を調べる。
