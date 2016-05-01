@@ -1,13 +1,7 @@
 # Makefile
-#
-# Build on
-# Windows 8.1 64-bit Edition
-# - Cygwin 64 (2.2.1)
-#  - GNU make 4.1
-#  - g++ 4.9.3
-#  - GNU assembler 2.25
-#  - Ruby 2.2.2p95
-#  - Perl 5.22.0
+
+CXX?=g++
+RUBY?=ruby
 
 # Set link options to link c/c++ libraries statically
 # LIBCFLAGS=-static
@@ -64,7 +58,7 @@ sudokusse_cells_packed.o : sudokusse.s
 	$(AS) -defsym CellsPacked=1 $(ASFLAGS_SSE_AVX) -o $@ $<
 
 $(GENERATED_CODES) : $(GENERATOR_SCRIPT)
-	ruby $(GENERATOR_SCRIPT)
+	$(RUBY) $(GENERATOR_SCRIPT)
 
 $(HEADERS):
 
