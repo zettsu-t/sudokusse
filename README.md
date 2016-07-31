@@ -1,4 +1,4 @@
-# Sudoku solver with SSE4.2 / AVX
+# Sudoku asm solver with SSE4.2 / AVX
 
 Solving sudoku puzzles with SIMD instructions faster than C++ template metaprogramming.
 
@@ -22,13 +22,13 @@ Launch a terminal and change its current directory to a directory
 that contains _sudoku.cpp_.
 
 ```bash
-$ cd .../sudokusse
+cd .../sudokusse
 ```
 
 And execute _make_ without arguments to build.
 
 ```bash
-$ make
+make
 ```
 
 After built successfully, executable files _bin/sudokusse*.exe_ are generated.
@@ -39,9 +39,9 @@ Execute the generated binary from a terminal. _sudokusse.exe_ solves a
 sudoku puzzle example 10,000 times and shows elapsed time to solve it.
 
 ```bash
-$ bin/sudokusse 10000 < data/sudoku_example1.txt
+bin/sudokusse 10000 < data/sudoku_example1.txt
 ```
 
 ## And more
 
-Please read _notes_english.txt_ to know more details.
+Please read [notes_english.txt](notes_english.txt) to know more details.

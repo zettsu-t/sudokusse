@@ -480,7 +480,7 @@ a profiler to Sudoku.exe.
 * To return from a function in assembly, pop + jmp is faster than ret.
 
 
-[[Bibliography and acknowledgment]]
+[[Bibliography and acknowledgments]]
 
 1. I cite the Sudoku solver algorithm and puzzle examples from the book.
 
