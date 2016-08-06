@@ -3,14 +3,21 @@ Copyright (C) 2012-2016 Zettsu Tatsuya
 
 [[Platform]]
 [Building]
-+ Windows 10 64bit Edition
+Windows 10 Anniversary Update 64bit Edition
 
-+ Cygwin 64bit version (2.5.1)
- - GNU Make 4.1
- - g++ 5.3.0
++ Cygwin 64bit version (2.5.2)
+ - GNU Make 4.2.1
+ - g++ 5.4.0
  - GNU assembler 2.25.2
- - Ruby 2.2.4p230
+ - Ruby 2.2.5p319
  - Perl 5.22.2
+or
++ Bash on Ubuntu on Windows
+ - GNU Make 3.81
+ - g++ 4.8.4
+ - GNU assembler 2.24
+ - Ruby 1.9.3p484
+ - Perl 5.18.2
 or
 + MinGW-w64 for 64 bit Windows
  - GNU Make 4.1

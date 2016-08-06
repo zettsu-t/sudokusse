@@ -25,10 +25,17 @@ CELLS_UNPACKED_TARGET=bin/sudokusse
 CELLS_PACKED_TARGET=bin/sudokusse_cells_packed
 TARGETS=$(CELLS_UNPACKED_TARGET) $(CELLS_PACKED_TARGET)
 
-CELLS_UNPACKED_OBJS=sudokumain.o sudoku.o sudokuxmmreg.o sudokusse_cells_unpacked.o
-CELLS_PACKED_OBJS=sudokumain.o sudoku.o sudokuxmmreg.o sudokusse_cells_packed.o
+ifneq (,$(findstring linux,$(shell gcc -dumpmachine)))
+OS_DEPENDENT_SRC=sudoku_linux.cpp
+else
+OS_DEPENDENT_SRC=sudoku_windows.cpp
+endif
+OS_DEPENDENT_OBJ=$(patsubst %.cpp,%.o,$(OS_DEPENDENT_SRC))
 
-HEADERS=sudoku.h
+CELLS_UNPACKED_OBJS=sudokumain.o sudoku.o sudokuxmmreg.o sudokusse_cells_unpacked.o $(OS_DEPENDENT_OBJ)
+CELLS_PACKED_OBJS=sudokumain.o sudoku.o sudokuxmmreg.o sudokusse_cells_packed.o $(OS_DEPENDENT_OBJ)
+
+HEADERS=sudoku.h sudoku_os_dependent.h
 GENERATED_CODES=sudokuConstAll.h
 GENERATOR_SCRIPT=sudokumap.rb
 
@@ -51,6 +58,9 @@ sudoku.o : sudoku.cpp $(HEADERS) $(GENERATED_CODES)
 sudokuxmmreg.o : sudokuxmmreg.cpp $(HEADERS) $(GENERATED_CODES)
 	$(CXX) -c $(CPPFLAGS) $< -o $@
 
+$(OS_DEPENDENT_OBJ) : $(OS_DEPENDENT_SRC) $(HEADERS) $(GENERATED_CODES)
+	$(CXX) -c $(CPPFLAGS) $< -o $@
+
 sudokusse_cells_unpacked.o : sudokusse.s
 	$(AS) -defsym CellsPacked=0 $(ASFLAGS_SSE_AVX) -o $@ $<
 
@@ -63,4 +73,4 @@ $(GENERATED_CODES) : $(GENERATOR_SCRIPT)
 $(HEADERS):
 
 clean:
-	$(RM) $(TARGETS) $(CELLS_UNPACKED_OBJS) $(CELLS_PACKED_OBJS) $(GENERATED_CODES)
+	$(RM) $(TARGETS) $(CELLS_UNPACKED_OBJS) $(CELLS_PACKED_OBJS) $(GENERATED_CODES) ./*.o

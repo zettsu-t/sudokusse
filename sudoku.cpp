@@ -13,9 +13,9 @@
 #include <iomanip>
 #include <cassert>
 #include <ctime>
+#include <cstring>
 #include <limits>
 #include <typeinfo>
-#include <windows.h>
 #include "sudoku.h"
 
 // 定数を定義する
@@ -1524,23 +1524,6 @@ SudokuLoader::~SudokuLoader() {
 }
 #endif
 
-// Windows時刻を取得する
-void GetTimeOfSys(FILETIME *pTime) {
-    GetSystemTimeAsFileTime(pTime);
-    return;
-}
-
-// CPUクロックカウンタを取得する
-void GetTimeOfClock(FILETIME *pTime) {
-    asm volatile (
-        "RDTSC\n\t"
-        "mov [%0], eax\n\t"
-        "mov [%0+4], edx\n\t"
-        ::"r"(pTime):"eax", "edx"
-        );
-    return;
-}
-
 int SudokuLoader::Exec(void) {
     if (measureCount_) {
         measureTimeToSolve(SudokuSolverType::SOLVER_GENERAL);
@@ -1572,7 +1555,6 @@ int SudokuLoader::getMeasureCount(const char *arg) {
 
 // 解く時間を測る
 void SudokuLoader::measureTimeToSolve(SudokuSolverType solverType) {
-    FILETIME startTimeSys, startTimeClock, stopTimeSys, stopTimeClock;
     auto showAverage = true;
 
     for(int trial=0;trial<2;++trial) {
@@ -1583,8 +1565,9 @@ void SudokuLoader::measureTimeToSolve(SudokuSolverType solverType) {
 
         // 二回目以降は早いはず
         SudokuTime leastTimeClock = 0;
-        GetTimeOfSys(&startTimeSys);
-        GetTimeOfClock(&startTimeClock);
+        std::unique_ptr<Sudoku::ITimer> pTimer(Sudoku::CreateTimerInstance());
+        pTimer->SetStartTime();
+        pTimer->StartClock();
 
         if (!measureCount_) {
             showAverage = false;
@@ -1600,11 +1583,12 @@ void SudokuLoader::measureTimeToSolve(SudokuSolverType solverType) {
                 }
             }
         }
-        GetTimeOfClock(&stopTimeClock);
-        GetTimeOfSys(&stopTimeSys);
+
+        pTimer->StopClock();
+        pTimer->SetStopTime();
 
         // SudokuTimeにキャストしている
-        printTime(startTimeSys, stopTimeSys, startTimeClock, stopTimeClock, measureCount_, leastTimeClock, showAverage);
+        pTimer->PrintTime(pSudokuOutStream_, measureCount_, leastTimeClock, showAverage);
     }
 }
 
@@ -1633,75 +1617,23 @@ SudokuTime SudokuLoader::solveSudoku(SudokuSolverType solverType, int count, boo
         }
     }
 
-    FILETIME startTimeClock, stopTimeClock;
-    GetTimeOfClock(&startTimeClock);
+    std::unique_ptr<Sudoku::ITimer> pTimer(Sudoku::CreateTimerInstance());
+    pTimer->StartClock();
     pSolver->Exec(isBenchmark_, verbose_);
-    GetTimeOfClock(&stopTimeClock);
+    pTimer->StopClock();
 
-    return convertTimeToNum(stopTimeClock) - convertTimeToNum(startTimeClock);
+    return pTimer->GetClockInterval();
 }
 
 // 数える
 SudokuTime SudokuLoader::enumerateSudoku(void) {
     SudokuSseSolver sseSolver(sudokuStr_, pSudokuOutStream_, printAllCadidate_);
 
-    FILETIME startTimeClock, stopTimeClock;
-    GetTimeOfClock(&startTimeClock);
+    std::unique_ptr<Sudoku::ITimer> pTimer(Sudoku::CreateTimerInstance());
+    pTimer->StartClock();
     sseSolver.Enumerate();
-    GetTimeOfClock(&stopTimeClock);
-
-    return convertTimeToNum(stopTimeClock) - convertTimeToNum(startTimeClock);
-}
-
-// 処理時間を表示する
-void SudokuLoader::printTime(const FILETIME& start100nsTime, const FILETIME& stop100nsTime, const FILETIME& startClock,
-                             const FILETIME& stopClock, SudokuTime count, SudokuTime leastClock, bool showAverage) {
-    // 解の数だけ求める場合
-    const SudokuTime actualCount = (count) ? count : 1;
-    const SudokuTime usecTime = (convertTimeToNum(stop100nsTime) - convertTimeToNum(start100nsTime)) / SudokuTimeUnitInUsec;
-    const SudokuTime clockElapsed = convertTimeToNum(stopClock) - convertTimeToNum(startClock);
-    const double usecOnceTime = static_cast<decltype(usecOnceTime)>(usecTime) /
-        static_cast<decltype(usecOnceTime)>(actualCount);
-    const SudokuTime clockOnce = clockElapsed / actualCount;
-    const double leastUsecOnceTime = static_cast<decltype(leastUsecOnceTime)>(leastClock  * usecTime) /
-        static_cast<decltype(leastUsecOnceTime)>(clockElapsed);
-
-    SudokuTime secTime = usecTime / SudokuTimeUsecPerSec;
-    const SudokuTime minTime = secTime / SudokuTimeSecPerMinute;
-    secTime = secTime % SudokuTimeSecPerMinute;
-
-    if (pSudokuOutStream_ != nullptr) {
-        (*pSudokuOutStream_) << std::dec;
-        (*pSudokuOutStream_) << "Total : ";
-        if (minTime > 0) {
-            (*pSudokuOutStream_) << minTime << "min ";
-        }
-        if ((minTime > 0) || (secTime > 0)) {
-            (*pSudokuOutStream_) << secTime << "sec, ";
-        }
-        (*pSudokuOutStream_) << std::dec << usecTime << "usec, ";
-        (*pSudokuOutStream_) << std::dec << clockElapsed << "clock\n";
-        if (showAverage) {
-            (*pSudokuOutStream_) << "average : " << std::fixed << std::setprecision(3) << usecOnceTime << "usec, ";
-            (*pSudokuOutStream_) << std::dec << clockOnce << "clock\n";
-            (*pSudokuOutStream_) << "Once least : " << std::fixed << std::setprecision(3) << leastUsecOnceTime << "usec, ";
-            (*pSudokuOutStream_) << std::dec << leastClock << "clock\n\n";
-        }
-    }
-    return;
-}
-
-// 100nsec単位の時間(Windows API)またはクロックを整数にする
-SudokuTime SudokuLoader::convertTimeToNum(const FILETIME& filetime) {
-    SudokuTime timeIn100nsec = filetime.dwHighDateTime;
-
-    // 一度に32bitまとめてシフトしない(x86のシフト命令はシフト幅が5bitしかない)
-    for(size_t i=0;i<sizeof(filetime.dwLowDateTime); ++i) {
-        timeIn100nsec <<= 8;
-    }
-    timeIn100nsec += filetime.dwLowDateTime;
-
-    return timeIn100nsec;
+    pTimer->StopClock();
+    return pTimer->GetClockInterval();
 }
 
 /*

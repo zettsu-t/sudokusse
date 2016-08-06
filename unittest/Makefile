@@ -29,20 +29,32 @@ CELLS_PACKED_TARGET_AVX=unittest_cells$(POSTFIX_PACKED)$(POSTFIX_AVX)
 TARGETS=$(CELLS_UNPACKED_TARGET_SSE) $(CELLS_PACKED_TARGET_SSE) \
         $(CELLS_UNPACKED_TARGET_AVX) $(CELLS_PACKED_TARGET_AVX)
 
+ifneq (,$(findstring linux,$(shell gcc -dumpmachine)))
+TESTED_OS_DEPENDENT_SRC=sudoku_linux.cpp
+TESTER_OS_DEPENDENT_SRC=sudokutestlinux.cpp
+else
+TESTED_OS_DEPENDENT_SRC=sudoku_windows.cpp
+TESTER_OS_DEPENDENT_SRC=sudokutestwindows.cpp
+endif
+
 TESTER_OBJS=main.o sudokussetest.o sudokutest.o sudokucelltest.o \
             sudokumaptest.o sudokusolvertest.o sudokuloadertest.o
 TESTED_OBJS=sudoku.o sudokuxmmreg.o
 CPP_OBJS=$(TESTER_OBJS) $(TESTED_OBJS)
 
+TESTED_OS_DEPENDENT_OBJ=$(patsubst %.cpp,%.o,$(TESTED_OS_DEPENDENT_SRC))
+TESTER_OS_DEPENDENT_OBJ=$(patsubst %.cpp,%.o,$(TESTER_OS_DEPENDENT_SRC))
+OS_DEPENDENT_OBJS=$(TESTED_OS_DEPENDENT_OBJ) $(TESTER_OS_DEPENDENT_OBJ)
+
 ASM_UNPACKED_OBJS=sudokusse_cells$(POSTFIX_UNPACKED).o
 ASM_PACKED_OBJS=sudokusse_cells$(POSTFIX_PACKED).o
 
-CELLS_UNPACKED_OBJS_SSE=$(patsubst %.o,%$(POSTFIX_SSE).o,$(CPP_OBJS) $(ASM_UNPACKED_OBJS))
-CELLS_PACKED_OBJS_SSE=$(patsubst %.o,%$(POSTFIX_SSE).o,$(CPP_OBJS) $(ASM_PACKED_OBJS))
-CELLS_UNPACKED_OBJS_AVX=$(patsubst %.o,%$(POSTFIX_AVX).o,$(CPP_OBJS) $(ASM_UNPACKED_OBJS))
-CELLS_PACKED_OBJS_AVX=$(patsubst %.o,%$(POSTFIX_AVX).o,$(CPP_OBJS) $(ASM_PACKED_OBJS))
+CELLS_UNPACKED_OBJS_SSE=$(patsubst %.o,%$(POSTFIX_SSE).o,$(CPP_OBJS) $(ASM_UNPACKED_OBJS)) $(OS_DEPENDENT_OBJS)
+CELLS_PACKED_OBJS_SSE=$(patsubst %.o,%$(POSTFIX_SSE).o,$(CPP_OBJS) $(ASM_PACKED_OBJS)) $(OS_DEPENDENT_OBJS)
+CELLS_UNPACKED_OBJS_AVX=$(patsubst %.o,%$(POSTFIX_AVX).o,$(CPP_OBJS) $(ASM_UNPACKED_OBJS)) $(OS_DEPENDENT_OBJS)
+CELLS_PACKED_OBJS_AVX=$(patsubst %.o,%$(POSTFIX_AVX).o,$(CPP_OBJS) $(ASM_PACKED_OBJS)) $(OS_DEPENDENT_OBJS)
 
-HEADERS=../sudoku.h sudokutest.h
+HEADERS=../sudoku.h sudokutest.h sudokutest_os_dependent.h
 GENERATED_CODES=sudokuConstAll.h
 GENERATOR_SCRIPT=../sudokumap.rb
 
@@ -50,23 +62,33 @@ GENERATOR_SCRIPT=../sudokumap.rb
 
 all: $(TARGETS)
 
+$(CELLS_UNPACKED_TARGET_SSE): export CPPFLAGS_ASM=$(CPPFLAGS_SSE)
 $(CELLS_UNPACKED_TARGET_SSE): $(CELLS_UNPACKED_OBJS_SSE)
 	$(CXX) $(LIBPATH) -o $@ $(LDFLAGS) $^ $(LIBS)
 	./$@
 
+$(CELLS_PACKED_TARGET_SSE): export CPPFLAGS_ASM=$(CPPFLAGS_SSE)
 $(CELLS_PACKED_TARGET_SSE): $(CELLS_PACKED_OBJS_SSE)
 	$(CXX) $(LIBPATH) -o $@ $(LDFLAGS) $^ $(LIBS)
 	./$@
 
+$(CELLS_UNPACKED_TARGET_AVX): export CPPFLAGS_ASM=$(CPPFLAGS_AVX)
 $(CELLS_UNPACKED_TARGET_AVX): $(CELLS_UNPACKED_OBJS_AVX)
 	$(CXX) $(LIBPATH) -o $@ $(LDFLAGS) $^ $(LIBS)
 	./$@
 
+$(CELLS_PACKED_TARGET_AVX): export CPPFLAGS_ASM=$(CPPFLAGS_AVX)
 $(CELLS_PACKED_TARGET_AVX): $(CELLS_PACKED_OBJS_AVX)
 	$(CXX) $(LIBPATH) -o $@ $(LDFLAGS) $^ $(LIBS)
 	./$@
 
 # no inlining
+$(TESTER_OS_DEPENDENT_OBJ) : $(TESTER_OS_DEPENDENT_SRC) $(HEADERS) $(GENERATED_CODES)
+	$(CXX) -c $(CPPFLAGS_ASM) $< -o $@
+
+$(TESTED_OS_DEPENDENT_OBJ) : ../$(TESTED_OS_DEPENDENT_SRC) $(HEADERS) $(GENERATED_CODES)
+	$(CXX) -c $(CPPFLAGS_ASM) $< -o $@
+
 main$(POSTFIX_SSE).o : main.cpp $(HEADERS) $(GENERATED_CODES)
 	$(CXX) -c $(CPPFLAGS_SSE) $< -o $@
 
@@ -93,7 +115,6 @@ sudoku$(POSTFIX_SSE).o : ../sudoku.cpp $(HEADERS) $(GENERATED_CODES)
 
 sudokuxmmreg$(POSTFIX_SSE).o : ../sudokuxmmreg.cpp $(HEADERS) $(GENERATED_CODES)
 	$(CXX) -c $(CPPFLAGS_SSE) $< -o $@
-
 
 main$(POSTFIX_AVX).o : main.cpp $(HEADERS) $(GENERATED_CODES)
 	$(CXX) -c $(CPPFLAGS_AVX) $< -o $@
@@ -122,7 +143,6 @@ sudoku$(POSTFIX_AVX).o : ../sudoku.cpp $(HEADERS) $(GENERATED_CODES)
 sudokuxmmreg$(POSTFIX_AVX).o : ../sudokuxmmreg.cpp $(HEADERS) $(GENERATED_CODES)
 	$(CXX) -c $(CPPFLAGS_AVX) $< -o $@
 
-
 sudokusse_cells$(POSTFIX_UNPACKED)$(POSTFIX_SSE).o : ../sudokusse.s
 	$(AS) $(ASFLAGS_UNPACKED) $(ASFLAGS_SSE) -o $@ $<
 
@@ -135,14 +155,13 @@ sudokusse_cells$(POSTFIX_UNPACKED)$(POSTFIX_AVX).o : ../sudokusse.s
 sudokusse_cells$(POSTFIX_PACKED)$(POSTFIX_AVX).o : ../sudokusse.s
 	$(AS) $(ASFLAGS_PACKED) $(ASFLAGS_AVX) -o $@ $<
 
-
 $(GENERATED_CODES) : $(GENERATOR_SCRIPT)
 	ruby $(GENERATOR_SCRIPT)
 
 $(HEADERS):
 
 clean:
-	$(RM) $(TARGETS) $(GENERATED_CODES)
+	$(RM) $(TARGETS) $(GENERATED_CODES) ./*.o
 	$(RM) $(CELLS_UNPACKED_OBJS_SSE)
 	$(RM) $(CELLS_PACKED_OBJS_SSE)
 	$(RM) $(CELLS_UNPACKED_OBJS_AVX)

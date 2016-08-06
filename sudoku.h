@@ -1,10 +1,12 @@
 // Sudoku solver with SSE 4.2 / AVX
 // Copyright (C) 2012-2015 Zettsu Tatsuya
 
+#ifndef SUDOKU_H_INCLUDED
+#define SUDOKU_H_INCLUDED
+
 #include <stdint.h>
 #include <string>
-#include <iostream>
-#include <windows.h>
+#include <nmmintrin.h>
 
 // 仮想関数を一切禁止すると速くなる。許可するなら下段のマクロを無効にする
 #define NO_DESTRUCTOR_AND_VTABLE (1)
@@ -26,18 +28,19 @@
   #define ALLOW_VIRTUAL virtual
 #endif
 
+// WindowsとLinuxで異なる実装を行うが、I/Fは共通にする
+#include "sudoku_os_dependent.h"
+
 // 型宣言(32Kbyte L1 Data Cacheに収まること)
 using SudokuIndex = unsigned short;          // マスとマスの集合の番号(shortの方が速い)
 using SudokuLoopIndex = unsigned int;        // マスとマスの集合の番号のループインデックス(intの方が速い)
 using SudokuCellCandidates = unsigned int;   // マスの候補の集合
 using SudokuNumber = int;                    // マスの初期設定の候補となる数字
-using SudokuTime = unsigned long long;       // 時刻と時間
 using SudokuSseElement = uint32_t;           // SSE4.2命令で解く場合のN byteデータアクセス単位(3マス分)
-using gRegister = uint64_t;                                // 汎用レジスタ(必ず符号なし)
+using gRegister = uint64_t;                  // 汎用レジスタ(必ず符号なし)
 using xmmRegister = __m128;                  // XMMレジスタ
 using SudokuPatternCount = uint64_t;         // 解の数
 
-static_assert(sizeof(SudokuTime) == 8, "Unexpected SudokuTime size");
 static_assert(sizeof(SudokuSseElement) == 4, "Unexpected SudokuSseElement size");
 static_assert(sizeof(xmmRegister) == 16, "Unexpected xmmRegister size");
 static_assert((alignof(xmmRegister) % 16) == 0, "Unexpected xmmRegister alignment");
@@ -415,8 +418,6 @@ private:
     void measureTimeToSolve(SudokuSolverType solverType);
     SudokuTime solveSudoku(SudokuSolverType solverType, int count, bool warmup);
     SudokuTime enumerateSudoku(void);
-    void printTime(const FILETIME& start100nsTime, const FILETIME& stop100nsTime, const FILETIME& startClock, const FILETIME& stopClock, SudokuTime count, SudokuTime leastClock, bool showAverage);
-    static SudokuTime convertTimeToNum(const FILETIME& filetime);
     // メンバ
     std::string sudokuStr_; // 初期マップの文字列
     bool   isBenchmark_;    // ベンチマークかどうか
@@ -424,14 +425,13 @@ private:
     int    measureCount_;   // 測定回数
     SudokuPatternCount printAllCadidate_;
     std::ostream* pSudokuOutStream_;  // 結果の出力先
-    static constexpr SudokuTime SudokuTimeUnitInUsec = 10;       // 1usecの時間単位(100nsec*10単位)
-    static constexpr SudokuTime SudokuTimeUsecPerSec = 1000000;  // 1秒当たり1usec
-    static constexpr SudokuTime SudokuTimeSecPerMinute = 60;     // 1分当たり秒
 };
 
 extern "C" {
     void PrintPattern(void);
 }
+
+#endif // SUDOKU_H_INCLUDED
 
 /*
 Local Variables:

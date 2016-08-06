@@ -3,7 +3,6 @@
 #include <stdint.h>
 #include <cstdlib>
 #include <string>
-#include <windows.h>
 
 /* 配列のサイズを求める
  * arrayにポインタを使わせないために、テンプレートにする

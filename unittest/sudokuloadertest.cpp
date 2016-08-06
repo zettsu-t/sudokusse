@@ -20,8 +20,6 @@ class SudokuLoaderTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST(test_Exec);
     CPPUNIT_TEST(test_solveSudoku);
     CPPUNIT_TEST(test_enumerateSudoku);
-    CPPUNIT_TEST(test_printTime);
-    CPPUNIT_TEST(test_convertTimeToNum);
     CPPUNIT_TEST_SUITE_END();
 
 public:
@@ -34,8 +32,6 @@ protected:
     void test_Exec();
     void test_solveSudoku();
     void test_enumerateSudoku();
-    void test_printTime();
-    void test_convertTimeToNum();
 private:
     std::unique_ptr<SudokuInStream> createSudokuStream(const std::string& str);
     // istringstreamの代わりにistrstreamを使うと、istrstreamが正しく初期化されない
@@ -193,73 +189,6 @@ void SudokuLoaderTest::test_enumerateSudoku() {
         const auto actual = sudokuXmmAllPatternCnt;
         constexpr decltype(actual) expected = 1140000ull;
         CPPUNIT_ASSERT_EQUAL(expected, actual);
-    }
-    return;
-}
-
-void SudokuLoaderTest::test_printTime() {
-    constexpr FILETIME startTimeShort {0x3e8UL, 0UL};  // 1000
-    constexpr FILETIME stopTimeShort  {0xbb8UL, 0UL};  // 3000 * 100nsec
-    constexpr FILETIME startClockShort {0x4b, 0UL};    // 75
-    constexpr FILETIME stopClockShort  {0xe1, 0UL};    // 225 : 200/150 = 1.333 usec/clock
-    // Total時間は     200 usec(100ns単位->usecになるので1/10)
-    // 1回の時間は     66.667 usec
-    // 1回の最小時間は 40.000 usec (1.333 * 30 clock)
-    pInstance_->printTime(startTimeShort, stopTimeShort, startClockShort, stopClockShort, 3, 30, true);
-
-    constexpr FILETIME startTimeMiddle  {0x0, 0UL};
-    constexpr FILETIME stopTimeMiddle   {0x754d4c0, 0UL};  // 123000000 * 100nsec
-    constexpr FILETIME startClockMiddle {0, 0UL};          // 75
-    constexpr FILETIME stopClockMiddle  {12300, 0UL};      // 225 : 200/150 = 1.333 usec/clock
-    // Total時間は     12 300 000 usec(100ns単位->usecになるので1/10)
-    // 1回の時間は     66.667 usec
-    // 1回の最小時間は 40.000 usec (1.333 * 30 clock)
-    pInstance_->printTime(startTimeMiddle, stopTimeMiddle, startClockMiddle, stopClockMiddle, 3, 300, true);
-
-    constexpr FILETIME startTimeLong  {0x4e72a000, 0xfffff918};  //  10000000000000 (0が13個) * 100nsec
-    constexpr FILETIME stopTimeLong   {0x5eece003, 0x0000540b};  // 110000000000003 (0が間に12個) * 100nsec
-    constexpr FILETIME startClockLong {0x00000000, 0xff000000};  // 0.000123456 usec/clock
-    constexpr FILETIME stopClockLong  {0xd60d6015, 0x001fc58a};  // 81000518403317781.233
-
-    // Total時間は 10000000000000 usec (0が13個)
-    // 1回の時間は        2000000 usec (0が6個)
-    // 1回の最小時間は 12.3456usec
-    pInstance_->printTime(startTimeLong, stopTimeLong, startClockLong, stopClockLong, 5000000, 100000, true);
-    pInstance_->printTime(startTimeLong, stopTimeLong, startClockLong, stopClockLong, 5000000, 100000, false);
-
-    const std::string actualstr = pSudokuOutStream_->str();
-
-    // 画面に表示するはずの内容を確認する
-    std::string expectedstr;
-    expectedstr = "Total : 200usec, 150clock\naverage : 66.667usec, 50clock\n";
-    expectedstr += "Once least : 40.000usec, 30clock\n\n";
-    expectedstr += "Total : 12sec, 12300000usec, 12300clock\naverage : 4100000.000usec, 4100clock\n";
-    expectedstr += "Once least : 300000.000usec, 300clock\n\n";
-    expectedstr += "Total : 166666min 40sec, 10000000000000usec, 81000518403317781clock\n";
-    expectedstr += "average : 2000000.000usec, 16200103680clock\nOnce least : 12.346usec, 100000clock\n\n";
-    expectedstr += "Total : 166666min 40sec, 10000000000000usec, 81000518403317781clock\n";
-    CPPUNIT_ASSERT(actualstr == expectedstr);
-
-    return;
-}
-
-void SudokuLoaderTest::test_convertTimeToNum() {
-    struct TestSet {
-        FILETIME   filetime; // low, highの順
-        SudokuTime sudokutime;
-    };
-
-    constexpr TestSet testSet[] {
-        {{0UL,0UL},0ULL},
-        {{1UL,0UL},1ULL},
-        {{0UL,1UL},0x100000000ULL},
-        {{2UL,1UL},0x100000002ULL},
-        {{0xffffffffUL,1UL},0x1ffffffffULL},
-        {{0xffffffffUL,0xffffffffUL},0xffffffffffffffffULL}
-    };
-
-    for(const auto& test : testSet) {
-        CPPUNIT_ASSERT_EQUAL(test.sudokutime,  pInstance_->convertTimeToNum(test.filetime));
     }
     return;
 }

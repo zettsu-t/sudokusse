@@ -5,10 +5,7 @@
 
 int main(int argc, char *argv[]) {
     /* 使うCPUを固定すると、processorとcacheのaffinityが上がる */
-    DWORD_PTR procMask = 1;
-    if (!SetProcessAffinityMask(GetCurrentProcess(), procMask)) {
-        std::cout << "SetProcessAffinityMask failed\n";
-    }
+    auto pProcessorBinder = Sudoku::CreateProcessorBinder();
 
     /* 本当はデータのポインタと関数のポインタは互換ではない */
     static_assert(sizeof(uintptr_t) == sizeof(&PrintPattern), "Unexpected uintptr_t size");

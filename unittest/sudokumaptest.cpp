@@ -6,6 +6,7 @@
 
 #include <cppunit/extensions/HelperMacros.h>
 #include <cassert>
+#include <cstring>
 #include <memory>
 #include "sudoku.h"
 #include "sudokutest.h"

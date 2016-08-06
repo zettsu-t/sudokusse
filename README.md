@@ -5,16 +5,18 @@ Solving sudoku puzzles with SIMD instructions faster than C++ template metaprogr
 ## Platform
 
 This sudoku solver is built on and runs on Cygwin with tools shown
-below. MinGW-w64 is also available with Cygwin /usr/bin/ tools.
+below. Bash on Ubuntu on Windows is available on Windows 10
+Anniversary Update.  MinGW-w64 is also available with Cygwin /usr/bin/
+tools.
 
-* Windows 10 64bit Edition
-* Cygwin 64bit version (2.5.2)
-* GNU Make (4.2.1)
-* g++ (5.4.0)
-* GNU assembler (2.25.2)
-* Ruby (2.2.5p319)
-* Perl (5.22.2)
-* CppUnit (1.12.1)
+* Windows 10 Anniversary Update 64bit Edition
+* Cygwin 64bit version
+* GNU Make
+* g++
+* GNU assembler
+* Ruby
+* Perl
+* CppUnit
 
 ## How to build
 
