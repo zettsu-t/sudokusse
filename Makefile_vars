@@ -1,0 +1,51 @@
+# Makefile
+LD=g++
+CXX=g++
+AS=as
+RUBY=ruby
+
+# Set 0 to use SSE and 1 to AVX
+USE_AVX_VALUE=1
+ASFLAGS_SSE_AVX=-defsym EnableAvx=$(USE_AVX_VALUE)
+
+ifeq ($(USE_AVX_VALUE),0)
+CPPFLAGS_SSE_AVX=-msse4.2
+else
+CPPFLAGS_SSE_AVX=-mavx2
+endif
+
+# -O2 optimization is better than -O3 in this program
+CPPFLAGS=-std=c++11 -O2 -Wall -masm=intel -m64 $(CPPFLAGS_SSE_AVX)
+LDFLAGS=
+
+CELLS_UNPACKED_TARGET=bin/sudokusse
+CELLS_PACKED_TARGET=bin/sudokusse_cells_packed
+TARGETS=$(CELLS_UNPACKED_TARGET) $(CELLS_PACKED_TARGET)
+
+ifneq (,$(findstring linux,$(shell gcc -dumpmachine)))
+OS_DEPENDENT_OBJ=sudoku_linux.o
+else
+OS_DEPENDENT_OBJ=sudoku_windows.o
+endif
+
+CELLS_COMMON_OBJS=sudokumain.o sudoku.o sudokuxmmreg.o
+CELLS_UNPACKED_OBJS=$(CELLS_COMMON_OBJS) sudokusse_cells_unpacked.o $(OS_DEPENDENT_OBJ)
+CELLS_PACKED_OBJS=$(CELLS_COMMON_OBJS) sudokusse_cells_packed.o $(OS_DEPENDENT_OBJ)
+OBJS=$(sort $(CELLS_UNPACKED_OBJS) $(CELLS_PACKED_OBJS))
+
+HEADERS=sudoku.h sudoku_os_dependent.h
+GENERATED_CODE=sudokuConstAll.h
+GENERATOR_SCRIPT=sudokumap.rb
+
+ALL_UPDATED_VARIABLES= \
+	LD CXX AS RUBY \
+	USE_AVX_VALUE ASFLAGS_SSE_AVX CPPFLAGS_SSE_AVX \
+	CPPFLAGS LDFLAGS \
+	CELLS_UNPACKED_TARGET CELLS_PACKED_TARGET TARGETS \
+	OS_DEPENDENT_OBJ CELLS_COMMON_OBJS CELLS_UNPACKED_OBJS CELLS_PACKED_OBJS OBJS \
+	HEADERS GENERATED_CODE GENERATOR_SCRIPT \
+
+#Local Variables:
+#mode: Makefile
+#coding: utf-8-dos
+#End:

@@ -1,0 +1,51 @@
+# Makefile
+THIS_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+include $(THIS_DIR)Makefile_vars
+
+.SUFFIXES: .o .cpp .h .s
+.PHONY: all clean
+
+all: $(TARGETS)
+
+$(CELLS_UNPACKED_TARGET_SSE): $(CELLS_UNPACKED_OBJS_SSE)
+	$(LD) $(LIBPATH) -o $@ $(LDFLAGS) $^ $(LIBS)
+
+$(CELLS_PACKED_TARGET_SSE): $(CELLS_PACKED_OBJS_SSE)
+	$(LD) $(LIBPATH) -o $@ $(LDFLAGS) $^ $(LIBS)
+
+$(CELLS_UNPACKED_TARGET_AVX): $(CELLS_UNPACKED_OBJS_AVX)
+	$(LD) $(LIBPATH) -o $@ $(LDFLAGS) $^ $(LIBS)
+
+$(CELLS_PACKED_TARGET_AVX): $(CELLS_PACKED_OBJS_AVX)
+	$(LD) $(LIBPATH) -o $@ $(LDFLAGS) $^ $(LIBS)
+
+%$(POSTFIX_SSE).o : %.cpp $(HEADERS) $(GENERATED_CODES)
+	$(CXX) -c $(CPPFLAGS_SSE) $< -o $@
+
+%$(POSTFIX_AVX).o : %.cpp $(HEADERS) $(GENERATED_CODES)
+	$(CXX) -c $(CPPFLAGS_AVX) $< -o $@
+
+sudokusse_cells$(POSTFIX_UNPACKED)$(POSTFIX_SSE).o : sudokusse.s
+	$(AS) $(ASFLAGS_UNPACKED) $(ASFLAGS_SSE) -o $@ $<
+
+sudokusse_cells$(POSTFIX_PACKED)$(POSTFIX_SSE).o : sudokusse.s
+	$(AS) $(ASFLAGS_PACKED) $(ASFLAGS_SSE) -o $@ $<
+
+sudokusse_cells$(POSTFIX_UNPACKED)$(POSTFIX_AVX).o : sudokusse.s
+	$(AS) $(ASFLAGS_UNPACKED) $(ASFLAGS_AVX) -o $@ $<
+
+sudokusse_cells$(POSTFIX_PACKED)$(POSTFIX_AVX).o : sudokusse.s
+	$(AS) $(ASFLAGS_PACKED) $(ASFLAGS_AVX) -o $@ $<
+
+$(HEADERS): ;
+
+$(GENERATED_CODES) : $(GENERATOR_SCRIPT)
+	$(RUBY) $(GENERATOR_SCRIPT)
+
+clean:
+	$(RM) $(TARGETS) $(OBJS) $(GENERATED_CODES) ./*.o
+
+#Local Variables:
+#mode: Makefile
+#coding: utf-8-dos
+#End:

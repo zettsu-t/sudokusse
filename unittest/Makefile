@@ -1,168 +1,37 @@
 # Makefile
+THIS_DIR:=$(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+include $(THIS_DIR)Makefile_vars
 
-POSTFIX_UNPACKED=_unpacked
-POSTFIX_PACKED=_packed
-POSTFIX_SSE=_sse
-POSTFIX_AVX=_avx
+# Compile parallel in a sub makefile
+MAKEFILE_SUB_COMPILE=$(THIS_DIR)Makefile_compile
+MAKEFILE_PARALLEL=-j 5
 
-# Available Cygwin only (MinGW with CppUnit not supported)
-INCLUDES=-I. -I..
-LIBPATH=
-LIBCFLAGS=
-LIBS=-lcppunit
-LDFLAGS=$(LIBCFLAGS) -mcmodel=small
+ALL_UPDATED_VARIABLES+= THIS_DIR MAKEFILE_SUB_COMPILE MAKEFILE_PARALLEL
 
-CPPFLAGS_COMMON=-std=c++11 -O0 -g -Wall -masm=intel -m64 -DUNITTEST $(INCLUDES) $(LIBCFLAGS)
-CPPFLAGS_SSE=$(CPPFLAGS_COMMON) -msse4.2 -DSUDOKU_USE_AVX=0
-CPPFLAGS_AVX=$(CPPFLAGS_COMMON) -mavx2 -DSUDOKU_USE_AVX=1
+# An empty line inserted intentionally to execute all TARGETS files
+define execute-command
+bash ./launchtest.sh $(1)
 
-ASFLAGS_UNPACKED=-defsym CellsPacked=0
-ASFLAGS_PACKED=-defsym CellsPacked=1
-ASFLAGS_SSE=-defsym EnableAvx=0
-ASFLAGS_AVX=-defsym EnableAvx=1
+endef
 
-CELLS_UNPACKED_TARGET_SSE=unittest_cells$(POSTFIX_UNPACKED)$(POSTFIX_SSE)
-CELLS_PACKED_TARGET_SSE=unittest_cells$(POSTFIX_PACKED)$(POSTFIX_SSE)
-CELLS_UNPACKED_TARGET_AVX=unittest_cells$(POSTFIX_UNPACKED)$(POSTFIX_AVX)
-CELLS_PACKED_TARGET_AVX=unittest_cells$(POSTFIX_PACKED)$(POSTFIX_AVX)
+.PHONY: all check clean show FORCE
 
-TARGETS=$(CELLS_UNPACKED_TARGET_SSE) $(CELLS_PACKED_TARGET_SSE) \
-        $(CELLS_UNPACKED_TARGET_AVX) $(CELLS_PACKED_TARGET_AVX)
+all: $(TARGETS) check
 
-ifneq (,$(findstring linux,$(shell gcc -dumpmachine)))
-TESTED_OS_DEPENDENT_SRC=sudoku_linux.cpp
-TESTER_OS_DEPENDENT_SRC=sudokutestlinux.cpp
-else
-TESTED_OS_DEPENDENT_SRC=sudoku_windows.cpp
-TESTER_OS_DEPENDENT_SRC=sudokutestwindows.cpp
-endif
+# Compile if source files are changed
+$(TARGETS): FORCE
+	$(MAKE) $(MAKEFILE_PARALLEL) -f $(MAKEFILE_SUB_COMPILE)
 
-TESTER_OBJS=main.o sudokussetest.o sudokutest.o sudokucelltest.o \
-            sudokumaptest.o sudokusolvertest.o sudokuloadertest.o
-TESTED_OBJS=sudoku.o sudokuxmmreg.o
-CPP_OBJS=$(TESTER_OBJS) $(TESTED_OBJS)
-
-TESTED_OS_DEPENDENT_OBJ=$(patsubst %.cpp,%.o,$(TESTED_OS_DEPENDENT_SRC))
-TESTER_OS_DEPENDENT_OBJ=$(patsubst %.cpp,%.o,$(TESTER_OS_DEPENDENT_SRC))
-OS_DEPENDENT_OBJS=$(TESTED_OS_DEPENDENT_OBJ) $(TESTER_OS_DEPENDENT_OBJ)
-
-ASM_UNPACKED_OBJS=sudokusse_cells$(POSTFIX_UNPACKED).o
-ASM_PACKED_OBJS=sudokusse_cells$(POSTFIX_PACKED).o
-
-CELLS_UNPACKED_OBJS_SSE=$(patsubst %.o,%$(POSTFIX_SSE).o,$(CPP_OBJS) $(ASM_UNPACKED_OBJS)) $(OS_DEPENDENT_OBJS)
-CELLS_PACKED_OBJS_SSE=$(patsubst %.o,%$(POSTFIX_SSE).o,$(CPP_OBJS) $(ASM_PACKED_OBJS)) $(OS_DEPENDENT_OBJS)
-CELLS_UNPACKED_OBJS_AVX=$(patsubst %.o,%$(POSTFIX_AVX).o,$(CPP_OBJS) $(ASM_UNPACKED_OBJS)) $(OS_DEPENDENT_OBJS)
-CELLS_PACKED_OBJS_AVX=$(patsubst %.o,%$(POSTFIX_AVX).o,$(CPP_OBJS) $(ASM_PACKED_OBJS)) $(OS_DEPENDENT_OBJS)
-
-HEADERS=../sudoku.h sudokutest.h sudokutest_os_dependent.h
-GENERATED_CODES=sudokuConstAll.h
-GENERATOR_SCRIPT=../sudokumap.rb
-
-.PHONY: all clean
-
-all: $(TARGETS)
-
-$(CELLS_UNPACKED_TARGET_SSE): export CPPFLAGS_ASM=$(CPPFLAGS_SSE)
-$(CELLS_UNPACKED_TARGET_SSE): $(CELLS_UNPACKED_OBJS_SSE)
-	$(CXX) $(LIBPATH) -o $@ $(LDFLAGS) $^ $(LIBS)
-	./$@
-
-$(CELLS_PACKED_TARGET_SSE): export CPPFLAGS_ASM=$(CPPFLAGS_SSE)
-$(CELLS_PACKED_TARGET_SSE): $(CELLS_PACKED_OBJS_SSE)
-	$(CXX) $(LIBPATH) -o $@ $(LDFLAGS) $^ $(LIBS)
-	./$@
-
-$(CELLS_UNPACKED_TARGET_AVX): export CPPFLAGS_ASM=$(CPPFLAGS_AVX)
-$(CELLS_UNPACKED_TARGET_AVX): $(CELLS_UNPACKED_OBJS_AVX)
-	$(CXX) $(LIBPATH) -o $@ $(LDFLAGS) $^ $(LIBS)
-	./$@
-
-$(CELLS_PACKED_TARGET_AVX): export CPPFLAGS_ASM=$(CPPFLAGS_AVX)
-$(CELLS_PACKED_TARGET_AVX): $(CELLS_PACKED_OBJS_AVX)
-	$(CXX) $(LIBPATH) -o $@ $(LDFLAGS) $^ $(LIBS)
-	./$@
-
-# no inlining
-$(TESTER_OS_DEPENDENT_OBJ) : $(TESTER_OS_DEPENDENT_SRC) $(HEADERS) $(GENERATED_CODES)
-	$(CXX) -c $(CPPFLAGS_ASM) $< -o $@
-
-$(TESTED_OS_DEPENDENT_OBJ) : ../$(TESTED_OS_DEPENDENT_SRC) $(HEADERS) $(GENERATED_CODES)
-	$(CXX) -c $(CPPFLAGS_ASM) $< -o $@
-
-main$(POSTFIX_SSE).o : main.cpp $(HEADERS) $(GENERATED_CODES)
-	$(CXX) -c $(CPPFLAGS_SSE) $< -o $@
-
-sudokussetest$(POSTFIX_SSE).o : sudokussetest.cpp $(HEADERS) $(GENERATED_CODES)
-	$(CXX) -c $(CPPFLAGS_SSE) $< -o $@
-
-sudokutest$(POSTFIX_SSE).o : sudokutest.cpp $(HEADERS) $(GENERATED_CODES)
-	$(CXX) -c $(CPPFLAGS_SSE) $< -o $@
-
-sudokucelltest$(POSTFIX_SSE).o : sudokucelltest.cpp $(HEADERS) $(GENERATED_CODES)
-	$(CXX) -c $(CPPFLAGS_SSE) $< -o $@
-
-sudokumaptest$(POSTFIX_SSE).o : sudokumaptest.cpp $(HEADERS) $(GENERATED_CODES)
-	$(CXX) -c $(CPPFLAGS_SSE) $< -o $@
-
-sudokusolvertest$(POSTFIX_SSE).o : sudokusolvertest.cpp $(HEADERS) $(GENERATED_CODES)
-	$(CXX) -c $(CPPFLAGS_SSE) $< -o $@
-
-sudokuloadertest$(POSTFIX_SSE).o : sudokuloadertest.cpp $(HEADERS) $(GENERATED_CODES)
-	$(CXX) -c $(CPPFLAGS_SSE) $< -o $@
-
-sudoku$(POSTFIX_SSE).o : ../sudoku.cpp $(HEADERS) $(GENERATED_CODES)
-	$(CXX) -c $(CPPFLAGS_SSE) $< -o $@
-
-sudokuxmmreg$(POSTFIX_SSE).o : ../sudokuxmmreg.cpp $(HEADERS) $(GENERATED_CODES)
-	$(CXX) -c $(CPPFLAGS_SSE) $< -o $@
-
-main$(POSTFIX_AVX).o : main.cpp $(HEADERS) $(GENERATED_CODES)
-	$(CXX) -c $(CPPFLAGS_AVX) $< -o $@
-
-sudokussetest$(POSTFIX_AVX).o : sudokussetest.cpp $(HEADERS) $(GENERATED_CODES)
-	$(CXX) -c $(CPPFLAGS_AVX) $< -o $@
-
-sudokutest$(POSTFIX_AVX).o : sudokutest.cpp $(HEADERS) $(GENERATED_CODES)
-	$(CXX) -c $(CPPFLAGS_AVX) $< -o $@
-
-sudokucelltest$(POSTFIX_AVX).o : sudokucelltest.cpp $(HEADERS) $(GENERATED_CODES)
-	$(CXX) -c $(CPPFLAGS_AVX) $< -o $@
-
-sudokumaptest$(POSTFIX_AVX).o : sudokumaptest.cpp $(HEADERS) $(GENERATED_CODES)
-	$(CXX) -c $(CPPFLAGS_AVX) $< -o $@
-
-sudokusolvertest$(POSTFIX_AVX).o : sudokusolvertest.cpp $(HEADERS) $(GENERATED_CODES)
-	$(CXX) -c $(CPPFLAGS_AVX) $< -o $@
-
-sudokuloadertest$(POSTFIX_AVX).o : sudokuloadertest.cpp $(HEADERS) $(GENERATED_CODES)
-	$(CXX) -c $(CPPFLAGS_AVX) $< -o $@
-
-sudoku$(POSTFIX_AVX).o : ../sudoku.cpp $(HEADERS) $(GENERATED_CODES)
-	$(CXX) -c $(CPPFLAGS_AVX) $< -o $@
-
-sudokuxmmreg$(POSTFIX_AVX).o : ../sudokuxmmreg.cpp $(HEADERS) $(GENERATED_CODES)
-	$(CXX) -c $(CPPFLAGS_AVX) $< -o $@
-
-sudokusse_cells$(POSTFIX_UNPACKED)$(POSTFIX_SSE).o : ../sudokusse.s
-	$(AS) $(ASFLAGS_UNPACKED) $(ASFLAGS_SSE) -o $@ $<
-
-sudokusse_cells$(POSTFIX_PACKED)$(POSTFIX_SSE).o : ../sudokusse.s
-	$(AS) $(ASFLAGS_PACKED) $(ASFLAGS_SSE) -o $@ $<
-
-sudokusse_cells$(POSTFIX_UNPACKED)$(POSTFIX_AVX).o : ../sudokusse.s
-	$(AS) $(ASFLAGS_UNPACKED) $(ASFLAGS_AVX) -o $@ $<
-
-sudokusse_cells$(POSTFIX_PACKED)$(POSTFIX_AVX).o : ../sudokusse.s
-	$(AS) $(ASFLAGS_PACKED) $(ASFLAGS_AVX) -o $@ $<
-
-$(GENERATED_CODES) : $(GENERATOR_SCRIPT)
-	ruby $(GENERATOR_SCRIPT)
-
-$(HEADERS):
+check:
+	$(foreach exe,$(TARGETS),$(call execute-command,./$(exe)))
 
 clean:
-	$(RM) $(TARGETS) $(GENERATED_CODES) ./*.o
-	$(RM) $(CELLS_UNPACKED_OBJS_SSE)
-	$(RM) $(CELLS_PACKED_OBJS_SSE)
-	$(RM) $(CELLS_UNPACKED_OBJS_AVX)
-	$(RM) $(CELLS_PACKED_OBJS_AVX)
+	$(MAKE) -f $(MAKEFILE_SUB_COMPILE) clean
+
+show:
+	$(foreach v, $(ALL_UPDATED_VARIABLES), $(info $(v) = $($(v))))
+
+#Local Variables:
+#mode: Makefile
+#coding: utf-8-dos
+#End:

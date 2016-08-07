@@ -1,0 +1,36 @@
+# Makefile
+THIS_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+include $(THIS_DIR)Makefile_vars
+
+.SUFFIXES: .o .cpp .h .s
+.PHONY: all clean
+
+all: $(TARGETS)
+
+$(CELLS_UNPACKED_TARGET): $(CELLS_UNPACKED_OBJS)
+	$(LD) -o $@ $(LDFLAGS) $^
+
+$(CELLS_PACKED_TARGET): $(CELLS_PACKED_OBJS)
+	$(LD) -o $@ $(LDFLAGS) $^
+
+%.o: %.cpp $(HEADERS) $(GENERATED_CODE)
+	$(CXX) -c $(CPPFLAGS) $< -o $@
+
+sudokusse_cells_unpacked.o : sudokusse.s
+	$(AS) -defsym CellsPacked=0 $(ASFLAGS_SSE_AVX) -o $@ $<
+
+sudokusse_cells_packed.o : sudokusse.s
+	$(AS) -defsym CellsPacked=1 $(ASFLAGS_SSE_AVX) -o $@ $<
+
+$(HEADERS): ;
+
+$(GENERATED_CODE) : $(GENERATOR_SCRIPT)
+	$(RUBY) $(GENERATOR_SCRIPT)
+
+clean:
+	$(RM) $(TARGETS) $(OBJS) $(GENERATED_CODE) ./*.o
+
+#Local Variables:
+#mode: Makefile
+#coding: utf-8-dos
+#End:
