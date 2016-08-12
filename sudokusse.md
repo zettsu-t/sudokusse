@@ -348,6 +348,7 @@ General purpose registers are used for
 ### SSE4.2/AVX data structures to count sudoku solutions
 
 XMM registers hold cells described below.
+
 |Register|Cells|
 |:-------|:----|
 |XMM1|(0,0), ... , (7,0)|
