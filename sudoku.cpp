@@ -1001,7 +1001,7 @@ void SudokuSseEnumeratorMap::PrintFromAsm(const XmmRegisterSet& xmmRegSet) {
     ++patternNumber_;
     /* レジスタはasm側で保存する */
     pSudokuOutStream_->flush();
-    (*pSudokuOutStream_) << "[Pattern " << patternNumber_ << "]\n";
+    (*pSudokuOutStream_) << "[Solution " << patternNumber_ << "]\n";
     Print(true, xmmRegSet);
     return;
 }
@@ -1402,7 +1402,7 @@ void SudokuSseSolver::Enumerate(void) {
         enumeratorMap_.SetToPrint(printAllCadidate_);
     }
     const auto result = enumeratorMap_.Enumerate();
-    (*pSudokuOutStream_) << "Number of pattern : " << result << "\n";
+    (*pSudokuOutStream_) << "Number of solutions : " << result << "\n";
     return;
 }
 

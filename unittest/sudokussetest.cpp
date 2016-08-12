@@ -25,8 +25,8 @@ class SudokuSseEnumeratorMapTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST_SUITE_END();
 
 public:
-    void setUp();
-    void tearDown();
+    void setUp() override;
+    void tearDown() override;
 protected:
     void test_Constructor();
     void test_SetToPrint();
@@ -78,8 +78,8 @@ class SudokuSseTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST_SUITE_END();
 
 public:
-    void setUp();
-    void tearDown();
+    void setUp() override;
+    void tearDown() override;
 protected:
     void test_MaskLower32bit();
     void test_PowerOf2();
@@ -332,7 +332,7 @@ void SudokuSseEnumeratorMapTest::test_PrintFromAsm() {
         sudokuXmmRightBottomSolved = test.rightBottomElement;
         map.PrintFromAsm(xmmRegSet);
 
-        std::string expected("[Pattern 9876]\n");
+        std::string expected("[Solution 9876]\n");
         expected.append(test.expctedPrintSolved);
         std::string actual(sudokuOutStream.str());
         CPPUNIT_ASSERT(expected == actual);

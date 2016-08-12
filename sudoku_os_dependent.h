@@ -142,7 +142,7 @@ namespace Sudoku {
             (*pOutStream) << std::dec << usecTime << "usec, ";
             (*pOutStream) << std::dec << clockElapsed << "clock\n";
             if (showAverage) {
-                (*pOutStream) << "average : " << std::fixed << std::setprecision(3) << usecOnceTime << "usec, ";
+                (*pOutStream) << "Average : " << std::fixed << std::setprecision(3) << usecOnceTime << "usec, ";
                 (*pOutStream) << std::dec << clockOnce << "clock\n";
                 (*pOutStream) << "Once least : " << std::fixed << std::setprecision(3) << leastUsecOnceTime << "usec, ";
                 (*pOutStream) << std::dec << leastClock << "clock\n\n";

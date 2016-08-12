@@ -107,12 +107,12 @@ protected:
 
         // 画面に表示するはずの内容を確認する
         std::string expectedstr;
-        expectedstr = "Total : 200usec, 150clock\naverage : 66.667usec, 50clock\n";
+        expectedstr = "Total : 200usec, 150clock\nAverage : 66.667usec, 50clock\n";
         expectedstr += "Once least : 40.000usec, 30clock\n\n";
-        expectedstr += "Total : 12sec, 12300000usec, 12300clock\naverage : 4100000.000usec, 4100clock\n";
+        expectedstr += "Total : 12sec, 12300000usec, 12300clock\nAverage : 4100000.000usec, 4100clock\n";
         expectedstr += "Once least : 300000.000usec, 300clock\n\n";
         expectedstr += "Total : 166666min 40sec, 10000000000000usec, 81000518403317781clock\n";
-        expectedstr += "average : 2000000.000usec, 16200103680clock\nOnce least : 12.346usec, 100000clock\n\n";
+        expectedstr += "Average : 2000000.000usec, 16200103680clock\nOnce least : 12.346usec, 100000clock\n\n";
         expectedstr += "Total : 166666min 40sec, 10000000000000usec, 81000518403317781clock\n";
 
         const std::string actualstr = pOutStream->str();

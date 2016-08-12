@@ -39,8 +39,8 @@ class SudokuSolverTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST_SUITE_END();
 
 public:
-    void setUp();
-    void tearDown();
+    void setUp() override;
+    void tearDown() override;
 protected:
     void test_Constructor();
     void test_Exec();
@@ -68,8 +68,8 @@ class SudokuSseSolverTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST_SUITE_END();
 
 public:
-    void setUp();
-    void tearDown();
+    void setUp() override;
+    void tearDown() override;
 
 protected:
     void test_Constructor();
@@ -96,8 +96,8 @@ protected:
     std::unique_ptr<SudokuSseSearchState> pInstance_;    // インスタンス
     std::unique_ptr<SudokuOutStream> pSudokuOutStream_;  // 結果出力先
 public:
-    void setUp();
-    void tearDown();
+    void setUp() override;
+    void tearDown() override;
 protected:
     void test_Print();
 
@@ -370,7 +370,7 @@ void SudokuSseSolverTest::test_Enumerate() {
     expected += "0:0:0:0:0:0:0:0:0\n";
     expected += "0:0:0:0:0:0:0:0:0\n";
     expected += "0:0:0:0:0:0:0:0:0\n";
-    expected += "[Pattern 1]\n";
+    expected += "[Solution 1]\n";
     expected += "1:2:3:4:5:6:7:8:9\n";
     expected += "4:5:6:7:8:9:1:2:3\n";
     expected += "7:8:9:1:2:3:4:5:6\n";
@@ -380,7 +380,7 @@ void SudokuSseSolverTest::test_Enumerate() {
     expected += "5:3:1:6:4:2:9:7:8\n";
     expected += "8:6:2:9:3:7:5:1:4\n";
     expected += "9:4:7:5:1:8:3:6:2\n";
-    expected += "Number of pattern : 570000\n";
+    expected += "Number of solutions : 570000\n";
 
     CPPUNIT_ASSERT_EQUAL(expected, pSudokuOutStream_->str());
 }

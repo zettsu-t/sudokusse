@@ -46,4 +46,4 @@ bin/sudokusse 10000 < data/sudoku_example1.txt
 
 ## And more
 
-Please read [notes_english.txt](notes_english.txt) to know more details.
+Please read [sudokusse.md](sudokusse.md) to know more details.

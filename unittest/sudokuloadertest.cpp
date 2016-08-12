@@ -23,8 +23,8 @@ class SudokuLoaderTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST_SUITE_END();
 
 public:
-    void setUp();
-    void tearDown();
+    void setUp() override;
+    void tearDown() override;
 protected:
     void test_Constructor();
     void test_CanLaunch();
