@@ -557,24 +557,24 @@ a profiler to SudokuSSE.
 ## Bibliography and acknowledgments
 
 1. I cite the sudoku solver algorithm and puzzle examples from the
-book.
+  book.
 
-Dennis E. Shasha (May 2007), "Puzzles for Programmers and Pros", Wrox
-(I read its Japanese translation published by Ohmsha. See my Japanese
-[howtobuild.txt](howtobuild.txt).)
+  Dennis E. Shasha (May 2007), "Puzzles for Programmers and Pros", Wrox
+  (I read its Japanese translation published by Ohmsha. See my Japanese
+  [howtobuild.txt](howtobuild.txt).)
 
 2. I use CppUnit code on the website.
 
-_http://www.atmarkit.co.jp/fdotnet/cpptest/cpptest02/cpptest02_02.html_
+  _http://www.atmarkit.co.jp/fdotnet/cpptest/cpptest02/cpptest02_02.html_
 
 3. I adopt an idea of Mr. Kawai Hidemi to count how many solutions in
-a sudoku puzzle and compare execution time with his program on the
-article.
+  a sudoku puzzle and compare execution time with his program on the
+  article.
 
-_http://developer.cybozu.co.jp/tech/?p=1692_
+  _http://developer.cybozu.co.jp/tech/?p=1692_
 
 4. I check instruction set and latency of x86_64 on the manual.
 
-"Intel 64 and IA-32 Architectures Optimization Reference Manual"
+  "Intel 64 and IA-32 Architectures Optimization Reference Manual"
 
-_http://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-optimization-manual.html_
+  _http://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-optimization-manual.html_
