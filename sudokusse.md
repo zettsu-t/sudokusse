@@ -29,17 +29,17 @@ shown below are required.
 ### Generate executables
 
 1. Launch a terminal and change its current directory to a directory
-that contains _sudoku.cpp_.
+  that contains _sudoku.cpp_.
 
-```bash
-cd .../sudokusse
-```
+  ```bash
+  cd .../sudokusse
+  ```
 
-2. Execute make without arguments to build.
+1. Execute make without arguments to build.
 
-```bash
-make
-```
+  ```bash
+  make
+  ```
 
 After built successfully, these two executable files are generated.
 
