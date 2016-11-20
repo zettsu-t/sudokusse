@@ -1,4 +1,4 @@
-# Sudoku asm solver with SSE4.2 / AVX
+# Sudoku asm solver with SSE/AVX SIMD instructions
 
 Solving sudoku puzzles with SIMD instructions faster than C++ template metaprogramming.
 
