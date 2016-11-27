@@ -6,16 +6,21 @@
 // 実行回数の前に-を付けると、解く過程を示しながらその回数だけ実行する(-5なら5回)
 // 実行回数を0にすると、取り得る解を数える。第二引数があればその数だけ解を列挙する。
 //
+// 引数に数字ではなくファイル名を指定したときは、そのファイルの各行を解く
+// 第二引数があり1の場合はSSEで、それ以外の場合はC++で解く
+//
 // sudoku [実行回数 [列挙回数]] < 初期マップ
 
-#include <iostream>
-#include <sstream>
+#include <algorithm>
+#include <fstream>
 #include <iomanip>
+#include <iostream>
+#include <limits>
+#include <sstream>
+#include <typeinfo>
 #include <cassert>
 #include <ctime>
 #include <cstring>
-#include <limits>
-#include <typeinfo>
 #include "sudoku.h"
 
 // 定数を定義する
@@ -672,7 +677,7 @@ INLINE SudokuIndex SudokuMap::CountFilledCells(void) const {
 }
 
 // 高速化
-INLINE SudokuIndex SudokuMap::unrolledSelectBacktrakedCellIndexInnerCommon(SudokuIndex outerIndex, SudokuIndex innerIndex,
+INLINE SudokuIndex SudokuMap::unrolledSelectBacktrackedCellIndexInnerCommon(SudokuIndex outerIndex, SudokuIndex innerIndex,
                                                                            SudokuIndex& leastCountOfGroup,
                                                                            SudokuIndex& candidateCellIndex) const {
     const auto cellIndex = Group_[backtrackedGroup_][outerIndex][innerIndex];
@@ -691,20 +696,20 @@ INLINE SudokuIndex SudokuMap::unrolledSelectBacktrakedCellIndexInnerCommon(Sudok
 }
 
 template <SudokuIndex innerIndex>
-INLINE SudokuIndex SudokuMap::unrolledSelectBacktrakedCellIndexInner(SudokuIndex outerIndex, SudokuIndex& leastCountOfGroup,
+INLINE SudokuIndex SudokuMap::unrolledSelectBacktrackedCellIndexInner(SudokuIndex outerIndex, SudokuIndex& leastCountOfGroup,
                                                                      SudokuIndex& candidateCellIndex) const {
-    return unrolledSelectBacktrakedCellIndexInnerCommon(outerIndex, innerIndex, leastCountOfGroup, candidateCellIndex)
-        + unrolledSelectBacktrakedCellIndexInner<innerIndex-1>(outerIndex, leastCountOfGroup, candidateCellIndex);
+    return unrolledSelectBacktrackedCellIndexInnerCommon(outerIndex, innerIndex, leastCountOfGroup, candidateCellIndex)
+        + unrolledSelectBacktrackedCellIndexInner<innerIndex-1>(outerIndex, leastCountOfGroup, candidateCellIndex);
 }
 
 template <>
-INLINE SudokuIndex SudokuMap::unrolledSelectBacktrakedCellIndexInner<0>(SudokuIndex outerIndex, SudokuIndex& leastCountOfGroup,
+INLINE SudokuIndex SudokuMap::unrolledSelectBacktrackedCellIndexInner<0>(SudokuIndex outerIndex, SudokuIndex& leastCountOfGroup,
                                                                         SudokuIndex& candidateCellIndex) const {
-    return unrolledSelectBacktrakedCellIndexInnerCommon(outerIndex, 0, leastCountOfGroup, candidateCellIndex);
+    return unrolledSelectBacktrackedCellIndexInnerCommon(outerIndex, 0, leastCountOfGroup, candidateCellIndex);
 }
 
 // バックトラッキング候補のマスを選ぶ
-INLINE SudokuIndex SudokuMap::SelectBacktrakedCellIndex(void) const {
+INLINE SudokuIndex SudokuMap::SelectBacktrackedCellIndex(void) const {
     SudokuIndex leastGroupCount = Sudoku::SizeOfCandidates * Sudoku::SizeOfCellsPerGroup;
     SudokuIndex leastCount = Sudoku::SizeOfCandidates;
     SudokuIndex resultCellIndex = 0;
@@ -726,7 +731,7 @@ INLINE SudokuIndex SudokuMap::SelectBacktrakedCellIndex(void) const {
                 }
             }
         } else {
-            groupCount = unrolledSelectBacktrakedCellIndexInner<Sudoku::SizeOfCellsPerGroup-1>
+            groupCount = unrolledSelectBacktrackedCellIndexInner<Sudoku::SizeOfCellsPerGroup-1>
                 (i, leastCountOfGroup, candidateCellIndex);
         }
         // 候補の最小のマス、候補の最小のグループの順で選ぶ
@@ -743,7 +748,7 @@ INLINE SudokuIndex SudokuMap::SelectBacktrakedCellIndex(void) const {
     return resultCellIndex;
 }
 
-// 候補が矛盾していないかどうか返す(解きながら調べるのでこの関数は呼ばれない)
+// 候補が矛盾していないかどうか返す
 bool SudokuMap::IsConsistent(void) const {
     for(SudokuLoopIndex i=0;i<Sudoku::SizeOfGroupsPerCell;++i) {
         for(SudokuLoopIndex j=0;j<Sudoku::SizeOfGroupsPerMap;++j) {
@@ -1119,9 +1124,14 @@ bool SudokuSolver::solve(SudokuMap& map, bool topLevel, bool verbose) {
             map.Print(pSudokuOutStream_);
         }
         if (map.IsFilled()) {
+            if (!map.IsConsistent()) {
+                // バックトラッキングを打ち切る
+                return false;
+            }
             // 解けた
             return true;
         }
+
         const auto newCount = map.CountFilledCells();
         if (oldCount == newCount) {
             break;
@@ -1130,7 +1140,7 @@ bool SudokuSolver::solve(SudokuMap& map, bool topLevel, bool verbose) {
     }
 
     // 減らないので候補を決め打ちしてバックトラッキングする
-    const auto cellIndex = map.SelectBacktrakedCellIndex();
+    const auto cellIndex = map.SelectBacktrackedCellIndex();
     // 1から順に試す
     auto candidate = SudokuCell::GetInitialCandidate();
     for(;;) {
@@ -1333,6 +1343,34 @@ void SudokuSseMap::Print(std::ostream* pSudokuOutStream) const {
     return;
 }
 
+// C++版と同じ方法で次のバックトラッキング候補を見つける
+bool SudokuSseMap::SearchNext(SudokuSseCandidateCell& cell) {
+    SudokuIndex leastGroupCount = Sudoku::SizeOfCandidates * Sudoku::SizeOfCellsPerGroup;
+    SudokuIndex leastCount = Sudoku::SizeOfCandidates;
+    bool result = false;
+
+    // 外ループをアンローリングすると却って遅くなる
+    for(SudokuLoopIndex i=0;i<Sudoku::SizeOfGroupsPerMap;++i) {
+        SudokuIndex groupCount = 0;
+        SudokuSseCandidateCell localCell = {SudokuSseMap::InitialRegisterNum * SudokuSse::RegisterWordCnt,
+                                            0, 0, Sudoku::SizeOfCandidates};
+        groupCount = unrolledSelectBacktrackedCellIndexInner<Sudoku::SizeOfCellsPerGroup-1>(i, localCell);
+
+        // 候補の最小のマス、候補の最小のグループの順で選ぶ
+        if ((leastCount > localCell.count) ||
+            ((leastCount == localCell.count) && (leastGroupCount > groupCount))) {
+            leastCount = localCell.count;
+            cell = localCell;
+            result = true;
+        }
+        if (leastGroupCount > groupCount) {
+            leastGroupCount = groupCount;
+        }
+    }
+
+    return result;
+}
+
 // 次のバックトラッキング候補を見つける
 bool SudokuSseMap::SearchNext(SudokuSseSearchState& searchState) {
     sudokuXmmUniqueCandidate = searchState.member_.uniqueCandidate_;
@@ -1358,6 +1396,117 @@ bool SudokuSseMap::SearchNext(SudokuSseSearchState& searchState) {
     searchState.member_.candidateOutBoxShift_ = sudokuXmmCandidateOutBoxShift;
 
     return (searchState.member_.candidateCnt_ <= Sudoku::SizeOfCandidates);
+}
+
+// 候補を唯一に設定出来たら、設定してtrueを返す
+bool SudokuSseMap::SetUniqueCell(const SudokuSseCandidateCell& cell, SudokuCellCandidates candidate) {
+    auto original = (xmmRegSet_.regVal_[cell.regIndex] & cell.mask) >> cell.shift;
+    bool result = original & candidate;
+    if (result) {
+        xmmRegSet_.regVal_[cell.regIndex] &= ~cell.mask;
+        xmmRegSet_.regVal_[cell.regIndex] |= candidate << cell.shift;
+    }
+    return result;
+}
+
+// すべてのマスが埋まっているときに、行が候補が矛盾していないかどうか返す
+bool SudokuSseMap::IsConsistent(void) const {
+    SudokuIndex regIndex = InitialRegisterNum * SudokuSse::RegisterWordCnt;
+    SudokuSseElement tripleColumnSet[Sudoku::SizeOfBoxesOnEdge];
+    SudokuSseElement boxSet[Sudoku::SizeOfGroupsPerMap];
+    ::memset(tripleColumnSet, 0, sizeof(tripleColumnSet));
+    ::memset(boxSet, 0, sizeof(boxSet));
+
+    // アンローリングした方が速い
+    for(SudokuLoopIndex row=0; row<Sudoku::SizeOfGroupsPerMap; ++row) {
+        SudokuSseElement rowAccumlated = 0;
+        for(SudokuLoopIndex i=0;i<Sudoku::SizeOfBoxesOnEdge;++i) {
+            auto value = xmmRegSet_.regVal_[regIndex];
+            rowAccumlated |= value;
+
+            assert(i < arraySizeof(tripleColumnSet));
+            tripleColumnSet[i] |= value;
+
+            auto boxIndex = (row / Sudoku::SizeOfBoxesOnEdge) * Sudoku::SizeOfBoxesOnEdge + i;
+            assert(boxIndex < arraySizeof(boxSet));
+            boxSet[boxIndex] |= value;
+            ++regIndex;
+        }
+
+        auto total = ((rowAccumlated >> (Sudoku::SizeOfCandidates * 2)) & Sudoku::AllCandidates) |
+            ((rowAccumlated >> Sudoku::SizeOfCandidates) & Sudoku::AllCandidates) |
+            (rowAccumlated & Sudoku::AllCandidates);
+        if (countCandidates(total) != Sudoku::SizeOfCellsPerGroup) {
+            return false;
+        }
+        regIndex += 1;
+    }
+
+    for(const auto& tripleColumn : tripleColumnSet) {
+        if (countCandidates(tripleColumn) != (Sudoku::SizeOfCellsPerGroup * Sudoku::SizeOfCellsOnBoxEdge)) {
+            return false;
+        }
+    }
+
+    for(const auto& box : boxSet) {
+        if (countCandidates(box) != Sudoku::SizeOfCellsPerGroup) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+INLINE void SudokuSseMap::getRegisterIndex(SudokuIndex outerIndex, SudokuIndex innerIndex, SudokuSseCandidateCell& cell) const {
+    cell.regIndex = (outerIndex + InitialRegisterNum) * SudokuSse::RegisterWordCnt +
+        Sudoku::SizeOfBoxesOnEdge - (innerIndex / Sudoku::SizeOfBoxesOnEdge) - 1;
+    cell.shift = (Sudoku::SizeOfCellsOnBoxEdge - (innerIndex % Sudoku::SizeOfCellsOnBoxEdge) - 1) * Sudoku::SizeOfCandidates;
+    cell.mask = Sudoku::AllCandidates << cell.shift;
+    cell.count = 0;
+    return;
+}
+
+INLINE SudokuIndex SudokuSseMap::countCandidates(SudokuSseElement value) const {
+    decltype(value) count = 0;
+    asm volatile (
+        "popcnt %0, %1"
+        : "=r"(count) :"r"(value):);
+    return count;
+}
+
+INLINE SudokuIndex SudokuSseMap::countCandidatesIfMultiple(SudokuSseElement value) const {
+    auto count = countCandidates(value);
+    return (count > Sudoku::SizeOfUniqueCandidate) ? count : Sudoku::OutOfRangeCandidates;
+}
+
+INLINE SudokuIndex SudokuSseMap::unrolledSelectBacktrackedCellIndexInnerCommon(SudokuIndex outerIndex, SudokuIndex innerIndex,
+                                                                               SudokuSseCandidateCell& cell) const {
+    SudokuSseCandidateCell localCell;
+    getRegisterIndex(outerIndex, innerIndex, localCell);
+    auto value = (xmmRegSet_.regVal_[localCell.regIndex] & localCell.mask) >> localCell.shift;
+
+    const auto countOrOutOfRange = countCandidatesIfMultiple(value);
+    assert(countOrOutOfRange > Sudoku::SizeOfUniqueCandidate);
+    localCell.count = SudokuCell::MaskCandidatesUnlessMultiple(countOrOutOfRange);
+    assert(localCell.count <= Sudoku::SizeOfCandidates);
+
+    // 候補がなければcountはマスの数より大きい
+    if (cell.count > countOrOutOfRange) {
+        cell = localCell;
+    }
+
+    return localCell.count;
+}
+
+template <SudokuIndex innerIndex>
+INLINE SudokuIndex SudokuSseMap::unrolledSelectBacktrackedCellIndexInner(SudokuIndex outerIndex, SudokuSseCandidateCell& cell) const {
+    return unrolledSelectBacktrackedCellIndexInnerCommon(outerIndex, innerIndex, cell)
+        + unrolledSelectBacktrackedCellIndexInner<innerIndex-1>(outerIndex, cell);
+}
+
+template <>
+INLINE SudokuIndex SudokuSseMap::unrolledSelectBacktrackedCellIndexInner<0>(SudokuIndex outerIndex, SudokuSseCandidateCell& cell) const {
+    return unrolledSelectBacktrackedCellIndexInnerCommon(outerIndex, 0, cell);
 }
 
 // コンストラクタ
@@ -1424,9 +1573,52 @@ bool SudokuSseSolver::solve(SudokuSseMap& map, bool topLevel, bool verbose) {
 
         // 全マス埋めた
         if (sudokuXmmElementCnt == Sudoku::SizeOfAllCells) {
+            if (!map.IsConsistent()) {
+                // バックトラッキングを打ち切る
+                return false;
+            }
             return true;
         }
 
+#if 1
+        // 減らないので候補を決め打ちしてバックトラッキングする
+        SudokuSseCandidateCell cell;
+        auto found = map.SearchNext(cell);
+        if (!found) {
+            return false;
+        }
+
+        // 1から順に試す
+        auto candidate = SudokuCell::GetInitialCandidate();
+        for(;;) {
+            SudokuSseMap newMap = map;
+            // 設定できなければ書き換えない方が、上記のコピーを省ける
+            const auto filled = newMap.SetUniqueCell(cell, candidate);
+
+            // 候補を矛盾なく設定できたら解く
+            if (filled) {
+                if (verbose) {
+                    map.Print(pSudokuOutStream_);
+                }
+
+                // バックトラッキング開始
+                const auto result = solve(newMap, false, verbose);
+                if (result) {
+                    // 単に値をコピーして状態を書き戻す
+                    map = newMap;
+                    // 解けた
+                    return true;
+                }
+            }
+
+            // 次の候補がまだあれば試す
+            candidate = SudokuCell::GetNextCandidate(candidate);
+            if (SudokuCell::IsEmptyCandidates(candidate) != false) {
+                break;
+            }
+        }
+#else
+        // この方法だと、バックトラッキング回数が多すぎる
         SudokuSseSearchState searchState;
         for(;;) {
             SudokuSseMap newMap = map;
@@ -1449,6 +1641,7 @@ bool SudokuSseSolver::solve(SudokuSseMap& map, bool topLevel, bool verbose) {
                 return true;
             }
         }
+#endif
         break;
     }
 
@@ -1466,14 +1659,185 @@ bool SudokuSseSolver::fillCells(SudokuSseMap& map, bool topLevel, bool verbose) 
     return true;
 }
 
-SudokuLoader::SudokuLoader(int argc, const char * const argv[], std::istream* pSudokuInStream, std::ostream* pSudokuOutStream)
-    : isBenchmark_(false), verbose_(true), measureCount_(1), printAllCadidate_(0), pSudokuOutStream_(nullptr) {
-    std::string sudokuStr;
+SudokuChecker::SudokuChecker(const std::string& solution, std::ostream* pSudokuOutStream)
+    : valid_(parse(solution, pSudokuOutStream)) {
+    return;
+}
 
-    if ((pSudokuInStream == nullptr) || (pSudokuOutStream == nullptr)) {
+bool SudokuChecker::valid() const {
+    return valid_;
+}
+
+bool SudokuChecker::parse(const std::string& solution, std::ostream* pSudokuOutStream) {
+    std::istringstream is(solution);
+    Grid grid(Sudoku::SizeOfGroupsPerMap, Group(Sudoku::SizeOfCellsPerGroup, 0));
+
+    bool valid = true;
+    for(SudokuIndex row = 0; valid && (row < Sudoku::SizeOfGroupsPerMap); ++row) {
+        std::string str;
+        getline(is, str);
+        if (str.empty()) {
+            valid = false;
+            break;
+        }
+
+        // 行の要素数が異常
+        if (str.size() < (Sudoku::SizeOfCellsPerGroup * 2 - 1)) {
+            valid = false;
+            break;
+        }
+
+        for(SudokuIndex column = 0; valid && (column < Sudoku::SizeOfCellsPerGroup); ++column) {
+            // マスの区切り文字(末尾はなくてもよい)
+            if (((column + 1) < Sudoku::SizeOfCellsPerGroup) && (str.at(column * 2 + 1) != ':')) {
+                valid = false;
+            }
+
+            // マスの数字
+            int num = 0;
+            if (Sudoku::ConvertCharToSudokuCandidate(Sudoku::MinCandidatesNumber, Sudoku::MaxCandidatesNumber,
+                                                     str.at(column * 2), num)) {
+                grid.at(row).at(column) = num;
+            } else {
+                valid = false;
+            }
+        }
+    }
+
+    return (valid) ? check(grid, pSudokuOutStream) : false;
+}
+
+bool SudokuChecker::check(const Grid& grid, std::ostream* pSudokuOutStream) {
+    return checkRowSet(grid, pSudokuOutStream) &&
+        checkColumnSet(grid, pSudokuOutStream) &&
+        checkBoxSet(grid, pSudokuOutStream);
+}
+
+bool SudokuChecker::checkRowSet(const Grid& grid, std::ostream* pSudokuOutStream) {
+    // 各行のマスが一意
+    for(SudokuIndex row = 0; row < Sudoku::SizeOfGroupsPerMap; ++row) {
+        auto valid = checkUnique(grid.at(row));
+        if (!valid) {
+            if (pSudokuOutStream) {
+                *pSudokuOutStream << "Error in row " << (row + 1) << "\n";
+            }
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool SudokuChecker::checkColumnSet(const Grid& grid, std::ostream* pSudokuOutStream) {
+    // 各列のマスが一意
+    for(SudokuIndex column = 0; column < Sudoku::SizeOfGroupsPerMap; ++column) {
+        Group group;
+        for(SudokuIndex row = 0; row < Sudoku::SizeOfCellsPerGroup; ++row) {
+            group.push_back(grid.at(row).at(column));
+        }
+
+        auto valid = checkUnique(group);
+        if (!valid) {
+            if (pSudokuOutStream) {
+                *pSudokuOutStream << "Error in column " << (column + 1) << "\n";
+            }
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool SudokuChecker::checkBoxSet(const Grid& grid, std::ostream* pSudokuOutStream) {
+    // 各3x3箱のマスが一意
+    for(SudokuIndex column = 0; column < Sudoku::SizeOfGroupsPerMap; column += Sudoku::SizeOfBoxesOnEdge) {
+        for(SudokuIndex row = 0; row < Sudoku::SizeOfCellsPerGroup; row += Sudoku::SizeOfBoxesOnEdge) {
+            Group group;
+            for(SudokuIndex x = 0; x < Sudoku::SizeOfCellsOnBoxEdge; ++x) {
+                for(SudokuIndex y = 0; y < Sudoku::SizeOfCellsOnBoxEdge; ++y) {
+                    group.push_back(grid.at(row + y).at(column + x));
+                }
+            }
+
+            auto valid = checkUnique(group);
+            if (!valid) {
+                if (pSudokuOutStream) {
+                    *pSudokuOutStream << "Error in a box with row " << (row + 1) << " column " << (column + 1) << "\n";
+                }
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+// 行、列、3x3箱のメンバが一意かどうか調べる
+bool SudokuChecker::checkUnique(const Group& line) {
+    Group row = line;
+    std::sort(row.begin(), row.end());
+    row.erase(std::unique(row.begin(), row.end()), row.end());
+    return (row.size() == Sudoku::SizeOfCellsPerGroup);
+}
+
+const int SudokuLoader::ExitStatusPassed = 0;
+const int SudokuLoader::ExitStatusFailed = 1;
+
+SudokuLoader::SudokuLoader(int argc, const char * const argv[], std::istream* pSudokuInStream, std::ostream* pSudokuOutStream)
+    : solverType_(SudokuSolverType::SOLVER_GENERAL), isBenchmark_(false), verbose_(true),
+      measureCount_(1), printAllCadidate_(0), pSudokuOutStream_(nullptr) {
+
+    if (pSudokuOutStream == nullptr) {
         return;
     }
     pSudokuOutStream_ = pSudokuOutStream;
+
+    // 各行に数独パズルを書いたファイル名を、可能なら設定する
+    if (!setMultiMode(argc, argv)) {
+        if (pSudokuInStream == nullptr) {
+            return;
+        }
+        setSingleMode(argc, argv, pSudokuInStream);
+    }
+
+    return;
+}
+
+// デストラクタ
+#ifndef NO_DESTRUCTOR
+SudokuLoader::~SudokuLoader() {
+    // 何もしないなら定義も不要
+    return;
+}
+#endif
+
+int SudokuLoader::Exec(void) {
+    return (multiLineFilename_.empty()) ? execSingle() : execMulti();
+}
+
+bool SudokuLoader::CanLaunch(int argc, const char * const argv[]) {
+    if (!sudokuXmmAssumeCellsPacked) {
+        return true;
+    }
+    if ((argc <= 1) || getMeasureCount(argv[1])) {
+        return false;
+    }
+    return true;
+}
+
+int SudokuLoader::getMeasureCount(const char *arg) {
+    if (!arg) {
+        return 0;
+    }
+    std::istringstream countStream(arg);
+
+    decltype(getMeasureCount(nullptr)) measureCount = 0;
+    countStream >> measureCount;
+    return measureCount;
+}
+
+void SudokuLoader::setSingleMode(int argc, const char * const argv[], std::istream* pSudokuInStream) {
+    std::string sudokuStr;
 
     // ベンチマーク回数または饒舌モードを設定する
     if (argc > 1) {
@@ -1516,41 +1880,95 @@ SudokuLoader::SudokuLoader(int argc, const char * const argv[], std::istream* pS
     return;
 }
 
-// デストラクタ
-#ifndef NO_DESTRUCTOR
-SudokuLoader::~SudokuLoader() {
-    // 何もしないなら定義も不要
-    return;
-}
-#endif
+// 一ファイルに複数のパズルを書けるときにtrue
+bool SudokuLoader::setMultiMode(int argc, const char * const argv[]) {
+    bool result = false;
 
-int SudokuLoader::Exec(void) {
+    if (argc < 2) {
+        return result;
+    }
+
+    std::ifstream is(argv[1]);
+    if (!is.good()) {
+        return result;
+    }
+
+    multiLineFilename_ = argv[1];
+    result = true;
+    if (argc > 2) {
+        std::string param = argv[2];
+        if (param == "1") {
+            solverType_ = SudokuSolverType::SOLVER_SSE_4_2;
+        }
+    }
+
+    return result;
+}
+
+int SudokuLoader::execSingle(void) {
     if (measureCount_) {
         measureTimeToSolve(SudokuSolverType::SOLVER_GENERAL);
     }
     measureTimeToSolve(SudokuSolverType::SOLVER_SSE_4_2);
-    return 0;
+    return ExitStatusPassed;
 }
 
-bool SudokuLoader::CanLaunch(int argc, const char * const argv[]) {
-    if (!sudokuXmmAssumeCellsPacked) {
-        return true;
-    }
-    if ((argc <= 1) || getMeasureCount(argv[1])) {
-        return false;
-    }
-    return true;
+int SudokuLoader::execMulti(void) {
+    std::ifstream is(multiLineFilename_);
+    return execMulti(&is);
 }
 
-int SudokuLoader::getMeasureCount(const char *arg) {
-    if (!arg) {
-        return 0;
+int SudokuLoader::execMulti(std::istream* pSudokuInStream) {
+    if (pSudokuInStream == nullptr) {
+        return ExitStatusFailed;
     }
-    std::istringstream countStream(arg);
 
-    decltype(getMeasureCount(nullptr)) measureCount = 0;
-    countStream >> measureCount;
-    return measureCount;
+    switch(solverType_) {
+    case SudokuSolverType::SOLVER_SSE_4_2:
+        *pSudokuOutStream_ << "Solving with SSE/AVX\n";
+        break;
+    case SudokuSolverType::SOLVER_GENERAL:
+    default:
+        *pSudokuOutStream_ << "Solving in C++\n";
+        break;
+    }
+
+    int result = ExitStatusPassed;
+    size_t lineNum = 1;
+    for(;;++lineNum) {
+        std::string lineStr;
+        getline(*pSudokuInStream, lineStr);
+        if (lineStr.empty()) {
+            break;
+        }
+
+        std::unique_ptr<SudokuBaseSolver> pSolver;
+        std::ostringstream ss;
+        switch(solverType_) {
+        case SudokuSolverType::SOLVER_SSE_4_2:
+            pSolver = std::unique_ptr<SudokuBaseSolver>(new SudokuSseSolver(lineStr, &ss, printAllCadidate_));
+            break;
+        case SudokuSolverType::SOLVER_GENERAL:
+        default:
+            pSolver = std::unique_ptr<SudokuBaseSolver>(new SudokuSolver(lineStr, 0, &ss, printAllCadidate_));
+            break;
+        }
+
+        pSolver->Exec(false, false);
+        SudokuChecker checker(ss.str(), pSudokuOutStream_);
+        if (!checker.valid()) {
+            if (pSudokuOutStream_ != nullptr) {
+                *pSudokuOutStream_ << "Error in case " << lineNum << "\n" << lineStr << "\n" << ss.str();
+            }
+            result = ExitStatusFailed;
+        }
+    }
+
+    if (result == ExitStatusPassed) {
+        *pSudokuOutStream_ << "All " << (lineNum - 1) << " cases passed.\n";
+    }
+
+    return result;
 }
 
 // 解く時間を測る

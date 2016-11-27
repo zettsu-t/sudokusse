@@ -17,6 +17,7 @@ endif
 # -O2 optimization is better than -O3 in this program
 CPPFLAGS=-std=c++11 -O2 -Wall -masm=intel -m64 $(CPPFLAGS_SSE_AVX)
 LDFLAGS=
+LIBS=
 
 CELLS_UNPACKED_TARGET=bin/sudokusse
 CELLS_PACKED_TARGET=bin/sudokusse_cells_packed

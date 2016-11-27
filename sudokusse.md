@@ -1,4 +1,4 @@
-# Sudoku asm solver with SSE4.2 / AVX
+# Sudoku asm solver with SSE/AVX SIMD instructions
 
 _SudokuSSE_ solves sudoku puzzles with SIMD instructions and C++
 template metaprogramming.
@@ -11,9 +11,9 @@ shown below are required.
 
 |Tool|Cygwin 64bit|Bash on Ubuntu on Windows|MinGW-w64|
 |:------|:------|:------|:------|
-|GCC (g++)|5.4.0|4.8.4|4.9.2|
-|GNU assembler (as)|2.25.2|2.24|2.24|
-|GNU Make|4.2.1|3.81|4.1|
+|GCC (g++)|5.4.0|4.8.4|6.1.0|
+|GNU assembler (as)|2.25.2|2.24|2.26|
+|GNU Make|4.2.1|3.81|4.2|
 |Ruby|2.2.5p319|1.9.3p484|ActiveScriptRuby 2.3.1p112|
 |Perl|5.22.2|5.18.2|Cygwin perl|
 |CppUnit|1.12.1|1.13.0|-|
@@ -61,7 +61,8 @@ SudokuSSE accepts sudoku puzzles in text files.
   printable non-number character such as a period or white space.
 
 SudokuSSE accepts two formats. Redundant lines are not parsed in both
-formats and you can write anything there as comments.
+formats and you can write anything there as comments. Every sudoku
+puzzle must have at least one cell with an initial number.
 
 ### Format 1 : 9 characters x 9 lines
 
@@ -141,6 +142,28 @@ line. Numbers in a cell mean candidates of the cell at a step.
 For example `:123:` means the cell can contain 1 or 2 or 3 but cannot
 contain 4 to 9 (SudokuSSE judges so at the step). When the puzzle
 solved completely, each cell has a unique number.
+
+### Solve sudoku puzzles in one step
+
+Prepare a file which contains sudoku puzzles at each line in the
+format 2 (81 characters in one line). SudokuSSE solves all lines of
+the file and checks whether their solutions are valid.
+
+```bash
+bin/sudokusse.exe filename
+```
+
+In default, SudokuSSE solves sudoku puzzles without SSE/AVX
+instructions. Set "1" to the second argument and SudokuSSE uses
+SSE/AVX instructions.
+
+```bash
+bin/sudokusse.exe filename 1
+```
+
+SudokuSSE solves the hardest 49151 puzzles
+[sudoku17](http://staffhome.ecm.uwa.edu.au/~00013890/sudoku17)
+within 10 seconds.
 
 ### Count how many solutions a sudoku puzzle has
 
@@ -467,8 +490,6 @@ apply the rule for 7 and set 7 to the cell marked `!`.
 
 Choose a candidate in a cell in an ongoing sudoku map.
 
-##### C++
-
 1. Select a cell that has least size (2 or more) of candidates in the
   cells.
 1. If multiple cells are selected, select a row that has the least
@@ -477,15 +498,19 @@ Choose a candidate in a cell in an ongoing sudoku map.
 1. If the row has multiple cells that have least and same size of
   candidates, use a cell found first.
 
-##### SSE 4.2
-
-Search cells top to bottom and left to right (scan horizontally) and
-select a cell that has least size (2 or more) of candidates in the
-cells.
-
 Before starting backtracking, SudokuSSE makes a copy of the sudoku map
 to rewind backtracking. The map has only primitives so we can use
 compiler-generated copying (trivial copy) and avoid object aliasing.
+
+The description show below is an older method. This may be faster than
+a method above but takes infinite time for the case at line 8 in
+_sudoku17_.
+
+<font color="SlateGray">
+Search cells top to bottom and left to right (scan horizontally) and
+select a cell that has least size (2 or more) of candidates in the
+cells.
+</font>
 
 ### Algorithm to count solutions of sudoku puzzles
 
@@ -578,3 +603,7 @@ a profiler to SudokuSSE.
   "Intel 64 and IA-32 Architectures Optimization Reference Manual"
 
   _http://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-optimization-manual.html_
+
+5. I use these sudoku puzzles as test cases.
+
+  http://staffhome.ecm.uwa.edu.au/~00013890/sudoku17

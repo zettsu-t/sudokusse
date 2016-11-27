@@ -4,15 +4,8 @@
 #include <cstdlib>
 #include <string>
 
-/* 配列のサイズを求める
- * arrayにポインタを使わせないために、テンプレートにする
- * C++98では、関数内で定義した構造体を配列にしたときは、このテンプレートはコンパイルエラーになる
- * C++11では、コンパイルエラーにならない
- */
-template<typename T, size_t n>
-constexpr size_t arraySizeof(const T (&)[n]) {
-    return n;
-}
+// arraySizeofの定義
+#include "sudoku.h"
 
 // 変数のビット数を求める
 template<typename T>

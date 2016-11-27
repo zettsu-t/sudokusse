@@ -18,8 +18,7 @@ int main(int argc, char *argv[]) {
     }
 
     SudokuLoader sudoku(argc, argv, &std::cin, &std::cout);
-    sudoku.Exec();
-    return 0;
+    return sudoku.Exec();
 }
 
 /*

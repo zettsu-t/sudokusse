@@ -8,10 +8,10 @@ include $(THIS_DIR)Makefile_vars
 all: $(TARGETS)
 
 $(CELLS_UNPACKED_TARGET): $(CELLS_UNPACKED_OBJS)
-	$(LD) -o $@ $(LDFLAGS) $^
+	$(LD) -o $@ $(LDFLAGS) $^ $(LIBS)
 
 $(CELLS_PACKED_TARGET): $(CELLS_PACKED_OBJS)
-	$(LD) -o $@ $(LDFLAGS) $^
+	$(LD) -o $@ $(LDFLAGS) $^ $(LIBS)
 
 %.o: %.cpp $(HEADERS) $(GENERATED_CODE)
 	$(CXX) -c $(CPPFLAGS) $< -o $@

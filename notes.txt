@@ -1,5 +1,7 @@
 SSE4.2 / AVX版 数独ソルバー 説明
 
+(本ファイルの記述は古いです。sudokusse.md をご参照ください。)
+
 [アセンブリ記述]
 
 sudokusse.s のメモリアクセスは、すべてRIP-relative (instruction pointer

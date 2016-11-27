@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 #include <string>
+#include <vector>
 #include <nmmintrin.h>
 
 // 仮想関数を一切禁止すると速くなる。許可するなら下段のマクロを無効にする
@@ -30,6 +31,16 @@
 
 // WindowsとLinuxで異なる実装を行うが、I/Fは共通にする
 #include "sudoku_os_dependent.h"
+
+/* 配列のサイズを求める
+ * arrayにポインタを使わせないために、テンプレートにする
+ * C++98では、関数内で定義した構造体を配列にしたときは、このテンプレートはコンパイルエラーになる
+ * C++11では、コンパイルエラーにならない
+ */
+template<typename T, size_t n>
+constexpr size_t arraySizeof(const T (&)[n]) {
+    return n;
+}
 
 // 型宣言(32Kbyte L1 Data Cacheに収まること)
 using SudokuIndex = unsigned short;          // マスとマスの集合の番号(shortの方が速い)
@@ -197,7 +208,7 @@ public:
     bool FillCrossing(void);
     INLINE bool SetUniqueCell(SudokuIndex cellIndex, SudokuCellCandidates candidate);
     INLINE SudokuIndex CountFilledCells(void) const;
-    INLINE SudokuIndex SelectBacktrakedCellIndex(void) const;
+    INLINE SudokuIndex SelectBacktrackedCellIndex(void) const;
     bool IsConsistent(void) const;
 private:
     bool findUnusedCandidate(SudokuCell& targetCell) const;
@@ -224,7 +235,7 @@ private:
         (SudokuIndex targetCellIndex, SudokuCellCandidates candidates) const;
     template <SudokuIndex innerIndex> INLINE SudokuCellCandidates unrolledFindUniqueCandidateInner
         (SudokuIndex targetCellIndex, SudokuIndex outerIndex, SudokuIndex groupIndex, SudokuCellCandidates candidates) const;
-    template <SudokuIndex innerIndex> INLINE SudokuIndex unrolledSelectBacktrakedCellIndexInner
+    template <SudokuIndex innerIndex> INLINE SudokuIndex unrolledSelectBacktrackedCellIndexInner
         (SudokuIndex outerIndex, SudokuIndex& leastCountOfGroup, SudokuIndex& candidateCellIndex) const;
     INLINE SudokuCellCandidates unrolledFindUnusedCandidateInnerCommon
         (SudokuIndex targetCellIndex, SudokuIndex outerIndex, SudokuIndex groupIndex, SudokuIndex innerIndex,
@@ -234,7 +245,7 @@ private:
     INLINE SudokuCellCandidates unrolledFindUniqueCandidateInnerCommon
         (SudokuIndex targetCellIndex, SudokuIndex outerIndex, SudokuIndex groupIndex, SudokuIndex innerIndex,
          SudokuCellCandidates candidates) const;
-    INLINE SudokuIndex unrolledSelectBacktrakedCellIndexInnerCommon
+    INLINE SudokuIndex unrolledSelectBacktrackedCellIndexInnerCommon
         (SudokuIndex outerIndex, SudokuIndex innerIndex,
          SudokuIndex& leastCountOfGroup, SudokuIndex& candidateCellIndex) const;
 };
@@ -326,6 +337,14 @@ extern "C" {
     extern XmmRegisterSet sudokuXmmToPrint;
 }
 
+// バックトラッキング候補
+struct SudokuSseCandidateCell {
+    size_t           regIndex;  // マスが入っている汎用レジスタの番号
+    SudokuSseElement shift;     // マスが入っている汎用レジスタのビット位置
+    SudokuSseElement mask;      // マスが入っている汎用レジスタのビットマスク
+    SudokuSseElement count;     // 候補数
+};
+
 // 全マス(SSE4.2)
 class SudokuSseMap {
     // Unit test
@@ -343,7 +362,17 @@ public:
     void Preset(const std::string& presetStr);
     void Print(std::ostream* pSudokuOutStream) const;
     void FillCrossing(bool loadXmm);
+    bool SearchNext(SudokuSseCandidateCell& cell);
     bool SearchNext(SudokuSseSearchState& searchState);
+    bool SetUniqueCell(const SudokuSseCandidateCell& cell, SudokuCellCandidates candidate);
+    bool IsConsistent(void) const;
+private:
+    INLINE void getRegisterIndex(SudokuIndex outerIndex, SudokuIndex innerIndex, SudokuSseCandidateCell& cell) const;
+    INLINE SudokuIndex countCandidates(SudokuSseElement value) const;
+    INLINE SudokuIndex countCandidatesIfMultiple(SudokuSseElement value) const;
+    INLINE SudokuIndex unrolledSelectBacktrackedCellIndexInnerCommon(SudokuIndex outerIndex, SudokuIndex innerIndex, SudokuSseCandidateCell& cell) const;
+    template <SudokuIndex innerIndex>
+    INLINE SudokuIndex unrolledSelectBacktrackedCellIndexInner(SudokuIndex outerIndex, SudokuSseCandidateCell& cell) const;
 };
 
 // 全パターンを数えるためのマス(SSE4.2)
@@ -400,6 +429,27 @@ private:
     SudokuPatternCount printAllCadidate_;
 };
 
+// 解が正しいかどうか判定する
+class SudokuCheckerTest;
+class SudokuChecker {
+    // ユニットテスト
+    friend class SudokuCheckerTest;
+public:
+    SudokuChecker(const std::string& solution, std::ostream* pSudokuOutStream);
+    virtual ~SudokuChecker() = default;
+    bool valid() const;  // 解が正しければtrue
+private:
+    using Group = std::vector<SudokuNumber>;
+    using Grid = std::vector<Group>;
+    bool parse(const std::string& solution, std::ostream* pSudokuOutStream);
+    bool check(const Grid& grid, std::ostream* pSudokuOutStream);
+    bool checkRowSet(const Grid& grid, std::ostream* pSudokuOutStream);
+    bool checkColumnSet(const Grid& grid, std::ostream* pSudokuOutStream);
+    bool checkBoxSet(const Grid& grid, std::ostream* pSudokuOutStream);
+    bool checkUnique(const Group& line);
+    bool valid_;
+};
+
 // 読み込みと実行時間測定
 class SudokuLoader {
     // Unit test
@@ -415,16 +465,25 @@ public:
     static bool CanLaunch(int argc, const char * const argv[]);
 private:
     static int getMeasureCount(const char *arg);
+    void setSingleMode(int argc, const char * const argv[], std::istream* pSudokuInStream);
+    bool setMultiMode(int argc, const char * const argv[]);
+    int execSingle(void);
+    int execMulti(void);
+    int execMulti(std::istream* pSudokuInStream);
     void measureTimeToSolve(SudokuSolverType solverType);
     SudokuTime solveSudoku(SudokuSolverType solverType, int count, bool warmup);
     SudokuTime enumerateSudoku(void);
     // メンバ
     std::string sudokuStr_; // 初期マップの文字列
+    std::string multiLineFilename_;  // 各行に数独パズルを書いたファイル名
+    SudokuSolverType solverType_;    // 各行に数独パズルを書いたファイルを解く方法
     bool   isBenchmark_;    // ベンチマークかどうか
     bool   verbose_;        // 解く過程を示すかどうか
     int    measureCount_;   // 測定回数
     SudokuPatternCount printAllCadidate_;
     std::ostream* pSudokuOutStream_;  // 結果の出力先
+    static const int ExitStatusPassed;  // 正常終了
+    static const int ExitStatusFailed;  // 異常終了
 };
 
 extern "C" {
