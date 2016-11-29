@@ -1409,54 +1409,6 @@ bool SudokuSseMap::SetUniqueCell(const SudokuSseCandidateCell& cell, SudokuCellC
     return result;
 }
 
-// すべてのマスが埋まっているときに、行が候補が矛盾していないかどうか返す
-bool SudokuSseMap::IsConsistent(void) const {
-    SudokuIndex regIndex = InitialRegisterNum * SudokuSse::RegisterWordCnt;
-    SudokuSseElement tripleColumnSet[Sudoku::SizeOfBoxesOnEdge];
-    SudokuSseElement boxSet[Sudoku::SizeOfGroupsPerMap];
-    ::memset(tripleColumnSet, 0, sizeof(tripleColumnSet));
-    ::memset(boxSet, 0, sizeof(boxSet));
-
-    // アンローリングした方が速い
-    for(SudokuLoopIndex row=0; row<Sudoku::SizeOfGroupsPerMap; ++row) {
-        SudokuSseElement rowAccumlated = 0;
-        for(SudokuLoopIndex i=0;i<Sudoku::SizeOfBoxesOnEdge;++i) {
-            auto value = xmmRegSet_.regVal_[regIndex];
-            rowAccumlated |= value;
-
-            assert(i < arraySizeof(tripleColumnSet));
-            tripleColumnSet[i] |= value;
-
-            auto boxIndex = (row / Sudoku::SizeOfBoxesOnEdge) * Sudoku::SizeOfBoxesOnEdge + i;
-            assert(boxIndex < arraySizeof(boxSet));
-            boxSet[boxIndex] |= value;
-            ++regIndex;
-        }
-
-        auto total = ((rowAccumlated >> (Sudoku::SizeOfCandidates * 2)) & Sudoku::AllCandidates) |
-            ((rowAccumlated >> Sudoku::SizeOfCandidates) & Sudoku::AllCandidates) |
-            (rowAccumlated & Sudoku::AllCandidates);
-        if (countCandidates(total) != Sudoku::SizeOfCellsPerGroup) {
-            return false;
-        }
-        regIndex += 1;
-    }
-
-    for(const auto& tripleColumn : tripleColumnSet) {
-        if (countCandidates(tripleColumn) != (Sudoku::SizeOfCellsPerGroup * Sudoku::SizeOfCellsOnBoxEdge)) {
-            return false;
-        }
-    }
-
-    for(const auto& box : boxSet) {
-        if (countCandidates(box) != Sudoku::SizeOfCellsPerGroup) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 INLINE void SudokuSseMap::getRegisterIndex(SudokuIndex outerIndex, SudokuIndex innerIndex, SudokuSseCandidateCell& cell) const {
     cell.regIndex = (outerIndex + InitialRegisterNum) * SudokuSse::RegisterWordCnt +
         Sudoku::SizeOfBoxesOnEdge - (innerIndex / Sudoku::SizeOfBoxesOnEdge) - 1;
@@ -1573,10 +1525,6 @@ bool SudokuSseSolver::solve(SudokuSseMap& map, bool topLevel, bool verbose) {
 
         // 全マス埋めた
         if (sudokuXmmElementCnt == Sudoku::SizeOfAllCells) {
-            if (!map.IsConsistent()) {
-                // バックトラッキングを打ち切る
-                return false;
-            }
             return true;
         }
 

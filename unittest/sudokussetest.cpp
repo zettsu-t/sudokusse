@@ -71,6 +71,13 @@ class SudokuSseTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST(test_ChooseNextCadidate);
     CPPUNIT_TEST(test_SearchRowPartElements);
     CPPUNIT_TEST(test_SearchRowElements);
+    CPPUNIT_TEST(test_FoldRowParts);
+    CPPUNIT_TEST(test_CheckRow);
+    CPPUNIT_TEST(test_CheckRowSet);
+    CPPUNIT_TEST(test_CheckColumn);
+    CPPUNIT_TEST(test_CheckBox);
+    CPPUNIT_TEST(test_CheckSetBox);
+    CPPUNIT_TEST(test_CheckConsistency);
     CPPUNIT_TEST(test_FastCollectCandidatesAtRow);
     CPPUNIT_TEST(test_FastCollectCandidatesAtBox);
     CPPUNIT_TEST(test_FastCollectCandidatesAtColumn);
@@ -106,6 +113,13 @@ protected:
     void test_ChooseNextCadidate();
     void test_SearchRowPartElements();
     void test_SearchRowElements();
+    void test_FoldRowParts();
+    void test_CheckRow();
+    void test_CheckRowSet();
+    void test_CheckColumn();
+    void test_CheckBox();
+    void test_CheckSetBox();
+    void test_CheckConsistency();
     void test_FastCollectCandidatesAtRow();
     void test_FastCollectCandidatesAtBox();
     void test_FastCollectCandidatesAtColumn();
@@ -1991,6 +2005,193 @@ void SudokuSseTest::test_SearchRowElements()
     }
 
     return;
+}
+
+void SudokuSseTest::test_FoldRowParts() {
+    struct TestSet {
+        // XMMレジスタのアラインメントが必要
+        union {
+            gRegister arg[2];
+            xmmRegister xmmReg;
+        };
+        gRegister left;
+        gRegister center;
+        gRegister right;
+    };
+
+    constexpr TestSet testSet[] {
+        {{0, 0}, 0, 0, 0},
+        {{0x100401, 0}, 0, 0, 7},
+        {{0x80200800100401, 0}, 0, 0x38, 7},
+        {{0x80200800100401, 0x4010040}, 0x1c0, 0x38, 7}
+    };
+
+    for(const auto& test : testSet) {
+        gRegister actualLeft = 0;
+        gRegister actualCenter = 0;
+        gRegister actualRight = 0;
+
+        asm volatile (
+            "movdqa  xmm1, xmmword ptr [rsi]\n\t"
+            "call testFoldRowParts\n\t"
+            :"=a"(actualLeft),"=b"(actualCenter),"=c"(actualRight):"S"(&test.xmmReg):"r8","r9","r15");
+
+        CPPUNIT_ASSERT_EQUAL(test.left, actualLeft);
+        CPPUNIT_ASSERT_EQUAL(test.center, actualCenter);
+        CPPUNIT_ASSERT_EQUAL(test.right, actualRight);
+    }
+}
+
+void SudokuSseTest::test_CheckRow() {
+    struct TestSet {
+        // XMMレジスタのアラインメントが必要
+        union {
+            gRegister arg[2];
+            xmmRegister xmmReg;
+        };
+        gRegister expected;
+    };
+
+    constexpr TestSet testSet[] {
+        {{0, 0}, 1},
+        {{0x40200800100401, 0x4010040}, 1},
+        {{0x80200800100401, 0x4010040}, 0}
+    };
+
+    for(const auto& test : testSet) {
+        gRegister actual = 2;
+        asm volatile (
+            "movdqa  xmm1, xmmword ptr [rsi]\n\t"
+            "call testCheckRow\n\t"
+            :"=a"(actual):"S"(&test.xmmReg):"r8","r9","r10","r11","r12","r13","r15");
+        CPPUNIT_ASSERT_EQUAL(test.expected, actual);
+    }
+}
+
+void SudokuSseTest::test_CheckRowSet() {
+    const gRegister filledXmmReg[] = {0x80200800100401, 0x4010040};
+    const gRegister voidXmmReg[] = {0x80200800100402, 0x4010040};
+
+    constexpr size_t maxPlueOne = 10;
+    for(size_t i=1; i<=maxPlueOne; ++i) {
+        XmmRegisterSet xmmRegSet;
+        ::memset(&xmmRegSet, 0, sizeof(xmmRegSet));
+        for(size_t j=1; j<maxPlueOne; ++j) {
+            ::memmove(&(xmmRegSet.regXmmVal_[j]), filledXmmReg, sizeof(filledXmmReg));
+        }
+
+        if (i < maxPlueOne) {
+            ::memmove(&(xmmRegSet.regXmmVal_[i]), voidXmmReg, sizeof(voidXmmReg));
+        }
+        gRegister expected = (i == maxPlueOne) ? 0 : 1;
+
+        gRegister actual = 0;
+        asm volatile (
+            "movdqa  xmm1, xmmword ptr [rsi+16]\n\t"
+            "movdqa  xmm2, xmmword ptr [rsi+32]\n\t"
+            "movdqa  xmm3, xmmword ptr [rsi+48]\n\t"
+            "movdqa  xmm4, xmmword ptr [rsi+64]\n\t"
+            "movdqa  xmm5, xmmword ptr [rsi+80]\n\t"
+            "movdqa  xmm6, xmmword ptr [rsi+96]\n\t"
+            "movdqa  xmm7, xmmword ptr [rsi+112]\n\t"
+            "movdqa  xmm8, xmmword ptr [rsi+128]\n\t"
+            "movdqa  xmm9, xmmword ptr [rsi+144]\n\t"
+            "call testCheckRowSet\n\t"
+            :"=a"(actual):"S"(&xmmRegSet):"r8","r9","r10","r11","r12","r13","r15");
+
+        CPPUNIT_ASSERT_EQUAL(expected, actual);
+    }
+}
+
+void SudokuSseTest::test_CheckColumn() {
+    struct TestSet {
+        // XMMレジスタのアラインメントが必要
+        union {
+            gRegister arg[2];
+            xmmRegister xmmReg;
+        };
+        gRegister expected;
+    };
+
+    constexpr TestSet testSet[] {
+        {{0, 0}, 1},
+        {{0x3ffffff07ffffff, 0x7ffffff}, 1},
+        {{0x7ffffff03ffffff, 0x7ffffff}, 1},
+        {{0x7ffffff07ffffff, 0x3ffffff}, 1},
+        {{0x7ffffff07ffffff, 0x7ffffff}, 0}
+    };
+
+    for(const auto& test : testSet) {
+        gRegister actual = 2;
+        asm volatile (
+            "movdqa  xmm0, xmmword ptr [rsi]\n\t"
+            "call testCheckColumn\n\t"
+            :"=a"(actual):"S"(&test.xmmReg):"rbx","rcx","rdx","r8","r15");
+
+        CPPUNIT_ASSERT_EQUAL(test.expected, actual);
+    }
+}
+
+void SudokuSseTest::test_CheckBox() {
+    struct TestSet {
+        // XMMレジスタのアラインメントが必要
+        union {
+            gRegister arg[2];
+            xmmRegister xmmReg;
+        };
+        gRegister expected;
+    };
+
+    constexpr TestSet testSet[] {
+        {{0, 0}, 1},
+        {{0x400700707007007, 0x7007007}, 1},
+        {{0x700700704007007, 0x7007007}, 1},
+        {{0x700700707007007, 0x4007007}, 1},
+        {{0x700700707007007, 0x7007007}, 0}
+    };
+
+    for(const auto& test : testSet) {
+        gRegister actual = 2;
+        asm volatile (
+            "movdqa  xmm10, xmmword ptr [rsi]\n\t"
+            "call testCheckBox\n\t"
+            :"=a"(actual):"S"(&test.xmmReg):"r8","r9","r10","r11","r12","r13","r15");
+
+        CPPUNIT_ASSERT_EQUAL(test.expected, actual);
+    }
+}
+
+void SudokuSseTest::test_CheckSetBox() {
+    const gRegister filledXmmReg[] = {0x700700707007007, 0x7007007};
+    const gRegister voidXmmReg[] = {0x400700707007007, 0x7007007};
+
+    constexpr size_t maxPlueOne = 13;
+    for(size_t i=10; i<=maxPlueOne; ++i) {
+        XmmRegisterSet xmmRegSet;
+        ::memset(&xmmRegSet, 0, sizeof(xmmRegSet));
+        for(size_t j=10; j<maxPlueOne; ++j) {
+            ::memmove(&(xmmRegSet.regXmmVal_[j]), filledXmmReg, sizeof(filledXmmReg));
+        }
+
+        if (i < maxPlueOne) {
+            ::memmove(&(xmmRegSet.regXmmVal_[i]), voidXmmReg, sizeof(voidXmmReg));
+        }
+        gRegister expected = (i == maxPlueOne) ? 0 : 1;
+
+        gRegister actual = 0;
+        asm volatile (
+            "movdqa  xmm10, xmmword ptr [rsi+160]\n\t"
+            "movdqa  xmm11, xmmword ptr [rsi+176]\n\t"
+            "movdqa  xmm12, xmmword ptr [rsi+192]\n\t"
+            "call testCheckSetBox\n\t"
+            :"=a"(actual):"S"(&xmmRegSet):"r8","r9","r10","r11","r12","r13","r15");
+
+        CPPUNIT_ASSERT_EQUAL(expected, actual);
+    }
+}
+
+void SudokuSseTest::test_CheckConsistency() {
+
 }
 
 void SudokuSseTest::test_FastCollectCandidatesAtRow() {

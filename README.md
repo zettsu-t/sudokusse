@@ -57,4 +57,5 @@ bin/sudokusse.exe sudoku17
 
 ## And more
 
+SudokuSSE uses bitboards to represent sudoku puzzles.
 Please read [sudokusse.md](sudokusse.md) to know more details.

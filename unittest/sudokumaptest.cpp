@@ -65,7 +65,6 @@ class SudokuSseMapTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST(test_SearchNextNew);
     CPPUNIT_TEST(test_SearchNextOld);
     CPPUNIT_TEST(test_SetUniqueCell);
-    CPPUNIT_TEST(test_IsConsistent);
     CPPUNIT_TEST(test_getRegisterIndex);
     CPPUNIT_TEST(test_countCandidates);
     CPPUNIT_TEST(test_countCandidatesIfMultiple);
@@ -82,7 +81,6 @@ protected:
     void test_SearchNextNew();
     void test_SearchNextOld();
     void test_SetUniqueCell();
-    void test_IsConsistent();
     void test_getRegisterIndex();
     void test_countCandidates();
     void test_countCandidatesIfMultiple();
@@ -857,48 +855,6 @@ void SudokuSseMapTest::test_SetUniqueCell() {
     pInstance_->xmmRegSet_.regVal_[regIndex] <<= Sudoku::SizeOfCandidates;
     CPPUNIT_ASSERT_EQUAL(true, pInstance_->SetUniqueCell(cell, candidate));
     CPPUNIT_ASSERT_EQUAL(candidate << Sudoku::SizeOfCandidates, pInstance_->xmmRegSet_.regVal_[regIndex]);
-}
-
-void SudokuSseMapTest::test_IsConsistent() {
-    const XmmRegisterSet regVal = {
-        0, 0, 0, 0,
-        0x0084040, 0x0101100, 0x2000210, 0x0,
-        0x2020004, 0x0802001, 0x1000408, 0x0,
-        0x0200210, 0x2008002, 0x0120020, 0x0,
-        0x0800900, 0x0400480, 0x0041040, 0x0,
-        0x1001001, 0x4000820, 0x0410002, 0x0,
-        0x0410002, 0x0200240, 0x4004004, 0x0,
-        0x4002020, 0x1010008, 0x0080801, 0x0,
-        0x0100408, 0x0060010, 0x0808080, 0x0,
-        0x0048080, 0x0084004, 0x0202100, 0x0};
-
-    pInstance_->xmmRegSet_ = regVal;
-    CPPUNIT_ASSERT_EQUAL(true, pInstance_->IsConsistent());
-
-    for(SudokuLoopIndex row=0; row<Sudoku::SizeOfGroupsPerMap; ++row) {
-        for(SudokuLoopIndex box=0;box<Sudoku::SizeOfBoxesOnEdge;++box) {
-            size_t regIndex = (SudokuSseMap::InitialRegisterNum + row) * SudokuSse::RegisterWordCnt + box;
-            const auto original = pInstance_->xmmRegSet_.regVal_[regIndex];
-
-            // 空白にする
-            pInstance_->xmmRegSet_.regVal_[regIndex] = original & (~0x1ff);
-            CPPUNIT_ASSERT_EQUAL(false, pInstance_->IsConsistent());
-
-            // 矛盾がある
-            pInstance_->xmmRegSet_.regVal_[regIndex] = original ^ 0x1ff;
-            CPPUNIT_ASSERT_EQUAL(false, pInstance_->IsConsistent());
-            pInstance_->xmmRegSet_ = regVal;
-
-            for(SudokuLoopIndex shift=1;shift<Sudoku::SizeOfBoxesOnEdge;++shift) {
-                const auto value = pInstance_->xmmRegSet_.regVal_[regIndex];
-                pInstance_->xmmRegSet_.regVal_[regIndex] = value ^ (0x1ff << (Sudoku::SizeOfCandidates * shift));
-                CPPUNIT_ASSERT_EQUAL(false, pInstance_->IsConsistent());
-                pInstance_->xmmRegSet_ = regVal;
-            }
-        }
-    }
-
-    return;
 }
 
 void SudokuSseMapTest::test_getRegisterIndex() {

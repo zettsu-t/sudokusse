@@ -256,6 +256,8 @@ which indicates all tests passed.
 
 ## The inside of SudokuSSE
 
+SudokuSSE uses bitboards to represent sudoku puzzles.
+
 ### C++ data structures to solve sudoku puzzles
 
 #### Class SudokuCell
@@ -506,11 +508,9 @@ The description show below is an older method. This may be faster than
 a method above but takes infinite time for the case at line 8 in
 _sudoku17_.
 
-<font color="SlateGray">
 Search cells top to bottom and left to right (scan horizontally) and
 select a cell that has least size (2 or more) of candidates in the
 cells.
-</font>
 
 ### Algorithm to count solutions of sudoku puzzles
 

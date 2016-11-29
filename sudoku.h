@@ -365,7 +365,6 @@ public:
     bool SearchNext(SudokuSseCandidateCell& cell);
     bool SearchNext(SudokuSseSearchState& searchState);
     bool SetUniqueCell(const SudokuSseCandidateCell& cell, SudokuCellCandidates candidate);
-    bool IsConsistent(void) const;
 private:
     INLINE void getRegisterIndex(SudokuIndex outerIndex, SudokuIndex innerIndex, SudokuSseCandidateCell& cell) const;
     INLINE SudokuIndex countCandidates(SudokuSseElement value) const;

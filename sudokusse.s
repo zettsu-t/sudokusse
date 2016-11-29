@@ -208,6 +208,14 @@ testFillNineUniqueCandidatesColumnX:          .quad 0, 0
 .endif
 .endm
 
+.macro MacroPextrd op1, op2, op3
+.if (EnableAvx != 0)
+    vpextrd \op1, \op2, \op3
+.else
+    pextrd  \op1, \op2, \op3
+.endif
+.endm
+
 .macro MacroPextrw op1, op2, op3
 .if (EnableAvx != 0)
     vpextrw \op1, \op2, \op3
@@ -1537,6 +1545,150 @@ searchNextCandidate1:
         jb      searchNextCandidate1
 .endm
 
+        .global testFoldRowParts
+        .global testCheckRow
+        .global testCheckRowSet
+        .global testCheckColumn
+        .global testCheckBox
+        .global testCheckSetBox
+        .global testCheckConsistency
+
+.macro FoldRowParts xRegRow, regWork1, regWork2, regWork3, regWork4, regWork5
+        MacroPextrq       \regWork2, \xRegRow, 0
+        MacroPextrq       \regWork1, \xRegRow, 1
+        SplitRowLowParts  \regWork3, \regWork2
+        MergeThreeElements2  \regWork1, \regWork4, \regWork5
+        MergeThreeElements2  \regWork2, \regWork4, \regWork5
+        MergeThreeElements2  \regWork3, \regWork4, \regWork5
+.endm
+
+testFoldRowParts:
+        InitMaskRegister
+        xor  rax, rax
+        xor  rbx, rbx
+        xor  rcx, rcx
+        FoldRowParts  xRegRow1, rax, rbx, rcx, r8, r9
+        ret
+
+# 列に一つずつ候補があるかどうか調べて、結果を返す
+# そうであればregResultは不変、そうでなければregInvalidを設定する
+.macro CheckRow xRegRow, regResult, regInvalid, regWork1, regWork2, regWork3, regWork4, regWork5
+        FoldRowParts \xRegRow, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5
+        or      \regWork1, \regWork2
+        or      \regWork1, \regWork3
+        popcnt  \regWork1, \regWork1
+        cmp     \regWork1, candidatesNum
+        cmovnz  \regResult, \regInvalid
+.endm
+
+testCheckRow:
+        InitMaskRegister
+        xor  rax, rax
+        mov  r8, 1
+        CheckRow  xRegRow1, rax, r8, r9, r10, r11, r12, r13
+        ret
+
+.macro CheckRowSet regResult, regInvalid, regWork1, regWork2, regWork3, regWork4, regWork5
+        CheckRow xRegRow1, \regResult, \regInvalid, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5
+        CheckRow xRegRow2, \regResult, \regInvalid, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5
+        CheckRow xRegRow3, \regResult, \regInvalid, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5
+        CheckRow xRegRow4, \regResult, \regInvalid, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5
+        CheckRow xRegRow5, \regResult, \regInvalid, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5
+        CheckRow xRegRow6, \regResult, \regInvalid, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5
+        CheckRow xRegRow7, \regResult, \regInvalid, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5
+        CheckRow xRegRow8, \regResult, \regInvalid, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5
+        CheckRow xRegRow9, \regResult, \regInvalid, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5
+.endm
+
+testCheckRowSet:
+        InitMaskRegister
+        xor  rax, rax
+        mov  r8, 1
+        CheckRowSet  rax, r8, r9, r10, r11, r12, r13
+        ret
+
+.macro CheckColumn regResult, regInvalid, reg32Work1, reg32Work2, reg32Work3
+        MacroPextrd \reg32Work1, xRegRowAll, 0
+        MacroPextrd \reg32Work2, xRegRowAll, 1
+        MacroPextrd \reg32Work3, xRegRowAll, 2
+        popcnt  \reg32Work1, \reg32Work1
+        popcnt  \reg32Work2, \reg32Work2
+        popcnt  \reg32Work3, \reg32Work3
+
+        cmp     \reg32Work1, (candidatesNum * rowPartNum)
+        cmovnz  \regResult, \regInvalid
+        cmp     \reg32Work2, (candidatesNum * rowPartNum)
+        cmovnz  \regResult, \regInvalid
+        cmp     \reg32Work3, (candidatesNum * rowPartNum)
+        cmovnz  \regResult, \regInvalid
+.endm
+
+testCheckColumn:
+        InitMaskRegister
+        xor  rax, rax
+        mov  r8, 1
+        CheckColumn  rax, r8, ebx, ecx, edx
+        ret
+
+.macro CheckBox xRegRow, regResult, regInvalid, regWork1, regWork2, regWork3, regWork4, regWork5
+        FoldRowParts \xRegRow, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5
+
+        popcnt  \regWork1, \regWork1
+        cmp     \regWork1, candidatesNum
+        cmovnz  \regResult, \regInvalid
+
+        popcnt  \regWork2, \regWork2
+        cmp     \regWork2, candidatesNum
+        cmovnz  \regResult, \regInvalid
+
+        popcnt  \regWork3, \regWork3
+        cmp     \regWork3, candidatesNum
+        cmovnz  \regResult, \regInvalid
+.endm
+
+testCheckBox:
+        InitMaskRegister
+        xor  rax, rax
+        mov  r8, 1
+        CheckBox  xRegRow1to3, rax, r8, r9, r10, r11, r12, r13
+        ret
+
+.macro CheckSetBox regResult, regInvalid, regWork1, regWork2, regWork3, regWork4, regWork5
+        CheckBox xRegRow1to3, \regResult, \regInvalid, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5
+        CheckBox xRegRow4to6, \regResult, \regInvalid, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5
+        CheckBox xRegRow7to9, \regResult, \regInvalid, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5
+.endm
+
+testCheckSetBox:
+        InitMaskRegister
+        xor  rax, rax
+        mov  r8, 1
+        CheckSetBox  rax, r8, r9, r10, r11, r12, r13
+        ret
+
+.macro CheckConsistency regResult, regInvalid, regWork1, regWork2, regWork3, regWork4, regWork5, reg32Work1, reg32Work2, reg32Work3
+        xor  \regResult, \regResult
+        mov  \regInvalid, 1
+        CheckRowSet  \regResult, \regInvalid, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5
+        cmp  \regResult, \regInvalid
+        jz   20001f
+
+        OrThreeXmmRegs  xRegRow1to3, xRegRow1, xRegRow2, xRegRow3
+        OrThreeXmmRegs  xRegRow4to6, xRegRow4, xRegRow5, xRegRow6
+        OrThreeXmmRegs  xRegRow7to9, xRegRow7, xRegRow8, xRegRow9
+        OrThreeXmmRegs  xRegRowAll, xRegRow1to3, xRegRow4to6, xRegRow7to9
+        CheckColumn  \regResult, \regInvalid, \reg32Work1, \reg32Work2, \reg32Work3
+        CheckSetBox  \regResult, \regInvalid, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5
+20001:
+.endm
+
+testCheckConsistency:
+        InitMaskRegister
+        xor  rax, rax
+        mov  r8, 1
+        CheckConsistency  rax, r8, r9, r10, rbx, rcx, rdx, ebx, ecx, edx
+        ret
+
 # コードを連続した領域に配置したよいので、テストを挟まず一か所にまとめる
 # C++のインラインアセンブラからサブルーチンとして呼び出すためのシンボル
         .global solveSudokuAsm
@@ -1573,7 +1725,9 @@ loopFilling:
         jnz     keepFilling
 
 exitFilling:
-        mov     qword ptr [rip + sudokuXmmAborted], 0
+        .set    regResult, r9
+        CheckConsistency regResult, r10, r11, r12, rbx, rcx, rdx, ebx, ecx, edx
+        mov     qword ptr [rip + sudokuXmmAborted], regResult
         mov     qword ptr [rip + sudokuXmmElementCnt], regCurrentPopcnt
         ret
 
