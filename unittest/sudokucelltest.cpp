@@ -32,6 +32,7 @@ class SudokuCellTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST(test_IsFilled);
     CPPUNIT_TEST(test_HasMultipleCandidates);
     CPPUNIT_TEST(test_IsConsistent);
+    CPPUNIT_TEST(test_HasCandidate);
     CPPUNIT_TEST(test_HasNoCandidates);
     CPPUNIT_TEST(test_SetCandidates);
     CPPUNIT_TEST(test_GetCandidates);
@@ -61,6 +62,7 @@ protected:
     void test_IsFilled();
     void test_HasMultipleCandidates();
     void test_IsConsistent();
+    void test_HasCandidate();
     void test_HasNoCandidates();
     void test_SetCandidates();
     void test_GetCandidates();
@@ -380,6 +382,17 @@ void SudokuCellTest::test_IsConsistent() {
     }
 
     return;
+}
+
+void SudokuCellTest::test_HasCandidate() {
+    for(SudokuCellCandidates candidates=0; candidates < Sudoku::SizeOfLookUpCell; ++candidates) {
+        pInstance_->candidates_ = candidates;
+        for(SudokuIndex i=0;i<Sudoku::SizeOfCandidates;++i) {
+            const SudokuCellCandidates candidate = 1 << i;
+            const bool expected = (candidates & candidate);
+            CPPUNIT_ASSERT_EQUAL(expected, pInstance_->HasCandidate(candidate));
+        }
+    }
 }
 
 void SudokuCellTest::test_HasNoCandidates() {

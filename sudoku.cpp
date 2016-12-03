@@ -6,10 +6,13 @@
 // 実行回数の前に-を付けると、解く過程を示しながらその回数だけ実行する(-5なら5回)
 // 実行回数を0にすると、取り得る解を数える。第二引数があればその数だけ解を列挙する。
 //
-// 引数に数字ではなくファイル名を指定したときは、そのファイルの各行を解く
-// 第二引数があり1の場合はSSEで、それ以外の場合はC++で解く
-//
 // sudoku [実行回数 [列挙回数]] < 初期マップ
+//
+// 引数に数字ではなくファイル名を指定したときは、そのファイルの各行を解く
+// 第二引数があり1またはsseの場合はSSEで解く。それ以外の場合はC++で解く。 
+// 第三引数があり1またはoffの場合は、解いた結果を検査しない
+//
+// sudoku ファイル名 [0|1] [0|1] < 初期マップ
 
 #include <algorithm>
 #include <fstream>
@@ -152,6 +155,11 @@ INLINE bool SudokuCell::IsConsistent(SudokuCellCandidates candidates) const {
         return false;
     }
     return IsEmptyCandidates(candidates_ & candidates);
+}
+
+// ある候補を含むかどうか返す
+INLINE bool SudokuCell::HasCandidate(SudokuCellCandidates candidate) const {
+    return !IsEmptyCandidates(candidates_ & candidate);
 }
 
 // 候補がないかどうか返す
@@ -641,11 +649,15 @@ bool SudokuMap::FillCrossing(void) {
     return false;
 }
 
+// マスの候補を強制的に一つに絞れるかどうか返す
+INLINE bool SudokuMap::CanSetUniqueCell(SudokuIndex cellIndex, SudokuCellCandidates candidate) const {
+    return cells_[cellIndex].HasCandidate(candidate);
+}
+
 // マスの候補を強制的に一つに絞る
-INLINE bool SudokuMap::SetUniqueCell(SudokuIndex cellIndex, SudokuCellCandidates candidate) {
-    auto& cell = cells_[cellIndex];
-    cell.SetCandidates(candidate);
-    return cell.IsFilled();
+INLINE void SudokuMap::SetUniqueCell(SudokuIndex cellIndex, SudokuCellCandidates candidate) {
+    cells_[cellIndex].SetCandidates(candidate);
+    return;
 }
 
 // 高速化
@@ -1147,9 +1159,10 @@ bool SudokuSolver::solve(SudokuMap& map, bool topLevel, bool verbose) {
         // 単に値をコピーして新たな状態を作る
         auto newMap = map;
 
-        const auto result = newMap.SetUniqueCell(cellIndex, candidate);
+        const auto canSet = newMap.CanSetUniqueCell(cellIndex, candidate);
         // 候補を矛盾なく設定できたら解く
-        if (result) {
+        if (canSet) {
+            newMap.SetUniqueCell(cellIndex, candidate);
             if (solve(newMap, false, verbose)) {
                 // 単に値をコピーして状態を書き戻す
                 map = newMap;
@@ -1398,15 +1411,17 @@ bool SudokuSseMap::SearchNext(SudokuSseSearchState& searchState) {
     return (searchState.member_.candidateCnt_ <= Sudoku::SizeOfCandidates);
 }
 
-// 候補を唯一に設定出来たら、設定してtrueを返す
-bool SudokuSseMap::SetUniqueCell(const SudokuSseCandidateCell& cell, SudokuCellCandidates candidate) {
+// マスの候補を強制的に一つに絞れるかどうか返す
+INLINE bool SudokuSseMap::CanSetUniqueCell(const SudokuSseCandidateCell& cell, SudokuCellCandidates candidate) const {
     auto original = (xmmRegSet_.regVal_[cell.regIndex] & cell.mask) >> cell.shift;
-    bool result = original & candidate;
-    if (result) {
-        xmmRegSet_.regVal_[cell.regIndex] &= ~cell.mask;
-        xmmRegSet_.regVal_[cell.regIndex] |= candidate << cell.shift;
-    }
-    return result;
+    return (original & candidate);
+}
+
+// マスの候補を強制的に一つに絞る
+INLINE void SudokuSseMap::SetUniqueCell(const SudokuSseCandidateCell& cell, SudokuCellCandidates candidate) {
+    xmmRegSet_.regVal_[cell.regIndex] &= ~cell.mask;
+    xmmRegSet_.regVal_[cell.regIndex] |= candidate << cell.shift;
+    return;
 }
 
 INLINE void SudokuSseMap::getRegisterIndex(SudokuIndex outerIndex, SudokuIndex innerIndex, SudokuSseCandidateCell& cell) const {
@@ -1541,10 +1556,11 @@ bool SudokuSseSolver::solve(SudokuSseMap& map, bool topLevel, bool verbose) {
         for(;;) {
             SudokuSseMap newMap = map;
             // 設定できなければ書き換えない方が、上記のコピーを省ける
-            const auto filled = newMap.SetUniqueCell(cell, candidate);
+            const auto canSet = newMap.CanSetUniqueCell(cell, candidate);
 
             // 候補を矛盾なく設定できたら解く
-            if (filled) {
+            if (canSet) {
+                newMap.SetUniqueCell(cell, candidate);
                 if (verbose) {
                     map.Print(pSudokuOutStream_);
                 }
@@ -1732,8 +1748,8 @@ const int SudokuLoader::ExitStatusPassed = 0;
 const int SudokuLoader::ExitStatusFailed = 1;
 
 SudokuLoader::SudokuLoader(int argc, const char * const argv[], std::istream* pSudokuInStream, std::ostream* pSudokuOutStream)
-    : solverType_(SudokuSolverType::SOLVER_GENERAL), isBenchmark_(false), verbose_(true),
-      measureCount_(1), printAllCadidate_(0), pSudokuOutStream_(nullptr) {
+    : solverType_(SudokuSolverType::SOLVER_GENERAL), check_(SudokuSolverCheck::CHECK),
+      isBenchmark_(false), verbose_(true), measureCount_(1), printAllCadidate_(0), pSudokuOutStream_(nullptr) {
 
     if (pSudokuOutStream == nullptr) {
         return;
@@ -1843,13 +1859,8 @@ bool SudokuLoader::setMultiMode(int argc, const char * const argv[]) {
 
     multiLineFilename_ = argv[1];
     result = true;
-    if (argc > 2) {
-        std::string param = argv[2];
-        if (param == "1") {
-            solverType_ = SudokuSolverType::SOLVER_SSE_4_2;
-        }
-    }
-
+    SudokuOption::setMode(argc, argv, 2, SudokuOption::CommandLineArgSseSolver, solverType_, SudokuSolverType::SOLVER_SSE_4_2);
+    SudokuOption::setMode(argc, argv, 3, SudokuOption::CommandLineNoChecking, check_, SudokuSolverCheck::DO_NOT_CHECK);
     return result;
 }
 
@@ -1903,17 +1914,20 @@ int SudokuLoader::execMulti(std::istream* pSudokuInStream) {
         }
 
         pSolver->Exec(false, false);
-        SudokuChecker checker(ss.str(), pSudokuOutStream_);
-        if (!checker.valid()) {
-            if (pSudokuOutStream_ != nullptr) {
-                *pSudokuOutStream_ << "Error in case " << lineNum << "\n" << lineStr << "\n" << ss.str();
+        if (check_ == SudokuSolverCheck::CHECK) {
+            SudokuChecker checker(ss.str(), pSudokuOutStream_);
+            if (!checker.valid()) {
+                if (pSudokuOutStream_ != nullptr) {
+                    *pSudokuOutStream_ << "Error in case " << lineNum << "\n" << lineStr << "\n" << ss.str();
+                }
+                result = ExitStatusFailed;
             }
-            result = ExitStatusFailed;
         }
     }
 
+    std::string message = (check_ == SudokuSolverCheck::DO_NOT_CHECK) ? "solved" : "passed";
     if (result == ExitStatusPassed) {
-        *pSudokuOutStream_ << "All " << (lineNum - 1) << " cases passed.\n";
+        *pSudokuOutStream_ << "All " << (lineNum - 1) << " cases " << message << ".\n";
     }
 
     return result;

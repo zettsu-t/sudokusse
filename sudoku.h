@@ -42,6 +42,29 @@ constexpr size_t arraySizeof(const T (&)[n]) {
     return n;
 }
 
+// コマンドライン引数
+namespace SudokuOption {
+    const char * const CommandLineArgSseSolver[] = {"1", "sse", "avx"};
+    const char * const CommandLineNoChecking[] = {"1", "off"};
+    // コマンドラインで指定した値が用意したものに一致したら値を設定する
+    template <typename T, size_t n>
+    void setMode(int argc, const char * const argv[], int argIndex, const char * const (&pOptionSet)[n], T& target, T value) {
+        if (argc <= argIndex) {
+            return;
+        }
+
+        std::string param = argv[argIndex];
+        for(auto& pOpt : pOptionSet) {
+            std::string opt = pOpt;
+            if (param == opt) {
+                target = value;
+            }
+        }
+
+        return;
+    }
+}
+
 // 型宣言(32Kbyte L1 Data Cacheに収まること)
 using SudokuIndex = unsigned short;          // マスとマスの集合の番号(shortの方が速い)
 using SudokuLoopIndex = unsigned int;        // マスとマスの集合の番号のループインデックス(intの方が速い)
@@ -111,6 +134,12 @@ enum class SudokuSolverType {
     SOLVER_SSE_4_2,  // SSE4.2 assembly
 };
 
+// 解いた結果を検査するかどうか
+enum class SudokuSolverCheck {
+    CHECK,         // 結果を検査する
+    DO_NOT_CHECK,  // 結果を検査しない
+};
+
 // 解法(共通)
 class SudokuBaseSolver {
 public:
@@ -153,6 +182,7 @@ public:
     INLINE bool IsFilled(void) const;
     INLINE bool HasMultipleCandidates(void) const;
     INLINE bool IsConsistent(SudokuCellCandidates candidates) const;
+    INLINE bool HasCandidate(SudokuCellCandidates candidate) const;
     INLINE bool HasNoCandidates(void) const;
     INLINE void SetCandidates(SudokuCellCandidates candidates);
     INLINE SudokuCellCandidates GetCandidates(void) const;
@@ -206,7 +236,8 @@ public:
     // 数独操作
     INLINE bool IsFilled(void) const;
     bool FillCrossing(void);
-    INLINE bool SetUniqueCell(SudokuIndex cellIndex, SudokuCellCandidates candidate);
+    INLINE bool CanSetUniqueCell(SudokuIndex cellIndex, SudokuCellCandidates candidate) const;
+    INLINE void SetUniqueCell(SudokuIndex cellIndex, SudokuCellCandidates candidate);
     INLINE SudokuIndex CountFilledCells(void) const;
     INLINE SudokuIndex SelectBacktrackedCellIndex(void) const;
     bool IsConsistent(void) const;
@@ -364,7 +395,8 @@ public:
     void FillCrossing(bool loadXmm);
     bool SearchNext(SudokuSseCandidateCell& cell);
     bool SearchNext(SudokuSseSearchState& searchState);
-    bool SetUniqueCell(const SudokuSseCandidateCell& cell, SudokuCellCandidates candidate);
+    INLINE bool CanSetUniqueCell(const SudokuSseCandidateCell& cell, SudokuCellCandidates candidate) const;
+    INLINE void SetUniqueCell(const SudokuSseCandidateCell& cell, SudokuCellCandidates candidate);
 private:
     INLINE void getRegisterIndex(SudokuIndex outerIndex, SudokuIndex innerIndex, SudokuSseCandidateCell& cell) const;
     INLINE SudokuIndex countCandidates(SudokuSseElement value) const;
@@ -475,7 +507,8 @@ private:
     // メンバ
     std::string sudokuStr_; // 初期マップの文字列
     std::string multiLineFilename_;  // 各行に数独パズルを書いたファイル名
-    SudokuSolverType solverType_;    // 各行に数独パズルを書いたファイルを解く方法
+    SudokuSolverType  solverType_;   // 各行に数独パズルを書いたファイルを解く方法
+    SudokuSolverCheck check_;        // 各行に数独パズルを書いたファイルを解く方法
     bool   isBenchmark_;    // ベンチマークかどうか
     bool   verbose_;        // 解く過程を示すかどうか
     int    measureCount_;   // 測定回数

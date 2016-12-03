@@ -153,9 +153,9 @@ the file and checks whether their solutions are valid.
 bin/sudokusse.exe filename
 ```
 
-In default, SudokuSSE solves sudoku puzzles without SSE/AVX
-instructions. Set "1" to the second argument and SudokuSSE uses
-SSE/AVX instructions.
+When the second argument is "0" or "c++" or omitted, SudokuSSE solves
+sudoku puzzles without SSE/AVX instructions.  Set "1" or "sse" to the
+second argument and SudokuSSE uses SSE/AVX instructions.
 
 ```bash
 bin/sudokusse.exe filename 1
@@ -164,6 +164,13 @@ bin/sudokusse.exe filename 1
 SudokuSSE solves the hardest 49151 puzzles
 [sudoku17](http://staffhome.ecm.uwa.edu.au/~00013890/sudoku17)
 within 10 seconds.
+
+When the third argument is "1" or "off", SudokuSSE does not check
+whether their solutions are valid and it takes less time.
+
+```bash
+bin/sudokusse.exe filename sse off
+```
 
 ### Count how many solutions a sudoku puzzle has
 
@@ -499,6 +506,12 @@ Choose a candidate in a cell in an ongoing sudoku map.
   used the step 2 instead of rows.)
 1. If the row has multiple cells that have least and same size of
   candidates, use a cell found first.
+
+When every cell in the ongoing sudoku map has unique candidate,
+SudokuSSE checks whether all rows, columns, and boxes in the map are
+correct. If it is correct, it is a solution of the map. Guessing a
+candidate sometimes leads an incorrect solution when the guess is
+wrong and SudokuSSE filters it out.
 
 Before starting backtracking, SudokuSSE makes a copy of the sudoku map
 to rewind backtracking. The map has only primitives so we can use

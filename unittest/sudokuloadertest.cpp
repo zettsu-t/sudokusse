@@ -244,9 +244,10 @@ void SudokuCheckerTest::test_checkUnique() {
 
 class SudokuLoaderTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST_SUITE(SudokuLoaderTest);
+    CPPUNIT_TEST(test_Constructor);
     CPPUNIT_TEST(test_CanLaunch);
-    CPPUNIT_TEST(test_setMultiMode);
     CPPUNIT_TEST(test_setSingleMode);
+    CPPUNIT_TEST(test_setMultiMode);
     CPPUNIT_TEST(test_getMeasureCount);
     CPPUNIT_TEST(test_execSingle);
     CPPUNIT_TEST(test_execMultiPassedCpp);
@@ -260,8 +261,9 @@ public:
     void setUp() override;
     void tearDown() override;
 protected:
-    void test_setMultiMode();
+    void test_Constructor();
     void test_setSingleMode();
+    void test_setMultiMode();
     void test_CanLaunch();
     void test_getMeasureCount();
     void test_execSingle();
@@ -319,6 +321,16 @@ void SudokuLoaderTest::tearDown() {
     return;
 }
 
+void SudokuLoaderTest::test_Constructor() {
+    SudokuLoader inst(0, nullptr, nullptr, nullptr);
+    CPPUNIT_ASSERT(inst.solverType_ == SudokuSolverType::SOLVER_GENERAL);
+    CPPUNIT_ASSERT(inst.check_ == SudokuSolverCheck::CHECK);
+    CPPUNIT_ASSERT(inst.isBenchmark_ == false);
+    CPPUNIT_ASSERT(inst.verbose_ == true);
+    CPPUNIT_ASSERT(inst.measureCount_ == 1);
+    CPPUNIT_ASSERT(inst.printAllCadidate_ == 0);
+}
+
 // これ以降はテスト・ケースの実装内容
 void SudokuLoaderTest::test_setSingleMode() {
     size_t streamIndex = 0;
@@ -362,19 +374,32 @@ void SudokuLoaderTest::test_setSingleMode() {
 namespace {
     struct TestArgsMultiMode {
         int    argc;
-        const char* argv[3];
+        const char* argv[4];
         bool   expected;
         SudokuSolverType solverType;
+        SudokuSolverCheck check;
     };
 
     constexpr TestArgsMultiMode testArgsMultiMode[] {
         // 解を一つ求める
-        {1, {"sudoku", nullptr, nullptr}, true, SudokuSolverType::SOLVER_GENERAL},
-        {2, {"sudoku", "../data/sudoku_example1.txt", nullptr}, false, SudokuSolverType::SOLVER_GENERAL},
-        {2, {"sudoku", "FileNotExists", nullptr}, true, SudokuSolverType::SOLVER_GENERAL},
-        {3, {"sudoku", "../data/sudoku_example1.txt", "x"}, false, SudokuSolverType::SOLVER_GENERAL},
-        {3, {"sudoku", "../data/sudoku_example1.txt", "0"}, false, SudokuSolverType::SOLVER_GENERAL},
-        {3, {"sudoku", "../data/sudoku_example1.txt", "1"}, false, SudokuSolverType::SOLVER_SSE_4_2}
+        {1, {"sudoku", nullptr, nullptr, nullptr},
+                true, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK},
+        {2, {"sudoku", "../data/sudoku_example1.txt", nullptr, nullptr},
+                false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK},
+        {2, {"sudoku", "FileNotExists", nullptr, nullptr},
+                true, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK},
+        {3, {"sudoku", "../data/sudoku_example1.txt", "0", nullptr},
+                false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK},
+        {3, {"sudoku", "../data/sudoku_example1.txt", "1", nullptr},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "c++", "0"},
+                false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "c++", "1"},
+                false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::DO_NOT_CHECK},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "sse", "0"},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "avx", "off"},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::DO_NOT_CHECK}
     };
 }
 
@@ -433,19 +458,32 @@ void SudokuLoaderTest::test_execSingle() {
 }
 
 void SudokuLoaderTest::test_execMultiPassedCpp() {
-    std::string pattern = SudokuTestPattern::NoBacktrackString;
-    pattern += "\n" + SudokuTestPattern::BacktrackString;
-    pattern += "\n" + SudokuTestPattern::BacktrackString2;
+    struct Test {
+        SudokuSolverCheck check;
+        const char* expected;
+    };
 
-    SudokuInStream is(pattern);
-    SudokuLoader inst(0, nullptr, nullptr, pSudokuOutStream_.get());
-    CPPUNIT_ASSERT_EQUAL(SudokuLoader::ExitStatusPassed, inst.execMulti(&is));
-    CPPUNIT_ASSERT_EQUAL(SudokuLoader::ExitStatusFailed, inst.execMulti(nullptr));
+    const Test testSet[] = {
+        {SudokuSolverCheck::CHECK, "Solving in C++\nAll 3 cases passed.\n"},
+        {SudokuSolverCheck::DO_NOT_CHECK, "Solving in C++\nAll 3 cases solved.\n"}
+    };
 
-    std::string expected = "Solving in C++\nAll 3 cases passed.\n";
-    std::string actual = pSudokuOutStream_->str();
-    actual.resize(expected.size());
-    CPPUNIT_ASSERT_EQUAL(expected, actual);
+    for(const auto& test : testSet) {
+        std::string pattern = SudokuTestPattern::NoBacktrackString;
+        pattern += "\n" + SudokuTestPattern::BacktrackString;
+        pattern += "\n" + SudokuTestPattern::BacktrackString2;
+
+        SudokuInStream is(pattern);
+        SudokuLoader inst(0, nullptr, nullptr, pSudokuOutStream_.get());
+        inst.check_ = test.check;
+        CPPUNIT_ASSERT_EQUAL(SudokuLoader::ExitStatusPassed, inst.execMulti(&is));
+        CPPUNIT_ASSERT_EQUAL(SudokuLoader::ExitStatusFailed, inst.execMulti(nullptr));
+
+        std::string expected = "Solving in C++\nAll 3 cases passed.\n";
+        std::string actual = pSudokuOutStream_->str();
+        actual.resize(expected.size());
+        CPPUNIT_ASSERT_EQUAL(expected, actual);
+    }
 }
 
 void SudokuLoaderTest::test_execMultiPassedSse() {
