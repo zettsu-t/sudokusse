@@ -34,9 +34,12 @@ extern "C" {
     extern volatile uint64_t testFindRowPartCandidatesRowCandidates;
     extern volatile uint64_t testFindRowPartCandidatesBox;
     extern volatile uint64_t testFillNineUniqueCandidatesPreRow;
+    extern volatile uint64_t testCountRowCellCandidatesMinCount;
+    extern volatile uint64_t testCountRowCellCandidatesRowPopCount;
     extern volatile xmmRegister testFillNineUniqueCandidatesRowX;
     extern volatile xmmRegister testFillNineUniqueCandidatesBoxX;
     extern volatile xmmRegister testFillNineUniqueCandidatesColumnX;
+    extern volatile xmmRegister testCountRowCellCandidatesRowX;
 }
 
 namespace SudokuTestCandidates {

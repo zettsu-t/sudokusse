@@ -299,29 +299,6 @@ private:
     SudokuMap map_;    // 数独(バックトラッキングは配列であらかじめ確保するよりスタックに確保した方が速い)
 };
 
-// バックトラッキング状態
-struct SudokuSseSearchStateMember {
-    uint64_t uniqueCandidate_;
-    uint64_t candidateCnt_;
-    uint64_t candidateRow_;
-    uint64_t candidateInBoxShift_;
-    uint64_t candidateOutBoxShift_;
-};
-
-// バックトラッキング状態
-class SudokuSseSearchState {
-    // Unit test
-    friend class SudokuSseSearchStateTest;
-
-public:
-    SudokuSseSearchState();
-#ifndef NO_DESTRUCTOR
-    ALLOW_VIRTUAL ~SudokuSseSearchState();
-#endif
-    void Print(std::ostream* pSudokuOutStream) const;
-    SudokuSseSearchStateMember member_;
-};
-
 // マス(SSE4.2)
 class SudokuSseCell {
     // Unit test
@@ -352,11 +329,6 @@ extern "C" {
     // パラメータ(説明はASMを参照)
     extern volatile uint64_t sudokuXmmAborted;
     extern volatile uint64_t sudokuXmmElementCnt;
-    extern volatile uint64_t sudokuXmmUniqueCandidate;
-    extern volatile uint64_t sudokuXmmCandidateCnt;
-    extern volatile uint64_t sudokuXmmCandidateRow;
-    extern volatile uint64_t sudokuXmmCandidateInBoxShift;
-    extern volatile uint64_t sudokuXmmCandidateOutBoxShift;
     extern volatile uint64_t sudokuXmmPrintAllCandidate;
     extern volatile uint64_t sudokuXmmRightBottomElement;
     extern volatile uint64_t sudokuXmmRightBottomSolved;
@@ -373,7 +345,6 @@ struct SudokuSseCandidateCell {
     size_t           regIndex;  // マスが入っている汎用レジスタの番号
     SudokuSseElement shift;     // マスが入っている汎用レジスタのビット位置
     SudokuSseElement mask;      // マスが入っている汎用レジスタのビットマスク
-    SudokuSseElement count;     // 候補数
 };
 
 // 全マス(SSE4.2)
@@ -394,16 +365,8 @@ public:
     void Print(std::ostream* pSudokuOutStream) const;
     void FillCrossing(bool loadXmm);
     bool SearchNext(SudokuSseCandidateCell& cell);
-    bool SearchNext(SudokuSseSearchState& searchState);
     INLINE bool CanSetUniqueCell(const SudokuSseCandidateCell& cell, SudokuCellCandidates candidate) const;
     INLINE void SetUniqueCell(const SudokuSseCandidateCell& cell, SudokuCellCandidates candidate);
-private:
-    INLINE void getRegisterIndex(SudokuIndex outerIndex, SudokuIndex innerIndex, SudokuSseCandidateCell& cell) const;
-    INLINE SudokuIndex countCandidates(SudokuSseElement value) const;
-    INLINE SudokuIndex countCandidatesIfMultiple(SudokuSseElement value) const;
-    INLINE SudokuIndex unrolledSelectBacktrackedCellIndexInnerCommon(SudokuIndex outerIndex, SudokuIndex innerIndex, SudokuSseCandidateCell& cell) const;
-    template <SudokuIndex innerIndex>
-    INLINE SudokuIndex unrolledSelectBacktrackedCellIndexInner(SudokuIndex outerIndex, SudokuSseCandidateCell& cell) const;
 };
 
 // 全パターンを数えるためのマス(SSE4.2)

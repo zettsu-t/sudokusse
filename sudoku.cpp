@@ -1156,12 +1156,11 @@ bool SudokuSolver::solve(SudokuMap& map, bool topLevel, bool verbose) {
     // 1から順に試す
     auto candidate = SudokuCell::GetInitialCandidate();
     for(;;) {
-        // 単に値をコピーして新たな状態を作る
-        auto newMap = map;
+        const auto canSet = map.CanSetUniqueCell(cellIndex, candidate);
 
-        const auto canSet = newMap.CanSetUniqueCell(cellIndex, candidate);
         // 候補を矛盾なく設定できたら解く
         if (canSet) {
+            auto newMap = map;
             newMap.SetUniqueCell(cellIndex, candidate);
             if (solve(newMap, false, verbose)) {
                 // 単に値をコピーして状態を書き戻す
@@ -1193,35 +1192,6 @@ bool SudokuSolver::fillCells(SudokuMap& map, bool topLevel, bool verbose) {
 }
 
 /* --------------- SSE 4.2版 --------------- */
-
-// バックトラッキング候補の検索を開始する
-SudokuSseSearchState::SudokuSseSearchState() {
-    member_.uniqueCandidate_ = 0;
-    member_.candidateCnt_ = 0;
-    member_.candidateRow_ = 0;
-    member_.candidateInBoxShift_ = 0;
-    member_.candidateOutBoxShift_ = 0;
-    return;
-}
-
-// デストラクタ
-#ifndef NO_DESTRUCTOR
-SudokuSseSearchState::~SudokuSseSearchState() {
-    // 何もしないなら定義も不要
-    return;
-}
-#endif
-
-void SudokuSseSearchState::Print(std::ostream* pSudokuOutStream) const {
-    if (pSudokuOutStream == nullptr) {
-        return;
-    }
-
-    (*pSudokuOutStream) << "fill unique candidate " << member_.uniqueCandidate_ << ", cnt ";
-    (*pSudokuOutStream) << member_.candidateCnt_ << ", row "  << member_.candidateRow_ << ", in " ;
-    (*pSudokuOutStream) << member_.candidateInBoxShift_ << ", out "  << member_.candidateOutBoxShift_ << "\n";
-    return;
-}
 
 // コンストラクタ
 SudokuSseCell::SudokuSseCell(void) {
@@ -1358,57 +1328,25 @@ void SudokuSseMap::Print(std::ostream* pSudokuOutStream) const {
 
 // C++版と同じ方法で次のバックトラッキング候補を見つける
 bool SudokuSseMap::SearchNext(SudokuSseCandidateCell& cell) {
-    SudokuIndex leastGroupCount = Sudoku::SizeOfCandidates * Sudoku::SizeOfCellsPerGroup;
-    SudokuIndex leastCount = Sudoku::SizeOfCandidates;
     bool result = false;
+    gRegister outBoxIndex = 0;
+    gRegister inBoxIndex = 0;
+    gRegister rowNumber = 0;
 
-    // 外ループをアンローリングすると却って遅くなる
-    for(SudokuLoopIndex i=0;i<Sudoku::SizeOfGroupsPerMap;++i) {
-        SudokuIndex groupCount = 0;
-        SudokuSseCandidateCell localCell = {SudokuSseMap::InitialRegisterNum * SudokuSse::RegisterWordCnt,
-                                            0, 0, Sudoku::SizeOfCandidates};
-        groupCount = unrolledSelectBacktrackedCellIndexInner<Sudoku::SizeOfCellsPerGroup-1>(i, localCell);
+    Sudoku::LoadXmmRegistersFromMem(xmmRegSet_.regXmmVal_);
 
-        // 候補の最小のマス、候補の最小のグループの順で選ぶ
-        if ((leastCount > localCell.count) ||
-            ((leastCount == localCell.count) && (leastGroupCount > groupCount))) {
-            leastCount = localCell.count;
-            cell = localCell;
-            result = true;
-        }
-        if (leastGroupCount > groupCount) {
-            leastGroupCount = groupCount;
-        }
+    asm volatile (
+        "call searchNextCandidate\n\t"
+        :"=a"(outBoxIndex),"=b"(inBoxIndex),"=c"(rowNumber)::"rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
+
+    if (rowNumber < Sudoku::SizeOfCandidates) {
+        cell.regIndex = (SudokuSseMap::InitialRegisterNum + rowNumber) * SudokuSse::RegisterWordCnt + outBoxIndex;
+        cell.shift = inBoxIndex * Sudoku::SizeOfCandidates;
+        cell.mask = Sudoku::AllCandidates << cell.shift;
+        result = true;
     }
 
     return result;
-}
-
-// 次のバックトラッキング候補を見つける
-bool SudokuSseMap::SearchNext(SudokuSseSearchState& searchState) {
-    sudokuXmmUniqueCandidate = searchState.member_.uniqueCandidate_;
-    sudokuXmmCandidateCnt = searchState.member_.candidateCnt_;
-    sudokuXmmCandidateRow = searchState.member_.candidateRow_;
-    sudokuXmmCandidateInBoxShift = searchState.member_.candidateInBoxShift_;
-    sudokuXmmCandidateOutBoxShift = searchState.member_.candidateOutBoxShift_;
-
-    // cout<<などを呼び出すとXMMレジスタの状態が変わるので必ずロードする
-    Sudoku::LoadXmmRegistersFromMem(xmmRegSet_.regXmmVal_);
-
-    // 使うレジスタはすべて記述する(Cygwinではレジスタが無いとエラーが出る)
-    asm volatile (
-        "call searchNextCandidate\n\t"
-        :::"rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
-
-    Sudoku::SaveXmmRegistersToMem(xmmRegSet_.regXmmVal_);
-
-    searchState.member_.uniqueCandidate_ = sudokuXmmUniqueCandidate;
-    searchState.member_.candidateCnt_ = sudokuXmmCandidateCnt;
-    searchState.member_.candidateRow_ = sudokuXmmCandidateRow;
-    searchState.member_.candidateInBoxShift_ = sudokuXmmCandidateInBoxShift;
-    searchState.member_.candidateOutBoxShift_ = sudokuXmmCandidateOutBoxShift;
-
-    return (searchState.member_.candidateCnt_ <= Sudoku::SizeOfCandidates);
 }
 
 // マスの候補を強制的に一つに絞れるかどうか返す
@@ -1422,58 +1360,6 @@ INLINE void SudokuSseMap::SetUniqueCell(const SudokuSseCandidateCell& cell, Sudo
     xmmRegSet_.regVal_[cell.regIndex] &= ~cell.mask;
     xmmRegSet_.regVal_[cell.regIndex] |= candidate << cell.shift;
     return;
-}
-
-INLINE void SudokuSseMap::getRegisterIndex(SudokuIndex outerIndex, SudokuIndex innerIndex, SudokuSseCandidateCell& cell) const {
-    cell.regIndex = (outerIndex + InitialRegisterNum) * SudokuSse::RegisterWordCnt +
-        Sudoku::SizeOfBoxesOnEdge - (innerIndex / Sudoku::SizeOfBoxesOnEdge) - 1;
-    cell.shift = (Sudoku::SizeOfCellsOnBoxEdge - (innerIndex % Sudoku::SizeOfCellsOnBoxEdge) - 1) * Sudoku::SizeOfCandidates;
-    cell.mask = Sudoku::AllCandidates << cell.shift;
-    cell.count = 0;
-    return;
-}
-
-INLINE SudokuIndex SudokuSseMap::countCandidates(SudokuSseElement value) const {
-    decltype(value) count = 0;
-    asm volatile (
-        "popcnt %0, %1"
-        : "=r"(count) :"r"(value):);
-    return count;
-}
-
-INLINE SudokuIndex SudokuSseMap::countCandidatesIfMultiple(SudokuSseElement value) const {
-    auto count = countCandidates(value);
-    return (count > Sudoku::SizeOfUniqueCandidate) ? count : Sudoku::OutOfRangeCandidates;
-}
-
-INLINE SudokuIndex SudokuSseMap::unrolledSelectBacktrackedCellIndexInnerCommon(SudokuIndex outerIndex, SudokuIndex innerIndex,
-                                                                               SudokuSseCandidateCell& cell) const {
-    SudokuSseCandidateCell localCell;
-    getRegisterIndex(outerIndex, innerIndex, localCell);
-    auto value = (xmmRegSet_.regVal_[localCell.regIndex] & localCell.mask) >> localCell.shift;
-
-    const auto countOrOutOfRange = countCandidatesIfMultiple(value);
-    assert(countOrOutOfRange > Sudoku::SizeOfUniqueCandidate);
-    localCell.count = SudokuCell::MaskCandidatesUnlessMultiple(countOrOutOfRange);
-    assert(localCell.count <= Sudoku::SizeOfCandidates);
-
-    // 候補がなければcountはマスの数より大きい
-    if (cell.count > countOrOutOfRange) {
-        cell = localCell;
-    }
-
-    return localCell.count;
-}
-
-template <SudokuIndex innerIndex>
-INLINE SudokuIndex SudokuSseMap::unrolledSelectBacktrackedCellIndexInner(SudokuIndex outerIndex, SudokuSseCandidateCell& cell) const {
-    return unrolledSelectBacktrackedCellIndexInnerCommon(outerIndex, innerIndex, cell)
-        + unrolledSelectBacktrackedCellIndexInner<innerIndex-1>(outerIndex, cell);
-}
-
-template <>
-INLINE SudokuIndex SudokuSseMap::unrolledSelectBacktrackedCellIndexInner<0>(SudokuIndex outerIndex, SudokuSseCandidateCell& cell) const {
-    return unrolledSelectBacktrackedCellIndexInnerCommon(outerIndex, 0, cell);
 }
 
 // コンストラクタ
@@ -1543,7 +1429,6 @@ bool SudokuSseSolver::solve(SudokuSseMap& map, bool topLevel, bool verbose) {
             return true;
         }
 
-#if 1
         // 減らないので候補を決め打ちしてバックトラッキングする
         SudokuSseCandidateCell cell;
         auto found = map.SearchNext(cell);
@@ -1554,12 +1439,11 @@ bool SudokuSseSolver::solve(SudokuSseMap& map, bool topLevel, bool verbose) {
         // 1から順に試す
         auto candidate = SudokuCell::GetInitialCandidate();
         for(;;) {
-            SudokuSseMap newMap = map;
-            // 設定できなければ書き換えない方が、上記のコピーを省ける
-            const auto canSet = newMap.CanSetUniqueCell(cell, candidate);
+            const auto canSet = map.CanSetUniqueCell(cell, candidate);
 
             // 候補を矛盾なく設定できたら解く
             if (canSet) {
+                SudokuSseMap newMap = map;
                 newMap.SetUniqueCell(cell, candidate);
                 if (verbose) {
                     map.Print(pSudokuOutStream_);
@@ -1581,31 +1465,7 @@ bool SudokuSseSolver::solve(SudokuSseMap& map, bool topLevel, bool verbose) {
                 break;
             }
         }
-#else
-        // この方法だと、バックトラッキング回数が多すぎる
-        SudokuSseSearchState searchState;
-        for(;;) {
-            SudokuSseMap newMap = map;
-            // 候補を一つ見つけて決め打ちする
-            if (!newMap.SearchNext(searchState)) {
-                // これ以上候補がない
-                break;
-            }
-            if (verbose) {
-                map.Print(pSudokuOutStream_);
-                searchState.Print(pSudokuOutStream_);
-            }
 
-            // バックトラッキング開始
-            const auto result = solve(newMap, false, verbose);
-            if (result) {
-                // 単に値をコピーして状態を書き戻す
-                map = newMap;
-                // 解けた
-                return true;
-            }
-        }
-#endif
         break;
     }
 

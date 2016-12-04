@@ -87,24 +87,6 @@ private:
 
 CPPUNIT_TEST_SUITE_REGISTRATION(SudokuSseSolverTest);
 
-class SudokuSseSearchStateTest : public CPPUNIT_NS::TestFixture {
-    CPPUNIT_TEST_SUITE(SudokuSseSearchStateTest);
-    CPPUNIT_TEST(test_Print);
-    CPPUNIT_TEST_SUITE_END();
-
-protected:
-    std::unique_ptr<SudokuSseSearchState> pInstance_;    // インスタンス
-    std::unique_ptr<SudokuOutStream> pSudokuOutStream_;  // 結果出力先
-public:
-    void setUp() override;
-    void tearDown() override;
-protected:
-    void test_Print();
-
-};
-
-CPPUNIT_TEST_SUITE_REGISTRATION(SudokuSseSearchStateTest);
-
 // テスト用の値が正しいかどうか検算する
 void SudokuSolverTest::verifyTestVector(void) {
     assert(SudokuTestPattern::NoBacktrackString.length() >= Sudoku::SizeOfAllCells);
@@ -397,42 +379,6 @@ void SudokuSseSolverTest::test_solve() {
 
 void SudokuSseSolverTest::test_fillCells() {
     pCommonTester_->test_fillCells();
-    return;
-}
-
-// 各テスト・ケースの実行直前に呼ばれる
-void SudokuSseSearchStateTest::setUp() {
-    pSudokuOutStream_ = decltype(pSudokuOutStream_)(new SudokuOutStream());
-    pInstance_ = decltype(pInstance_)(new SudokuSseSearchState());
-
-    CPPUNIT_ASSERT_EQUAL(static_cast<uint64_t>(0), pInstance_->member_.uniqueCandidate_);
-    CPPUNIT_ASSERT_EQUAL(static_cast<uint64_t>(0), pInstance_->member_.candidateCnt_);
-    CPPUNIT_ASSERT_EQUAL(static_cast<uint64_t>(0), pInstance_->member_.candidateRow_);
-    CPPUNIT_ASSERT_EQUAL(static_cast<uint64_t>(0), pInstance_->member_.candidateInBoxShift_);
-    CPPUNIT_ASSERT_EQUAL(static_cast<uint64_t>(0), pInstance_->member_.candidateOutBoxShift_);
-    return;
-}
-
-// 各テスト・ケースの実行直後に呼ばれる
-void SudokuSseSearchStateTest::tearDown() {
-    assert(pInstance_);
-    assert(pSudokuOutStream_);
-    pInstance_.reset();
-    pSudokuOutStream_.reset();
-    return;
-}
-
-void SudokuSseSearchStateTest::test_Print() {
-    constexpr SudokuSseSearchStateMember member {64, 4, 3, 2, 1};
-    pInstance_->member_ = member;
-    pInstance_->Print(pSudokuOutStream_.get());
-
-    // SetUpで設定したのだから成功するはず
-    SudokuOutStream* pOstream = dynamic_cast<SudokuOutStream*>(pSudokuOutStream_.get());
-    assert(pOstream != nullptr);
-    const std::string actualstr = pOstream->str();
-    std::string expectedstr("fill unique candidate 64, cnt 4, row 3, in 2, out 1\n");
-    CPPUNIT_ASSERT(expectedstr == actualstr);
     return;
 }
 

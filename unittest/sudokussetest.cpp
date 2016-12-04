@@ -66,11 +66,14 @@ class SudokuSseTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST(test_FindThreePartsCandidates);
     CPPUNIT_TEST(test_FindRowPartCandidates);
     CPPUNIT_TEST(test_FillThreePartsUniqueCandidates);
-    CPPUNIT_TEST(test_CountRowPartElements);
     CPPUNIT_TEST(test_CountFilledElements);
-    CPPUNIT_TEST(test_ChooseNextCadidate);
-    CPPUNIT_TEST(test_SearchRowPartElements);
-    CPPUNIT_TEST(test_SearchRowElements);
+    CPPUNIT_TEST(test_PopCountOrPowerOf2);
+    CPPUNIT_TEST(test_CompareRegisterSet);
+    CPPUNIT_TEST(test_CountCellCandidates);
+    CPPUNIT_TEST(test_CountThreeCellCandidates);
+    CPPUNIT_TEST(test_CountRowCellCandidatesSub);
+    CPPUNIT_TEST(test_CountRowCellCandidates);
+    CPPUNIT_TEST(test_SearchNextCandidate);
     CPPUNIT_TEST(test_FoldRowParts);
     CPPUNIT_TEST(test_CheckRow);
     CPPUNIT_TEST(test_CheckRowSet);
@@ -108,11 +111,14 @@ protected:
     void test_FindThreePartsCandidates();
     void test_FindRowPartCandidates();
     void test_FillThreePartsUniqueCandidates();
-    void test_CountRowPartElements();
     void test_CountFilledElements();
-    void test_ChooseNextCadidate();
-    void test_SearchRowPartElements();
-    void test_SearchRowElements();
+    void test_PopCountOrPowerOf2();
+    void test_CompareRegisterSet();
+    void test_CountCellCandidates();
+    void test_CountThreeCellCandidates();
+    void test_CountRowCellCandidatesSub();
+    void test_CountRowCellCandidates();
+    void test_SearchNextCandidate();
     void test_FoldRowParts();
     void test_CheckRow();
     void test_CheckRowSet();
@@ -130,6 +136,35 @@ private:
     void callPowerOf2orAll1(gRegister& arg, gRegister& result);
     gRegister rotateRowPart(gRegister arg);
     void rotateRow(uint64_t row[2]);
+
+    static constexpr size_t SizeOfRowSet = Sudoku::SizeOfGroupsPerMap;
+    union RowRegisterSet {
+        SudokuSseElement regVal[SizeOfRowSet * 4];
+        xmmRegister regXmm[SizeOfRowSet];
+    };
+    static_assert(sizeof(RowRegisterSet) == sizeof(RowRegisterSet::regXmm), "Wrong size");
+
+    // 111111111 111111110 111111100
+    // 111 1111 1111 1111 1101 1111 1100
+    static constexpr gRegister CellSet987 = 0x7fffdfc;
+
+    // 111111000 111110000 111100000
+    // 111 1110 0011 1110 0001 1110 0000
+    static constexpr gRegister CellSet654 = 0x7e3e1e0;
+
+    // 111110000 111100000 111111000
+    // 111 1100 0011 1100 0001 1111 1000
+    static constexpr gRegister CellSet546 = 0x7c3c1f8;
+
+    // 111100000 111111000 111110000
+    // 111 1000 0011 1111 0001 1111 0000
+    static constexpr gRegister CellSet456 = 0x783f1f0;
+    static constexpr gRegister CellSet401 = 0x7800001;
+
+    static constexpr gRegister InvalidRowPopCount = Sudoku::SizeOfCellsPerGroup * Sudoku::SizeOfCandidates + 1;
+    static constexpr gRegister InvalidShift = 0xffff;
+    static constexpr gRegister InvalidRowNumber = 0xfffe;
+    static constexpr gRegister CountCellCandidatesRowNumber = 5;
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION( SudokuSseTest );
@@ -822,7 +857,7 @@ void SudokuSseTest::test_CollectUniqueCandidatesInThreeLine()
             "movdqa  xmm1, xmmword ptr [%0]\n\t"
             "movdqa  xmm2, xmmword ptr [%0+16]\n\t"
             "movdqa  xmm3, xmmword ptr [%0+32]\n\t"
-            "call    testFCollectUniqueCandidatesInThreeLine\n\t"
+            "call    testCollectUniqueCandidatesInThreeLine\n\t"
             "movdqa  xmmword ptr [%0+48], xmm10\n\t"
             ::"r"(xmmreg):"r8","r9","r10","r11","r12","r13","r14","r15");
 
@@ -1712,58 +1747,6 @@ void SudokuSseTest::test_FindRowPartCandidates()
     return;
 }
 
-void SudokuSseTest::test_CountRowPartElements()
-{
-    struct TestSet {
-        gRegister arg;
-        gRegister count;
-        gRegister element;
-        gRegister isequal;
-    };
-
-    constexpr TestSet testSet[] {
-        {0x20081ff, 2, 0x1ff, 0},
-        {0x2008101, 2, 0x101, 1},
-        {0x2008101, 3, 0x101, 0},
-        {0x2008111, 3, 0x111, 1},
-        {0x20081ff, 9, 0x1ff, 1},
-    };
-
-    for(const auto& test : testSet) {
-        gRegister arg = test.arg;
-        const gRegister count = test.count;
-
-        for(Shiftpos e=Shiftpos::SHIFT_POSMIN; e<Shiftpos::SHIFT_POSCNT; e=static_cast<Shiftpos>(static_cast<int>(e)+1)) {
-            gRegister element = 0;
-            gRegister isequal = 0;
-            switch(e) {
-            case Shiftpos::SHIFT_POS0:
-                asm volatile (
-                    "call testCountRowPartElements0\n\t"
-                    :"=c"(element),"=d"(isequal):"a"(arg),"b"(count):"r14","r15");
-                break;
-            case Shiftpos::SHIFT_POS1:
-                asm volatile (
-                    "call testCountRowPartElements1\n\t"
-                    :"=c"(element),"=d"(isequal):"a"(arg),"b"(count):"r14","r15");
-                break;
-            case Shiftpos::SHIFT_POS2:
-                asm volatile (
-                    "call testCountRowPartElements2\n\t"
-                    :"=c"(element),"=d"(isequal):"a"(arg),"b"(count):"r14","r15");
-                break;
-            default:
-                break;
-            }
-            CPPUNIT_ASSERT_EQUAL(test.element, element);
-            CPPUNIT_ASSERT_EQUAL(test.isequal, isequal);
-            arg = rotateRowPart(arg);
-        }
-    }
-
-    return;
-}
-
 void SudokuSseTest::test_CountFilledElements()
 {
     struct TestSet {
@@ -1820,188 +1803,358 @@ void SudokuSseTest::test_CountFilledElements()
     return;
 }
 
-void SudokuSseTest::test_ChooseNextCadidate()
-{
-    struct TestSet {
-        gRegister argrowpart;
-        gRegister arguniquecandidate;
-        gRegister expectedrowpart;
-        gRegister expecteduniquecandidate;
-        gRegister chosen;
-    };
+void SudokuSseTest::test_PopCountOrPowerOf2() {
+    constexpr gRegister basePopCount = 128;
+    gRegister cellValue = 0;
 
-    constexpr TestSet testSet[] {
-        {0x7fffe03, 0, 0x7fffe01, 1, 1},
-        {0x7fffe03, 1, 0x7fffe02, 2, 1},
-        {0x7fffe03, 2, 0x7fffe03, 0, 0},
-        {0x7ffff42, 0,     0x7fffe02, 2, 1},
-        {0x7ffff42, 2,     0x7fffe40, 0x40, 1},
-        {0x7ffff42, 0x40,  0x7ffff00, 0x100, 1},
-        {0x7ffff42, 0x100, 0x7ffff42, 0, 0},
-    };
+    for(gRegister candidates=0; candidates <= Sudoku::SizeOfCandidates; ++candidates) {
+        for(gRegister i=0; i < Sudoku::SizeOfCellsOnBoxEdge; ++i) {
+            gRegister popCount = 0;
+            gRegister accumPopCount = 0;
+            gRegister arg = cellValue;
 
-    for(const auto& test : testSet) {
-        gRegister argrowpart = test.argrowpart;
-        gRegister arguniquecandidate = test.arguniquecandidate;
-        gRegister expectedrowpart = test.expectedrowpart;
-        for(Shiftpos e=Shiftpos::SHIFT_POSMIN; e<Shiftpos::SHIFT_POSCNT; e=static_cast<Shiftpos>(static_cast<int>(e)+1)) {
-            gRegister searched = 0;
-            gRegister actualrowpart = 0;
-            gRegister actualuniquecandidate = 0;
-            gRegister chosen = 0;
-            switch(e) {
-            case Shiftpos::SHIFT_POS0:
+            switch(i) {
+            case 0:
                 asm volatile (
-                    "call testChooseNextCadidate0\n\t"
-                    :"=c"(searched),"=d"(actualrowpart),"=S"(actualuniquecandidate),"=D"(chosen):"a"(argrowpart),"b"(arguniquecandidate):"r11","r12","r13","r14","r15");
+                    "call testPopCountOrPowerOf20\n\t"
+                    :"=a"(popCount),"=b"(accumPopCount):"c"(arg),"d"(basePopCount):"r8", "r15");
                 break;
-            case Shiftpos::SHIFT_POS1:
+            case 1:
+                arg = cellValue << Sudoku::SizeOfCandidates;
                 asm volatile (
-                    "call testChooseNextCadidate1\n\t"
-                    :"=c"(searched),"=d"(actualrowpart),"=S"(actualuniquecandidate),"=D"(chosen):"a"(argrowpart),"b"(arguniquecandidate):"r11","r12","r13","r14","r15");
+                    "call testPopCountOrPowerOf21\n\t"
+                    :"=a"(popCount),"=b"(accumPopCount):"c"(arg),"d"(basePopCount):"r8", "r15");
                 break;
-            case Shiftpos::SHIFT_POS2:
-                asm volatile (
-                    "call testChooseNextCadidate2\n\t"
-                    :"=c"(searched),"=d"(actualrowpart),"=S"(actualuniquecandidate),"=D"(chosen):"a"(argrowpart),"b"(arguniquecandidate):"r11","r12","r13","r14","r15");
-                break;
+            case 2:
             default:
+                arg = cellValue << (Sudoku::SizeOfCandidates * 2);
+                asm volatile (
+                    "call testPopCountOrPowerOf22\n\t"
+                    :"=a"(popCount),"=b"(accumPopCount):"c"(arg),"d"(basePopCount):"r8", "r15");
                 break;
             }
-            CPPUNIT_ASSERT_EQUAL(actualuniquecandidate, searched);
-            CPPUNIT_ASSERT_EQUAL(test.expecteduniquecandidate, actualuniquecandidate);
-            CPPUNIT_ASSERT_EQUAL(expectedrowpart, actualrowpart);
-            CPPUNIT_ASSERT_EQUAL(test.chosen, chosen);
-            argrowpart = rotateRowPart(argrowpart);
-            expectedrowpart = rotateRowPart(expectedrowpart);
+
+            const gRegister expectedPopCount = (candidates <= Sudoku::SizeOfUniqueCandidate) ?
+                (Sudoku::SizeOfCandidates + 1) : candidates;
+            CPPUNIT_ASSERT_EQUAL(expectedPopCount, popCount);
+            CPPUNIT_ASSERT_EQUAL(basePopCount + candidates, accumPopCount);
         }
+
+        cellValue <<= 1;
+        cellValue |= 1;
     }
 
     return;
 }
 
-void SudokuSseTest::test_SearchRowPartElements()
-{
+void SudokuSseTest::test_CompareRegisterSet() {
     struct TestSet {
-        gRegister candidatecnt;
-        gRegister prerowpart;
-        gRegister preuniquecandidate;
-        gRegister preinboxshift;
-        gRegister preoutboxshift;
-        gRegister searched;
-        gRegister expectedrowpart;
-        gRegister expecteduniquecandidate;
-        gRegister expectedinboxshift;
-        gRegister expectedoutboxshift;
+        gRegister leftHigh;
+        gRegister leftLow;
+        gRegister rightHigh;
+        gRegister rightLow;
+        gRegister zeroFlag;
+        gRegister carryFlag;
     };
 
-    constexpr TestSet testSet[] {
-        // 91-91-91
-        {2, 0x4060301,     0, 0, 0,  1,     0x4060201, 1,     0, 0},
-        {2, 0x4060301,     1, 0, 0,  0x100, 0x4060300, 0x100, 0, 0},
-        {2, 0x4060301, 0x100, 0, 0,  1,     0x4040301, 1,     1, 0},
-        {2, 0x4060301, 0x100, 0, 0,  1,     0x4040301, 1,     1, 0},
-        {2, 0x4060301,     1, 1, 0,  0x100, 0x4060101, 0x100, 1, 0},
-        {2, 0x4060301, 0x100, 1, 0,  1,     0x0060301, 1,     2, 0},
-        {2, 0x4060301,     1, 2, 0,  0x100, 0x4020301, 0x100, 2, 0},
-        {2, 0x4060301, 0x100, 2, 0,  0,     0x4060301, 0,     0, 1},
-        // 82-*-*
-        {2, 0x20bffff,     0, 0, 1,  2,     0x00bffff, 2,     2, 1},
-        {2, 0x20bffff,     2, 2, 1,  0x80,  0x203ffff, 0x80,  2, 1},
-        {2, 0x20bffff,  0x80, 2, 1,  0,     0x20bffff, 0,     0, 2},
-        // 678-*-234
-        {3, 0x380020e,     0, 0, 2,  2,     0x3800202, 2,     0, 2},
-        {3, 0x380020e,     2, 0, 2,  4,     0x3800204, 4,     0, 2},
-        {3, 0x380020e,     4, 0, 2,  8,     0x3800208, 8,     0, 2},
-        {3, 0x380020e,     8, 0, 2, 0x20,   0x080020e, 0x20,  2, 2},
-        {3, 0x380020e,  0x20, 2, 2, 0x40,   0x100020e, 0x40,  2, 2},
-        {3, 0x380020e,  0x40, 2, 2, 0x80,   0x200020e, 0x80,  2, 2},
-        {3, 0x380020e,  0x80, 2, 2, 0,      0x380020e, 0,     0, 3},
-        // *-*-*
-        {3, 0x0f0f0f0,     0, 0, 2,  0,     0x0f0f0f0, 0,     0, 3},
+    constexpr TestSet testSet[] = {
+        {0, 0, 0, 0, 1, 0},
+        {0, 0, 0, 1, 0, 1},
+        {0, 0, 1, 0, 0, 1},
+        {0, 1, 0, 0, 0, 0},
+        {0, 1, 0, 1, 1, 0},
+        {0, 1, 1, 0, 0, 1},
+        {1, 0, 0, 0, 0, 0},
+        {1, 0, 0, 1, 0, 0},
+        {1, 0, 1, 0, 1, 0},
+        {1, 0, 1, 1, 0, 1},
+        {0xaa, 0xfffe, 0xaa, 0xffff, 0, 1},
+        {0xaa, 0xffff, 0xaa, 0xfffe, 0, 0},
+        {0xab, 0xfffe, 0xaa, 0xffff, 0, 0}
     };
 
     for(const auto& test : testSet) {
-        gRegister candidatecnt = test.candidatecnt;
-        gRegister searched = 0;
-        gRegister actualrowpart = 0;
-        gRegister actualuniquecandidate = 0;
-        gRegister actualinboxshift = 0;
-        gRegister actualoutboxshift = 0;
-        testSearchRowPartElementsPreRowPart = test.prerowpart;
-        testSearchRowPartElementsPreUniqueCandidate = test.preuniquecandidate;
-        testSearchRowPartElementsPreInBoxShift = test.preinboxshift;
-        testSearchRowPartElementsPreOutBoxShift = test.preoutboxshift;
-
+        gRegister zeroFlag = 0;
+        gRegister carryFlag = 0;
         asm volatile (
-            "call testSearchRowPartElements\n\t"
-            :"=b"(searched),"=c"(actualrowpart),"=d"(actualuniquecandidate),"=S"(actualinboxshift),"=D"(actualoutboxshift):"a"(candidatecnt):"r11","r12","r13","r14","r15");
-        CPPUNIT_ASSERT_EQUAL(test.searched, searched);
-        CPPUNIT_ASSERT_EQUAL(test.expectedrowpart, actualrowpart);
-        CPPUNIT_ASSERT_EQUAL(test.expecteduniquecandidate, actualuniquecandidate);
-        CPPUNIT_ASSERT_EQUAL(test.expectedinboxshift, actualinboxshift);
-        CPPUNIT_ASSERT_EQUAL(test.expectedoutboxshift, actualoutboxshift);
+            "call testCompareRegisterSet\n\t"
+            :"=a"(zeroFlag),"=b"(carryFlag):"c"(test.leftHigh),"d"(test.leftLow),"S"(test.rightHigh),"D"(test.rightLow):"r8", "r9", "r10", "r15");
+        CPPUNIT_ASSERT_EQUAL(test.zeroFlag, zeroFlag);
+        CPPUNIT_ASSERT_EQUAL(test.carryFlag, carryFlag);
     }
 
     return;
 }
 
-void SudokuSseTest::test_SearchRowElements()
-{
+void SudokuSseTest::test_CountCellCandidates() {
+    constexpr gRegister basePopCount = 128;
+    gRegister cellValue = 0;
+
+    for(gRegister candidates=0; candidates <= Sudoku::SizeOfCandidates; ++candidates) {
+        for(gRegister baseMinCount=0; baseMinCount <= (candidates + 1); ++baseMinCount) {
+            for(gRegister i=0; i < Sudoku::SizeOfCellsOnBoxEdge; ++i) {
+                gRegister outBoxShift = 0;
+                gRegister inBoxShift = 0;
+                gRegister minCount = 0;
+                gRegister popCount = 0;
+                gRegister baseCount[2] = {baseMinCount, basePopCount};
+                gRegister arg = cellValue << (i * Sudoku::SizeOfCandidates);
+
+                switch(i) {
+                case 0:
+                    asm volatile (
+                        "call testCountCellCandidates10\n\t"
+                        :"=a"(outBoxShift),"=b"(inBoxShift),"=c"(minCount),"=d"(popCount):"S"(baseCount),"D"(arg):"r8", "r9", "r10", "r15");
+                    break;
+                case 1:
+                    asm volatile (
+                        "call testCountCellCandidates21\n\t"
+                        :"=a"(outBoxShift),"=b"(inBoxShift),"=c"(minCount),"=d"(popCount):"S"(baseCount),"D"(arg):"r8", "r9", "r10", "r15");
+                    break;
+                case 2:
+                default:
+                    asm volatile (
+                        "call testCountCellCandidates02\n\t"
+                        :"=a"(outBoxShift),"=b"(inBoxShift),"=c"(minCount),"=d"(popCount):"S"(baseCount),"D"(arg):"r8", "r9", "r10", "r15");
+                    break;
+                }
+
+                const auto invalid = (candidates <= Sudoku::SizeOfUniqueCandidate) || (candidates > baseMinCount);
+                const gRegister expectedOutBoxShift = (invalid) ? InvalidShift : ((i + 1) % 3);
+                const gRegister expectedInBoxShift = (invalid) ? InvalidShift : i;
+                const gRegister expectedMinCount = (invalid) ? minCount : candidates;
+                CPPUNIT_ASSERT_EQUAL(expectedOutBoxShift, outBoxShift);
+                CPPUNIT_ASSERT_EQUAL(expectedInBoxShift, inBoxShift);
+                CPPUNIT_ASSERT_EQUAL(expectedMinCount, minCount);
+                CPPUNIT_ASSERT_EQUAL(basePopCount + candidates, popCount);
+            }
+        }
+
+        cellValue <<= 1;
+        cellValue |= 1;
+    }
+
+    return;
+}
+
+void SudokuSseTest::test_CountThreeCellCandidates() {
+    constexpr gRegister basePopCount = 128;
     struct TestSet {
-        gRegister candidatecnt;
-        gRegister arghigh;
-        gRegister arglow;
-        gRegister preuniquecandidate;
-        gRegister precandidaterow;
-        gRegister preinboxshift;
-        gRegister preoutboxshift;
-        gRegister expecteduniquecandidate;
-        gRegister expectedcandidaterow;
-        gRegister expectedinboxshift;
-        gRegister expectedoutboxshift;
+        gRegister arg;
+        gRegister baseMinCount;
+        gRegister inBoxShift;
+        gRegister minCount;
+        gRegister popCount;
     };
 
-    constexpr TestSet testSet[] {
-        // 1(45)2-(45)36-789
-        {2, 0x43002, 0x60082001010100, 0,    0, 0, 0,  8,    0,  2, 1},
-        {2, 0x43002, 0x60082001010100, 8,    1, 2, 1,  0x10, 1,  2, 1},
-        {2, 0x43002, 0x60082001010100, 0x10, 3, 2, 1,  8,    3,  1, 2},
-        {2, 0x43002, 0x60082001010100, 8,    5, 1, 2,  0x10, 5,  1, 2},
-        {2, 0x43002, 0x60082001010100, 0x10, 9, 1, 2,  0,    10, 0, 0},
-        // ***-***-***(8642)
-        {4, 0x7fffff, 0x7ffffff07fffeaa, 0,    1, 0, 0,  2,    1,  0, 0},
-        {4, 0x7fffff, 0x7ffffff07fffeaa, 2,    1, 0, 0,  8,    1,  0, 0},
-        {4, 0x7fffff, 0x7ffffff07fffeaa, 8,    1, 0, 0,  0x20, 1,  0, 0},
-        {4, 0x7fffff, 0x7ffffff07fffeaa, 0x20, 1, 0, 0,  0x80, 1,  0, 0},
-        {4, 0x7fffff, 0x7ffffff07fffeaa, 0x80, 8, 0, 0,  0,    9,  0, 0},
+    constexpr TestSet testSet[] = {
+        {CellSet654, 3, InvalidShift, 3, 15},
+        {CellSet654, 4, 0, 4, 15},
+        {CellSet654, 5, 0, 4, 15},
+        {CellSet654, 6, 0, 4, 15},
+        {CellSet654, 7, 0, 4, 15},
+        {CellSet546, 4, 1, 4, 15},
+        {CellSet456, 4, 2, 4, 15},
+        {CellSet401, 4, 2, 4, 5},
     };
 
     for(const auto& test : testSet) {
-        gRegister candidatecnt = test.candidatecnt;
-        gRegister actualuniquecandidate = 0;
-        gRegister actualcandidaterow = 0;
-        gRegister actualinboxshift = 0;
-        gRegister actualoutboxshift = 0;
-        testSearchRowElementsPreUniqueCandidate = test.preuniquecandidate;
-        testSearchRowElementsPreCandidateRow = test.precandidaterow;
-        testSearchRowElementsPreInBoxShift = test.preinboxshift;
-        testSearchRowElementsPreOutBoxShift = test.preoutboxshift;
-
-        xmmRegister arg;
-        static_assert(sizeof(arg) == (sizeof(test.arglow) + sizeof(test.arghigh)),
-                      "Unexpected xmmRegister size");
-        *(reinterpret_cast<gRegister*>(&arg)) = test.arglow;
-        *(reinterpret_cast<gRegister*>(&arg) + 1) = test.arghigh;
+        gRegister outBoxShift = 0;
+        gRegister inBoxShift = 0;
+        gRegister minCount = 0;
+        gRegister popCount = 0;
+        gRegister baseCount[2] = {test.baseMinCount, basePopCount};
 
         asm volatile (
-            "movdqa  xmm1, xmmword ptr [rdi]\n\t"
-            "call testSearchRowElements\n\t"
-            :"=b"(actualuniquecandidate),"=c"(actualcandidaterow),"=d"(actualinboxshift),"=S"(actualoutboxshift):"a"(candidatecnt),"D"(&arg):"r8","r9","r10","r11","r12","r13","r14","r15");
-        CPPUNIT_ASSERT_EQUAL(test.expecteduniquecandidate, actualuniquecandidate);
-        CPPUNIT_ASSERT_EQUAL(test.expectedcandidaterow, actualcandidaterow);
-        CPPUNIT_ASSERT_EQUAL(test.expectedinboxshift, actualinboxshift);
-        CPPUNIT_ASSERT_EQUAL(test.expectedoutboxshift, actualoutboxshift);
+            "call testCountThreeCellCandidates\n\t"
+            :"=a"(outBoxShift),"=b"(inBoxShift),"=c"(minCount),"=d"(popCount):"S"(baseCount),"D"(test.arg):"r8", "r9", "r10", "r15");
+
+        const gRegister expectedOutBoxShift = (test.inBoxShift == InvalidShift) ? InvalidShift : 2;
+        CPPUNIT_ASSERT_EQUAL(expectedOutBoxShift, outBoxShift);
+        CPPUNIT_ASSERT_EQUAL(test.inBoxShift, inBoxShift);
+        CPPUNIT_ASSERT_EQUAL(test.minCount, minCount);
+        CPPUNIT_ASSERT_EQUAL(basePopCount + test.popCount, popCount);
+    }
+
+    return;
+}
+
+void SudokuSseTest::test_CountRowCellCandidatesSub() {
+    union RowData {
+        SudokuSseElement regVal[4];
+        xmmRegister regXmm;
+    };
+    static_assert(sizeof(RowData) == sizeof(xmmRegister), "Wrong size");
+
+    struct TestSet {
+        RowData   arg;
+        gRegister baseMinCount;
+        gRegister outBoxShift;
+        gRegister inBoxShift;
+        gRegister minCount;
+        gRegister popCount;
+    };
+
+    constexpr TestSet testSet[] = {
+        {{0, 0, 0, 0}, 3, InvalidShift, InvalidShift, 3, 0},
+        {{CellSet654, CellSet654, CellSet654, 0}, 3, InvalidShift, InvalidShift, 3, 45},
+        {{CellSet654, CellSet654, CellSet654, 0}, 4, 2, 0, 4, 45},
+        {{CellSet654, CellSet654, CellSet654, 0}, 4, 2, 0, 4, 45},
+        {{CellSet987, CellSet987, CellSet654, 0}, 4, 2, 0, 4, 63},
+        {{CellSet987, CellSet456, CellSet987, 0}, 4, 1, 2, 4, 63},
+        {{CellSet546, CellSet987, CellSet987, 0}, 4, 0, 1, 4, 63},
+    };
+
+    for(const auto& test : testSet) {
+        gRegister outBoxShift = 0;
+        gRegister inBoxShift = 0;
+        gRegister minCount = 0;
+        gRegister popCount = 0;
+        testCountRowCellCandidatesMinCount = test.baseMinCount;
+        testCountRowCellCandidatesRowPopCount = InvalidRowPopCount;
+        testCountRowCellCandidatesRowX = test.arg.regXmm;
+
+        asm volatile (
+            "call testCountRowCellCandidatesSub\n\t"
+            :"=a"(outBoxShift),"=b"(inBoxShift),"=c"(minCount),"=d"(popCount)::"r8", "r9", "r10", "r11", "r12", "r15");
+
+        CPPUNIT_ASSERT_EQUAL(test.outBoxShift, outBoxShift);
+        CPPUNIT_ASSERT_EQUAL(test.inBoxShift, inBoxShift);
+        CPPUNIT_ASSERT_EQUAL(test.minCount, minCount);
+        CPPUNIT_ASSERT_EQUAL(test.popCount, popCount);
+
+        outBoxShift = 0;
+        inBoxShift = 0;
+        minCount = 0;
+        popCount = 0;
+        gRegister rowNumber = 0;
+        const gRegister expectedPopCount = (test.outBoxShift == InvalidShift) ? InvalidRowPopCount : test.popCount;
+        const gRegister expectedRowNumber = (test.outBoxShift == InvalidShift) ? InvalidRowNumber : CountCellCandidatesRowNumber;
+        asm volatile (
+            "call testCountRowCellCandidates\n\t"
+            :"=a"(outBoxShift),"=b"(inBoxShift),"=c"(minCount),"=d"(popCount),"=S"(rowNumber)::"rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
+
+        CPPUNIT_ASSERT_EQUAL(test.outBoxShift, outBoxShift);
+        CPPUNIT_ASSERT_EQUAL(test.inBoxShift, inBoxShift);
+        CPPUNIT_ASSERT_EQUAL(test.minCount, minCount);
+        CPPUNIT_ASSERT_EQUAL(expectedPopCount, popCount);
+        CPPUNIT_ASSERT_EQUAL(expectedRowNumber, rowNumber);
+    }
+
+    return;
+}
+
+void SudokuSseTest::test_CountRowCellCandidates() {
+    union RowData {
+        SudokuSseElement regVal[4];
+        xmmRegister regXmm;
+    };
+    static_assert(sizeof(RowData) == sizeof(xmmRegister), "Wrong size");
+
+    struct TestSet {
+        RowData   arg;
+        gRegister baseMinCount;
+        gRegister basePopCount;
+        gRegister outBoxShift;
+        gRegister inBoxShift;
+        gRegister minCount;
+        gRegister popCount;
+        gRegister rowNumber;
+    };
+
+    constexpr TestSet testSet[] = {
+        {{0, 0, 0, 0}, 3, InvalidRowPopCount, InvalidShift, InvalidShift, 3, InvalidRowPopCount, InvalidRowNumber},
+        {{CellSet987, CellSet987, CellSet654, 0}, 4, 62, InvalidShift, InvalidShift, 4, 62, InvalidRowNumber},
+        {{CellSet987, CellSet987, CellSet654, 0}, 4, 63, InvalidShift, InvalidShift, 4, 63, InvalidRowNumber},
+        {{CellSet987, CellSet987, CellSet654, 0}, 4, 64, 2, 0, 4, 63, CountCellCandidatesRowNumber},
+        {{CellSet987, CellSet987, CellSet654, 0}, 9, 62, 2, 0, 4, 63, CountCellCandidatesRowNumber}
+    };
+
+    for(const auto& test : testSet) {
+        gRegister outBoxShift = 0;
+        gRegister inBoxShift = 0;
+        gRegister minCount = 0;
+        gRegister popCount = 0;
+        gRegister rowNumber = 0;
+        testCountRowCellCandidatesMinCount = test.baseMinCount;
+        testCountRowCellCandidatesRowPopCount = test.basePopCount;
+        testCountRowCellCandidatesRowX = test.arg.regXmm;
+
+        asm volatile (
+            "call testCountRowCellCandidates\n\t"
+            :"=a"(outBoxShift),"=b"(inBoxShift),"=c"(minCount),"=d"(popCount),"=S"(rowNumber)::"rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
+
+        CPPUNIT_ASSERT_EQUAL(test.outBoxShift, outBoxShift);
+        CPPUNIT_ASSERT_EQUAL(test.inBoxShift, inBoxShift);
+        CPPUNIT_ASSERT_EQUAL(test.minCount, minCount);
+        CPPUNIT_ASSERT_EQUAL(test.popCount, popCount);
+        CPPUNIT_ASSERT_EQUAL(test.rowNumber, rowNumber);
+    }
+
+    return;
+}
+
+void SudokuSseTest::test_SearchNextCandidate() {
+    RowRegisterSet xmmRegSet;
+
+    for(size_t i = 0; i < arraySizeof(xmmRegSet.regVal); i+=4) {
+        xmmRegSet.regVal[i] = 0x40404;
+        xmmRegSet.regVal[i + 1] = 0x0202020;
+        xmmRegSet.regVal[i + 2] = 0x1010100;
+        xmmRegSet.regVal[i + 3] = 0;
+    }
+
+    struct TestSet {
+        gRegister outBoxShift;
+        gRegister inBoxShift;
+        gRegister rowNumber;
+    };
+
+    constexpr TestSet testSet[] = {
+        {Sudoku::SizeOfBoxesOnEdge + 1, Sudoku::SizeOfCellsOnBoxEdge + 1, Sudoku::SizeOfGroupsPerMap + 1},
+        {1, 2, 3},
+        {2, 1, 8},
+    };
+
+    size_t index = 0;
+    for(const auto& test : testSet) {
+        ++index;
+        gRegister outBoxShift = 0;
+        gRegister inBoxShift = 0;
+        gRegister rowNumber = 0;
+
+        switch(index) {
+        case 2:
+            xmmRegSet.regVal[13] = 0x3001003;
+            xmmRegSet.regVal[17] = 0x7010100;
+            break;
+        case 3:
+            xmmRegSet.regVal[13] = 0x7ffffff;
+            xmmRegSet.regVal[17] = 0x7810100;
+            xmmRegSet.regVal[34] = 0x1003100;
+            break;
+        default:
+            break;
+        }
+
+        asm volatile (
+            "movdqa  xmm1,  xmmword ptr [rsi]\n\t"
+            "movdqa  xmm2,  xmmword ptr [rsi+16]\n\t"
+            "movdqa  xmm3,  xmmword ptr [rsi+32]\n\t"
+            "movdqa  xmm4,  xmmword ptr [rsi+48]\n\t"
+            "movdqa  xmm5,  xmmword ptr [rsi+64]\n\t"
+            "movdqa  xmm6,  xmmword ptr [rsi+80]\n\t"
+            "movdqa  xmm7,  xmmword ptr [rsi+96]\n\t"
+            "movdqa  xmm8,  xmmword ptr [rsi+112]\n\t"
+            "movdqa  xmm9,  xmmword ptr [rsi+128]\n\t"
+            "push rsi\n\t"
+            "call searchNextCandidate\n\t"
+            "pop  rsi\n\t"
+            :"=a"(outBoxShift),"=b"(inBoxShift),"=c"(rowNumber):"S"(&xmmRegSet):"rdx", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
+
+        CPPUNIT_ASSERT_EQUAL(test.outBoxShift, outBoxShift);
+        CPPUNIT_ASSERT_EQUAL(test.inBoxShift, inBoxShift);
+        CPPUNIT_ASSERT_EQUAL(test.rowNumber, rowNumber);
     }
 
     return;
@@ -2040,6 +2193,8 @@ void SudokuSseTest::test_FoldRowParts() {
         CPPUNIT_ASSERT_EQUAL(test.center, actualCenter);
         CPPUNIT_ASSERT_EQUAL(test.right, actualRight);
     }
+
+    return;
 }
 
 void SudokuSseTest::test_CheckRow() {
@@ -2066,6 +2221,8 @@ void SudokuSseTest::test_CheckRow() {
             :"=a"(actual):"S"(&test.xmmReg):"r8","r9","r10","r11","r12","r13","r15");
         CPPUNIT_ASSERT_EQUAL(test.expected, actual);
     }
+
+    return;
 }
 
 void SudokuSseTest::test_CheckRowSet() {
@@ -2101,6 +2258,8 @@ void SudokuSseTest::test_CheckRowSet() {
 
         CPPUNIT_ASSERT_EQUAL(expected, actual);
     }
+
+    return;
 }
 
 void SudokuSseTest::test_CheckColumn() {
@@ -2130,6 +2289,8 @@ void SudokuSseTest::test_CheckColumn() {
 
         CPPUNIT_ASSERT_EQUAL(test.expected, actual);
     }
+
+    return;
 }
 
 void SudokuSseTest::test_CheckBox() {
@@ -2159,6 +2320,8 @@ void SudokuSseTest::test_CheckBox() {
 
         CPPUNIT_ASSERT_EQUAL(test.expected, actual);
     }
+
+    return;
 }
 
 void SudokuSseTest::test_CheckSetBox() {
@@ -2188,10 +2351,62 @@ void SudokuSseTest::test_CheckSetBox() {
 
         CPPUNIT_ASSERT_EQUAL(expected, actual);
     }
+
+    return;
 }
 
 void SudokuSseTest::test_CheckConsistency() {
+    // SudokuTestPattern::NoBacktrackString
+    constexpr RowRegisterSet originalXmmRegSet = {
+        0x0084040, 0x0101100, 0x2000210, 0x0,
+        0x2020004, 0x0802001, 0x1000408, 0x0,
+        0x0200210, 0x2008002, 0x0120020, 0x0,
+        0x0800900, 0x0400480, 0x0041040, 0x0,
+        0x1001001, 0x4000820, 0x0410002, 0x0,
+        0x0410002, 0x0200240, 0x4004004, 0x0,
+        0x4002020, 0x1010008, 0x0080801, 0x0,
+        0x0100408, 0x0060010, 0x0808080, 0x0,
+        0x0048080, 0x0084004, 0x0202100, 0x0
+    };
 
+    for(int i=0; i<4; ++i) {
+        RowRegisterSet xmmRegSet = originalXmmRegSet;
+        gRegister result = 2;
+        gRegister expected = (i == 0) ? 0 : 1;
+        switch (i) {
+        case 1:
+            xmmRegSet.regVal[0] = 0x84010;
+            break;
+        case 2:
+            xmmRegSet.regVal[34] = 0x2020800;
+            break;
+        case 3:
+            xmmRegSet.regVal[17] = 0x4000020;
+            break;
+        case 0:
+        default:
+            break;
+        }
+
+        asm volatile (
+            "movdqa  xmm1,  xmmword ptr [rsi]\n\t"
+            "movdqa  xmm2,  xmmword ptr [rsi+16]\n\t"
+            "movdqa  xmm3,  xmmword ptr [rsi+32]\n\t"
+            "movdqa  xmm4,  xmmword ptr [rsi+48]\n\t"
+            "movdqa  xmm5,  xmmword ptr [rsi+64]\n\t"
+            "movdqa  xmm6,  xmmword ptr [rsi+80]\n\t"
+            "movdqa  xmm7,  xmmword ptr [rsi+96]\n\t"
+            "movdqa  xmm8,  xmmword ptr [rsi+112]\n\t"
+            "movdqa  xmm9,  xmmword ptr [rsi+128]\n\t"
+            "push rsi\n\t"
+            "call testCheckConsistency\n\t"
+            "pop  rsi\n\t"
+            :"=a"(result):"S"(&xmmRegSet):"rdx", "rcx", "rdx", "r8", "r9", "r10");
+
+        CPPUNIT_ASSERT_EQUAL(expected, result);
+    }
+
+    return;
 }
 
 void SudokuSseTest::test_FastCollectCandidatesAtRow() {
