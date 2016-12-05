@@ -517,14 +517,6 @@ Before starting backtracking, SudokuSSE makes a copy of the sudoku map
 to rewind backtracking. The map has only primitives so we can use
 compiler-generated copying (trivial copy) and avoid object aliasing.
 
-The description show below is an older method. This may be faster than
-a method above but takes infinite time for the case at line 8 in
-_sudoku17_.
-
-Search cells top to bottom and left to right (scan horizontally) and
-select a cell that has least size (2 or more) of candidates in the
-cells.
-
 ### Algorithm to count solutions of sudoku puzzles
 
 Backtracking only. Set a cell to candidate 1 to 9 if not blank and

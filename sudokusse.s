@@ -1876,7 +1876,7 @@ testFastCollectCandidatesAtBox670:
 testFastCollectCandidatesAtBox780:
         testFastCollectCandidatesAtBox xRegRow1, 7, 8, 0
 testFastCollectCandidatesAtBox788:
-        testFastCollectCandidatesAtBox xRegRow1, 7, 8, 8
+        testFastCollectCandidatesAtBox xRegRow9, 7, 8, 8
 
 .macro FastCollectCandidatesAtColumn regSum, regWork1, columnNumber, rowNumber
         .if ((\columnNumber + 1) == candidatesNum)
