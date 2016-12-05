@@ -328,6 +328,10 @@ private:
 extern "C" {
     // パラメータ(説明はASMを参照)
     extern volatile uint64_t sudokuXmmAborted;
+    extern volatile uint64_t sudokuXmmNextCellFound;
+    extern volatile uint64_t sudokuXmmNextOutBoxShift;
+    extern volatile uint64_t sudokuXmmNextInBoxShift;
+    extern volatile uint64_t sudokuXmmNextRowNumber;
     extern volatile uint64_t sudokuXmmElementCnt;
     extern volatile uint64_t sudokuXmmPrintAllCandidate;
     extern volatile uint64_t sudokuXmmRightBottomElement;
@@ -364,7 +368,7 @@ public:
     void Preset(const std::string& presetStr);
     void Print(std::ostream* pSudokuOutStream) const;
     void FillCrossing(bool loadXmm);
-    bool SearchNext(SudokuSseCandidateCell& cell);
+    INLINE bool GetNextCell(SudokuSseCandidateCell& cell);
     INLINE bool CanSetUniqueCell(const SudokuSseCandidateCell& cell, SudokuCellCandidates candidate) const;
     INLINE void SetUniqueCell(const SudokuSseCandidateCell& cell, SudokuCellCandidates candidate);
 };

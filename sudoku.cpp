@@ -1327,26 +1327,19 @@ void SudokuSseMap::Print(std::ostream* pSudokuOutStream) const {
 }
 
 // C++版と同じ方法で次のバックトラッキング候補を見つける
-bool SudokuSseMap::SearchNext(SudokuSseCandidateCell& cell) {
-    bool result = false;
-    gRegister outBoxIndex = 0;
-    gRegister inBoxIndex = 0;
-    gRegister rowNumber = 0;
+INLINE bool SudokuSseMap::GetNextCell(SudokuSseCandidateCell& cell) {
+    const bool found = (sudokuXmmNextCellFound != 0);
 
-    Sudoku::LoadXmmRegistersFromMem(xmmRegSet_.regXmmVal_);
-
-    asm volatile (
-        "call searchNextCandidate\n\t"
-        :"=a"(outBoxIndex),"=b"(inBoxIndex),"=c"(rowNumber)::"rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
-
-    if (rowNumber < Sudoku::SizeOfCandidates) {
+    if (found) {
+        const gRegister outBoxIndex = sudokuXmmNextOutBoxShift;
+        const gRegister inBoxIndex = sudokuXmmNextInBoxShift;
+        const gRegister rowNumber = sudokuXmmNextRowNumber;
         cell.regIndex = (SudokuSseMap::InitialRegisterNum + rowNumber) * SudokuSse::RegisterWordCnt + outBoxIndex;
         cell.shift = inBoxIndex * Sudoku::SizeOfCandidates;
         cell.mask = Sudoku::AllCandidates << cell.shift;
-        result = true;
     }
 
-    return result;
+    return found;
 }
 
 // マスの候補を強制的に一つに絞れるかどうか返す
@@ -1431,7 +1424,7 @@ bool SudokuSseSolver::solve(SudokuSseMap& map, bool topLevel, bool verbose) {
 
         // 減らないので候補を決め打ちしてバックトラッキングする
         SudokuSseCandidateCell cell;
-        auto found = map.SearchNext(cell);
+        auto found = map.GetNextCell(cell);
         if (!found) {
             return false;
         }

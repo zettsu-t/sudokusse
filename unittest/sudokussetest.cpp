@@ -74,6 +74,7 @@ class SudokuSseTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST(test_CountRowCellCandidatesSub);
     CPPUNIT_TEST(test_CountRowCellCandidates);
     CPPUNIT_TEST(test_SearchNextCandidate);
+    CPPUNIT_TEST(test_SearchNextCandidateParam);
     CPPUNIT_TEST(test_FoldRowParts);
     CPPUNIT_TEST(test_CheckRow);
     CPPUNIT_TEST(test_CheckRowSet);
@@ -119,6 +120,7 @@ protected:
     void test_CountRowCellCandidatesSub();
     void test_CountRowCellCandidates();
     void test_SearchNextCandidate();
+    void test_SearchNextCandidateParam();
     void test_FoldRowParts();
     void test_CheckRow();
     void test_CheckRowSet();
@@ -131,18 +133,21 @@ protected:
     void test_FastCollectCandidatesAtColumn();
     void test_FastSetUniqueCandidatesAtCellSub();
 private:
-    void callIsPowerOf2ToFlags(gRegister& arg, gRegister& result);
-    void callPowerOf2or0(gRegister& arg, gRegister& result);
-    void callPowerOf2orAll1(gRegister& arg, gRegister& result);
-    gRegister rotateRowPart(gRegister arg);
-    void rotateRow(uint64_t row[2]);
-
     static constexpr size_t SizeOfRowSet = Sudoku::SizeOfGroupsPerMap;
     union RowRegisterSet {
         SudokuSseElement regVal[SizeOfRowSet * 4];
         xmmRegister regXmm[SizeOfRowSet];
     };
     static_assert(sizeof(RowRegisterSet) == sizeof(RowRegisterSet::regXmm), "Wrong size");
+
+    void callIsPowerOf2ToFlags(gRegister& arg, gRegister& result);
+    void callPowerOf2or0(gRegister& arg, gRegister& result);
+    void callPowerOf2orAll1(gRegister& arg, gRegister& result);
+    gRegister rotateRowPart(gRegister arg);
+    void rotateRow(uint64_t row[2]);
+    void checkSearchNextCandidate(XmmRegisterSet& xmmRegSet, gRegister expectedFound,
+                                  gRegister expectedOutBoxShift, gRegister expectedInBoxShift,
+                                  gRegister expectedRowNumber);
 
     // 111111111 111111110 111111100
     // 111 1111 1111 1111 1101 1111 1100
@@ -2105,20 +2110,22 @@ void SudokuSseTest::test_SearchNextCandidate() {
     }
 
     struct TestSet {
+        gRegister found;
         gRegister outBoxShift;
         gRegister inBoxShift;
         gRegister rowNumber;
     };
 
     constexpr TestSet testSet[] = {
-        {Sudoku::SizeOfBoxesOnEdge + 1, Sudoku::SizeOfCellsOnBoxEdge + 1, Sudoku::SizeOfGroupsPerMap + 1},
-        {1, 2, 3},
-        {2, 1, 8},
+        {false, Sudoku::SizeOfBoxesOnEdge + 1, Sudoku::SizeOfCellsOnBoxEdge + 1, Sudoku::SizeOfGroupsPerMap + 1},
+        {true, 1, 2, 3},
+        {true, 2, 1, 8},
     };
 
     size_t index = 0;
     for(const auto& test : testSet) {
         ++index;
+        gRegister found = 0;
         gRegister outBoxShift = 0;
         gRegister inBoxShift = 0;
         gRegister rowNumber = 0;
@@ -2148,14 +2155,109 @@ void SudokuSseTest::test_SearchNextCandidate() {
             "movdqa  xmm8,  xmmword ptr [rsi+112]\n\t"
             "movdqa  xmm9,  xmmword ptr [rsi+128]\n\t"
             "push rsi\n\t"
-            "call searchNextCandidate\n\t"
+            "call testSearchNextCandidate\n\t"
             "pop  rsi\n\t"
-            :"=a"(outBoxShift),"=b"(inBoxShift),"=c"(rowNumber):"S"(&xmmRegSet):"rdx", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
+            :"=a"(outBoxShift),"=b"(inBoxShift),"=c"(rowNumber),"=d"(found):"S"(&xmmRegSet):"rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
 
+        CPPUNIT_ASSERT_EQUAL(test.found, found);
         CPPUNIT_ASSERT_EQUAL(test.outBoxShift, outBoxShift);
         CPPUNIT_ASSERT_EQUAL(test.inBoxShift, inBoxShift);
         CPPUNIT_ASSERT_EQUAL(test.rowNumber, rowNumber);
+
+        const auto actualFound = sudokuXmmNextCellFound;
+        const auto actualOutBoxShift = sudokuXmmNextOutBoxShift;
+        const auto actualInBoxShift = sudokuXmmNextInBoxShift;
+        const auto actualRowNumber = sudokuXmmNextRowNumber;
+
+        CPPUNIT_ASSERT_EQUAL(test.found, actualFound);
+        CPPUNIT_ASSERT_EQUAL(test.outBoxShift, actualOutBoxShift);
+        CPPUNIT_ASSERT_EQUAL(test.inBoxShift, actualInBoxShift);
+        CPPUNIT_ASSERT_EQUAL(test.rowNumber, actualRowNumber);
     }
+
+    return;
+}
+
+void SudokuSseTest::checkSearchNextCandidate(XmmRegisterSet& xmmRegSet,
+                                             gRegister expectedFound, gRegister expectedOutBoxShift,
+                                             gRegister expectedInBoxShift, gRegister expectedRowNumber) {
+    asm volatile (
+        "movdqa  xmm1,  xmmword ptr [rsi]\n\t"
+        "movdqa  xmm2,  xmmword ptr [rsi+16]\n\t"
+        "movdqa  xmm3,  xmmword ptr [rsi+32]\n\t"
+        "movdqa  xmm4,  xmmword ptr [rsi+48]\n\t"
+        "movdqa  xmm5,  xmmword ptr [rsi+64]\n\t"
+        "movdqa  xmm6,  xmmword ptr [rsi+80]\n\t"
+        "movdqa  xmm7,  xmmword ptr [rsi+96]\n\t"
+        "movdqa  xmm8,  xmmword ptr [rsi+112]\n\t"
+        "movdqa  xmm9,  xmmword ptr [rsi+128]\n\t"
+        "push rsi\n\t"
+        "call testSearchNextCandidate\n\t"
+        "pop  rsi\n\t"
+        ::"S"(&xmmRegSet):"rax", "rbx", "rcx", "rdx", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
+
+    const auto actualFound = sudokuXmmNextCellFound;
+    const auto actualOutBoxShift = sudokuXmmNextOutBoxShift;
+    const auto actualInBoxShift = sudokuXmmNextInBoxShift;
+    const auto actualRowNumber = sudokuXmmNextRowNumber;
+
+    CPPUNIT_ASSERT_EQUAL(expectedFound, actualFound);
+    if (expectedFound) {
+        CPPUNIT_ASSERT_EQUAL(expectedOutBoxShift, actualOutBoxShift);
+        CPPUNIT_ASSERT_EQUAL(expectedInBoxShift, actualInBoxShift);
+        CPPUNIT_ASSERT_EQUAL(expectedRowNumber, actualRowNumber);
+    }
+
+    return;
+}
+
+void SudokuSseTest::test_SearchNextCandidateParam() {
+    XmmRegisterSet xmmRegSet;
+
+    // 全マス空
+    ::memset(&xmmRegSet, 0, sizeof(xmmRegSet));
+    checkSearchNextCandidate(xmmRegSet, false, 0, 0, 0);
+
+    // 全マス一候補
+    SudokuTest::SetAllCellsFilled(0, xmmRegSet);
+    checkSearchNextCandidate(xmmRegSet, false, 0, 0, 0);
+
+    // 全マス全候補
+    SudokuTest::SetAllCellsFullCandidates(0, xmmRegSet);
+    checkSearchNextCandidate(xmmRegSet, true, 2, 2, 0);
+
+    // 最後の列の最後の箱に8候補
+    size_t rowNumber = Sudoku::SizeOfGroupsPerMap - 1;
+    size_t regIndex = rowNumber * SudokuSse::RegisterWordCnt + 2;
+    xmmRegSet.regVal_[regIndex] = Sudoku::AllThreeCandidates ^ 1;
+    checkSearchNextCandidate(xmmRegSet, true, 2, 0, rowNumber);
+
+    // 四番目にも8候補
+    rowNumber = 0;
+    regIndex = 1;
+    xmmRegSet.regVal_[regIndex] = Sudoku::AllThreeCandidates ^ (1 << (Sudoku::SizeOfCandidates * 2));
+    checkSearchNextCandidate(xmmRegSet, true, 1, 2, rowNumber);
+
+    // 二番目にも8候補
+    rowNumber = 0;
+    regIndex = 2;
+    xmmRegSet.regVal_[regIndex] = Sudoku::AllThreeCandidates ^ (1 << Sudoku::SizeOfCandidates);
+    checkSearchNextCandidate(xmmRegSet, true, 2, 1, rowNumber);
+
+    // 右下に2候補のマスが二つある。3*3マスの総候補が少ないので選ばれる。
+    rowNumber = 7;
+    regIndex = rowNumber * SudokuSse::RegisterWordCnt;
+    xmmRegSet.regVal_[regIndex] = Sudoku::AllThreeCandidates ^ (0x1d7 << Sudoku::SizeOfCandidates);
+    checkSearchNextCandidate(xmmRegSet, true, 0, 1, rowNumber);
+
+    // 真ん中に候補のないマスがあるがこれは関係ない
+    regIndex = 4 * SudokuSse::RegisterWordCnt + 1;
+    xmmRegSet.regVal_[regIndex] = Sudoku::AllThreeCandidates ^ (Sudoku::AllCandidates << Sudoku::SizeOfCandidates);
+    checkSearchNextCandidate(xmmRegSet, true, 0, 1, rowNumber);
+
+    // 真ん中に確定したマスがあるがこれは関係ない
+    xmmRegSet.regVal_[regIndex] = Sudoku::AllThreeCandidates ^ (0x100 << Sudoku::SizeOfCandidates);
+    checkSearchNextCandidate(xmmRegSet, true, 0, 1, rowNumber);
 
     return;
 }

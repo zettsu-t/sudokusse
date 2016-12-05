@@ -22,6 +22,10 @@
 
         # 本体コード
         .global sudokuXmmAborted
+        .global sudokuXmmNextCellFound
+        .global sudokuXmmNextOutBoxShift
+        .global sudokuXmmNextInBoxShift
+        .global sudokuXmmNextRowNumber
         .global sudokuXmmElementCnt
         .global sudokuXmmPrintAllCandidate
         .global sudokuXmmRightBottomElement
@@ -65,6 +69,10 @@
 # 本体コード
 .set  sudokuMaxLoopcnt,         81         # ループの上限回数
 sudokuXmmAborted:               .quad 0    # マスの矛盾を発見した(これ以上進められない)とき非0
+sudokuXmmNextCellFound:         .quad 0    # バックトラッキングのために決め打ちするマスを選んだ
+sudokuXmmNextOutBoxShift:       .quad 0    # バックトラッキングで決め打ちするマスが、行におけるどの箱か
+sudokuXmmNextInBoxShift:        .quad 0    # バックトラッキングで決め打ちするマスが、箱の中のどれか
+sudokuXmmNextRowNumber:         .quad 0    # バックトラッキングで決め打ちするマスがある行(0..8)
 sudokuXmmElementCnt:            .quad 0    # 埋まった(候補が一意になった)マスの数(0..81)
 sudokuXmmPrintAllCandidate:     .quad 0    # 非0なら候補をすべて表示する
 sudokuXmmRightBottomElement:    .quad 0    # 右下の初期値
@@ -148,8 +156,10 @@ testCountRowCellCandidatesRowX:               .quad 0, 0
 .set    numberOfColumns,    9  # 列の数
 .set    candidatesInRowPart,      3    # バックトラッキング候補を探すときの3マス
 .set    rowPartNum,               3    # バックトラッキング候補を探すときの行にある3マスの数
-.set    inBoxIndexInvalid, (candidatesInRowPart + 1)
+.set    inBoxIndexInvalid,  (candidatesInRowPart + 1)
 .set    outBoxIndexInvalid, (rowPartNum + 1)
+.set    rowNumberInvalid,   (numberOfRows + 1)
+.set    nextCellFound, 1
 .set    minCandidatesNumToSearch, 2    # バックトラッキング候補を探すときの最低要素数
 .set    uniqueCandidatesToSearch, 1    # バックトラッキング候補の最初
 .set    elementBitMask, 0x1ff          # 3x3箱の一要素のビットマスク
@@ -1425,7 +1435,7 @@ testCountRowCellCandidates:
 .macro CountRowSetCell xRegRowNumber, regOutBoxShift, regInBoxShift, regWork1, regWork2, regWork3, regWork4, regWork5, regWork6, regWork7, regWork8, regWork9, regWork10, regWork11
         mov  \regOutBoxShift, outBoxIndexInvalid
         mov  \regInBoxShift, inBoxIndexInvalid
-        mov  \regWork1, (numberOfRows + 1)
+        mov  \regWork1, rowNumberInvalid
         MacroPinsrq \xRegRowNumber, \regWork1, 0
         mov  \regWork1, candidatesTooMany
         xor  \regWork2, \regWork2
@@ -1442,11 +1452,23 @@ testCountRowCellCandidates:
 302:
 .endm
 
-        .global searchNextCandidate
-searchNextCandidate:
-        InitMaskRegister
+.macro SearchNextCandidate
         CountRowSetCell xRegWork1, rax, rbx, rcx, rdx, rsi, rdi, r8, r9, r10, r11, r12, r13, r14
         MacroPextrq  rcx, xRegWork1, 0
+        mov  r8, nextCellFound
+        xor  rdx, rdx
+        cmp  rcx, rowNumberInvalid
+        cmovnz  rdx, r8
+        mov  qword ptr [rip + sudokuXmmNextCellFound], rdx
+        mov  qword ptr [rip + sudokuXmmNextOutBoxShift], rax
+        mov  qword ptr [rip + sudokuXmmNextInBoxShift], rbx
+        mov  qword ptr [rip + sudokuXmmNextRowNumber], rcx
+.endm
+
+        .global testSearchNextCandidate
+testSearchNextCandidate:
+        InitMaskRegister
+        SearchNextCandidate
         ret
 
         .global testFoldRowParts
@@ -1474,7 +1496,7 @@ testFoldRowParts:
         FoldRowParts  xRegRow1, rax, rbx, rcx, r8, r9
         ret
 
-# 列に一つずつ候補があるかどうか調べて、結果を返す
+# 列にすべての候補があるかどうか調べて、結果を返す
 # そうであればregResultは不変、そうでなければregInvalidを設定する
 .macro CheckRow xRegRow, regResult, regInvalid, regWork1, regWork2, regWork3, regWork4, regWork5
         FoldRowParts \xRegRow, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5
@@ -1599,6 +1621,7 @@ testCheckConsistency:
 solveSudokuAsm:
         mov    gRegBitMask, elementBitMask
         xorps  xLoopPopCnt, xLoopPopCnt
+        mov    qword ptr [rip + sudokuXmmNextCellFound], 0
 
         # データ構造
         # xmmレジスタ = | 32bit:all 0 | 32bit:1行1..3列 | 同4..6列 | 同7..9列 |
@@ -1630,9 +1653,15 @@ loopFilling:
 
 exitFilling:
         .set    regResult, r9
+        mov     qword ptr [rip + sudokuXmmElementCnt], regCurrentPopcnt
         CheckConsistency regResult, r10, r11, r12, rbx, rcx, rdx, ebx, ecx, edx
         mov     qword ptr [rip + sudokuXmmAborted], regResult
-        mov     qword ptr [rip + sudokuXmmElementCnt], regCurrentPopcnt
+        cmp     regCurrentPopcnt, regMaxPopcnt
+        jz      exitFillingCells
+
+        # 全マス埋まっていないときは、バックトラッキングのために決め打ちするマスを選ぶ
+        SearchNextCandidate
+exitFillingCells:
         ret
 
 abortFilling:

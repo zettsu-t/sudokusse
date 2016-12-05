@@ -11,6 +11,32 @@
 #include "sudoku.h"
 #include "sudokutest.h"
 
+namespace SudokuTest {
+    void SetAllCellsFilled(size_t initialRegisterNum, XmmRegisterSet& xmmRegSet) {
+        for(size_t i = initialRegisterNum;
+            i < (initialRegisterNum + Sudoku::SizeOfGroupsPerMap); ++i) {
+            xmmRegSet.regVal_[i * SudokuSse::RegisterWordCnt] = 0x40404;
+            xmmRegSet.regVal_[i * SudokuSse::RegisterWordCnt + 1] = 0x0202020;
+            xmmRegSet.regVal_[i * SudokuSse::RegisterWordCnt + 2] = 0x1010100;
+            xmmRegSet.regVal_[i * SudokuSse::RegisterWordCnt + 3] = 0;
+        }
+
+        return;
+    }
+
+    void SetAllCellsFullCandidates(size_t initialRegisterNum, XmmRegisterSet& xmmRegSet) {
+        for(size_t i = initialRegisterNum;
+            i < (initialRegisterNum + Sudoku::SizeOfGroupsPerMap); ++i) {
+            for(size_t j = 0; j < (SudokuSse::RegisterWordCnt - 1); ++j) {
+                xmmRegSet.regVal_[i * SudokuSse::RegisterWordCnt + j] = Sudoku::AllThreeCandidates;
+            }
+            xmmRegSet.regVal_[(i + 1) * SudokuSse::RegisterWordCnt - 1] = 0;
+        }
+
+        return;
+    }
+}
+
 class SudokuMapTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST_SUITE(SudokuMapTest);
     CPPUNIT_TEST(test_Preset);
@@ -64,7 +90,7 @@ class SudokuSseMapTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST(test_Preset);
     CPPUNIT_TEST(test_Print);
     CPPUNIT_TEST(test_FillCrossing);
-    CPPUNIT_TEST(test_SearchNext);
+    CPPUNIT_TEST(test_GetNextCell);
     CPPUNIT_TEST(test_CanSetUniqueCell);
     CPPUNIT_TEST(test_SetUniqueCell);
     CPPUNIT_TEST_SUITE_END();
@@ -77,7 +103,7 @@ protected:
     void test_Preset();
     void test_Print();
     void test_FillCrossing();
-    void test_SearchNext();
+    void test_GetNextCell();
     void test_CanSetUniqueCell();
     void test_SetUniqueCell();
 
@@ -543,7 +569,7 @@ void SudokuMapTest::test_findUnusedCandidate() {
     CPPUNIT_ASSERT_EQUAL(expected, pInstance_->cells_[target].candidates_);
 
     // 合成
-    struct TestSet{
+    struct TestSet {
         SudokuIndex cellPosition;
         SudokuIndex candidateIndex;
     };
@@ -670,26 +696,12 @@ void SudokuSseMapTest::checkConstructor(void) {
 }
 
 void SudokuSseMapTest::setAllCellsFilled(void) {
-    for(size_t i = SudokuSseMap::InitialRegisterNum;
-        i < (SudokuSseMap::InitialRegisterNum + Sudoku::SizeOfGroupsPerMap); ++i) {
-        pInstance_->xmmRegSet_.regVal_[i * SudokuSse::RegisterWordCnt] = 0x40404;
-        pInstance_->xmmRegSet_.regVal_[i * SudokuSse::RegisterWordCnt + 1] = 0x0202020;
-        pInstance_->xmmRegSet_.regVal_[i * SudokuSse::RegisterWordCnt + 2] = 0x1010100;
-        pInstance_->xmmRegSet_.regVal_[i * SudokuSse::RegisterWordCnt + 3] = 0;
-    }
-
+    SudokuTest::SetAllCellsFilled(SudokuSseMap::InitialRegisterNum, pInstance_->xmmRegSet_);
     return;
 }
 
 void SudokuSseMapTest::setAllCellsFullCandidates(void) {
-    for(size_t i = SudokuSseMap::InitialRegisterNum;
-        i < (SudokuSseMap::InitialRegisterNum + Sudoku::SizeOfGroupsPerMap); ++i) {
-        for(size_t j = 0; j < (SudokuSse::RegisterWordCnt - 1); ++j) {
-            pInstance_->xmmRegSet_.regVal_[i * SudokuSse::RegisterWordCnt + j] = Sudoku::AllThreeCandidates;
-        }
-        pInstance_->xmmRegSet_.regVal_[(i + 1) * SudokuSse::RegisterWordCnt - 1] = 0;
-    }
-
+    SudokuTest::SetAllCellsFullCandidates(SudokuSseMap::InitialRegisterNum, pInstance_->xmmRegSet_);
     return;
 }
 
@@ -755,62 +767,37 @@ void SudokuSseMapTest::test_Print() {
 
 void SudokuSseMapTest::test_FillCrossing() {}
 
-void SudokuSseMapTest::test_SearchNext() {
-    const SudokuSseCandidateCell emptyCell = {SudokuSseMap::InitialRegisterNum * SudokuSse::RegisterWordCnt, 0, 0};
+void SudokuSseMapTest::test_GetNextCell() {
+    struct TestSet {
+        bool      found;
+        gRegister outBoxIndex;
+        gRegister inBoxIndex;
+        gRegister rowNumber;
+        size_t           expectedRegIndex;
+        SudokuSseElement expectedShift;
+    };
 
-    // 全マス空
-    SudokuSseCandidateCell cell = emptyCell;
-    ::memset(&pInstance_->xmmRegSet_, 0, sizeof(pInstance_->xmmRegSet_));
-    CPPUNIT_ASSERT_EQUAL(false, pInstance_->SearchNext(cell));
+    constexpr TestSet testSet[] = {
+        {false, 0xffff, 0xffff, 0xffff, 0, 0},
+        {true, 1, 0, 0, SudokuSseMap::InitialRegisterNum * SudokuSse::RegisterWordCnt + 1, 0},
+        {true, 0, 1, 0, SudokuSseMap::InitialRegisterNum * SudokuSse::RegisterWordCnt, 1},
+        {true, 0, 0, 1, (SudokuSseMap::InitialRegisterNum + 1) * SudokuSse::RegisterWordCnt, 0},
+        {true, 1, 2, 7, (SudokuSseMap::InitialRegisterNum + 7) * SudokuSse::RegisterWordCnt + 1, 2},
+        {true, 2, 1, 8, (SudokuSseMap::InitialRegisterNum + 8) * SudokuSse::RegisterWordCnt + 2, 1},
+    };
 
-    // 全マス一候補
-    cell = emptyCell;
-    setAllCellsFilled();
-    CPPUNIT_ASSERT_EQUAL(false, pInstance_->SearchNext(cell));
+    for(const auto& test : testSet) {
+        sudokuXmmNextCellFound = (test.found) ?  1 : 0;
+        sudokuXmmNextOutBoxShift = test.outBoxIndex;
+        sudokuXmmNextInBoxShift = test.inBoxIndex;
+        sudokuXmmNextRowNumber = test.rowNumber;
 
-    // 全マス全候補
-    cell = emptyCell;
-    setAllCellsFullCandidates();
-    CPPUNIT_ASSERT_EQUAL(true, pInstance_->SearchNext(cell));
-    checkCandidateCell(cell, SudokuSseMap::InitialRegisterNum * SudokuSse::RegisterWordCnt + 2, 2);
-
-    // 最後に8候補
-    cell = emptyCell;
-    size_t regIndex = (SudokuSseMap::InitialRegisterNum + Sudoku::SizeOfGroupsPerMap) * + 2;
-    pInstance_->xmmRegSet_.regVal_[regIndex] = Sudoku::AllThreeCandidates ^ 1;
-    CPPUNIT_ASSERT_EQUAL(true, pInstance_->SearchNext(cell));
-    checkCandidateCell(cell, regIndex, 0);
-
-    // 二番目にも8候補
-    cell = emptyCell;
-    regIndex = SudokuSseMap::InitialRegisterNum * SudokuSse::RegisterWordCnt + 2;
-    pInstance_->xmmRegSet_.regVal_[regIndex] = Sudoku::AllThreeCandidates ^ (1 << Sudoku::SizeOfCandidates);
-    CPPUNIT_ASSERT_EQUAL(true, pInstance_->SearchNext(cell));
-    checkCandidateCell(cell, regIndex, 1);
-
-    // 右下に2候補のマスが二つある。3*3マスの総候補が少ないので選ばれる。
-    cell = emptyCell;
-    regIndex = (SudokuSseMap::InitialRegisterNum + 7) * SudokuSse::RegisterWordCnt;
-    pInstance_->xmmRegSet_.regVal_[regIndex] = Sudoku::AllThreeCandidates ^ (0x1d7 << Sudoku::SizeOfCandidates);
-    CPPUNIT_ASSERT_EQUAL(true, pInstance_->SearchNext(cell));
-    auto expectedRegIndex = regIndex;
-    decltype(SudokuSseCandidateCell::shift) inBoxShift = 1;
-    checkCandidateCell(cell, expectedRegIndex, inBoxShift);
-
-    // 真ん中に候補のないマスがあるがこれは関係ない
-    cell = emptyCell;
-    regIndex = (SudokuSseMap::InitialRegisterNum + 4) * SudokuSse::RegisterWordCnt + 1;
-    pInstance_->xmmRegSet_.regVal_[regIndex] = Sudoku::AllThreeCandidates ^ (Sudoku::AllCandidates << Sudoku::SizeOfCandidates);
-    CPPUNIT_ASSERT_EQUAL(true, pInstance_->SearchNext(cell));
-    checkCandidateCell(cell, expectedRegIndex, inBoxShift);
-
-    // 真ん中に確定したマスがあるがこれは関係ない
-    cell = emptyCell;
-    pInstance_->xmmRegSet_.regVal_[regIndex] = Sudoku::AllThreeCandidates ^ (0x100 << Sudoku::SizeOfCandidates);
-    CPPUNIT_ASSERT_EQUAL(true, pInstance_->SearchNext(cell));
-    checkCandidateCell(cell, expectedRegIndex, inBoxShift);
-
-    return;
+        SudokuSseCandidateCell cell = {0, 0, 0};
+        CPPUNIT_ASSERT_EQUAL(test.found, pInstance_->GetNextCell(cell));
+        if (test.found) {
+            checkCandidateCell(cell, test.expectedRegIndex, test.expectedShift);
+        }
+    }
 }
 
 void SudokuSseMapTest::test_CanSetUniqueCell() {

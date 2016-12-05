@@ -152,6 +152,11 @@ private:
     static SudokuCellCandidates convertToCandidate(SudokuIndex index);
 };
 
+namespace SudokuTest {
+    extern void SetAllCellsFilled(size_t initialRegisterNum, XmmRegisterSet& xmmRegSet);
+    extern void SetAllCellsFullCandidates(size_t initialRegisterNum, XmmRegisterSet& xmmRegSet);
+}
+
 /*
 Local Variables:
 mode: c++
