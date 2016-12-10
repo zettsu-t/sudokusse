@@ -46,6 +46,7 @@ constexpr size_t arraySizeof(const T (&)[n]) {
 namespace SudokuOption {
     const char * const CommandLineArgSseSolver[] = {"1", "sse", "avx"};
     const char * const CommandLineNoChecking[] = {"1", "off"};
+    const char * const CommandLinePrint[] = {"2", "print"};
     // コマンドラインで指定した値が用意したものに一致したら値を設定する
     template <typename T, size_t n>
     void setMode(int argc, const char * const argv[], int argIndex, const char * const (&pOptionSet)[n], T& target, T value) {
@@ -138,6 +139,12 @@ enum class SudokuSolverType {
 enum class SudokuSolverCheck {
     CHECK,         // 結果を検査する
     DO_NOT_CHECK,  // 結果を検査しない
+};
+
+// 複数の問題を解くときに、結果を表示するかどうか
+enum class SudokuSolverPrint {
+    DO_NOT_PRINT,  // 結果を表示しない
+    PRINT,         // 結果を表示する
 };
 
 // 解法(共通)
@@ -433,13 +440,15 @@ class SudokuChecker {
     // ユニットテスト
     friend class SudokuCheckerTest;
 public:
-    SudokuChecker(const std::string& solution, std::ostream* pSudokuOutStream);
+    SudokuChecker(const std::string& puzzle, const std::string& solution, SudokuSolverPrint printSolution, std::ostream* pSudokuOutStream);
     virtual ~SudokuChecker() = default;
-    bool valid() const;  // 解が正しければtrue
+    bool Valid() const;  // 解が正しければtrue
 private:
     using Group = std::vector<SudokuNumber>;
     using Grid = std::vector<Group>;
-    bool parse(const std::string& solution, std::ostream* pSudokuOutStream);
+    bool parse(const std::string& puzzle, const std::string& solution, SudokuSolverPrint printSolution, std::ostream* pSudokuOutStream);
+    bool parseRow(SudokuIndex row, const std::string& rowLine, Grid& grid, std::string& solutionLine);
+    bool compare(const std::string& puzzle, const std::string& solution, std::ostream* pSudokuOutStream);
     bool check(const Grid& grid, std::ostream* pSudokuOutStream);
     bool checkRowSet(const Grid& grid, std::ostream* pSudokuOutStream);
     bool checkColumnSet(const Grid& grid, std::ostream* pSudokuOutStream);
@@ -475,7 +484,8 @@ private:
     std::string sudokuStr_; // 初期マップの文字列
     std::string multiLineFilename_;  // 各行に数独パズルを書いたファイル名
     SudokuSolverType  solverType_;   // 各行に数独パズルを書いたファイルを解く方法
-    SudokuSolverCheck check_;        // 各行に数独パズルを書いたファイルを解く方法
+    SudokuSolverCheck check_;        // 解いた結果を検査するかどうか
+    SudokuSolverPrint print_;        // 複数の問題を解くときに、結果を表示するかどうか
     bool   isBenchmark_;    // ベンチマークかどうか
     bool   verbose_;        // 解く過程を示すかどうか
     int    measureCount_;   // 測定回数

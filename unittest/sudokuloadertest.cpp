@@ -15,6 +15,8 @@
 class SudokuCheckerTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST_SUITE(SudokuCheckerTest);
     CPPUNIT_TEST(test_parse);
+    CPPUNIT_TEST(test_parseRow);
+    CPPUNIT_TEST(test_compare);
     CPPUNIT_TEST(test_checkRowSet);
     CPPUNIT_TEST(test_checkColumnSet);
     CPPUNIT_TEST(test_checkBoxSet);
@@ -26,12 +28,31 @@ public:
     void tearDown() override;
 protected:
     void test_parse();
+    void test_parseRow();
+    void test_compare();
     void test_checkRowSet();
     void test_checkColumnSet();
     void test_checkBoxSet();
     void test_checkUnique();
+
     SudokuChecker::Grid grid_;
+    static const SudokuSolverPrint solutionPrint_ = SudokuSolverPrint::DO_NOT_PRINT;
+    static const std::string puzzle_;
+    static const std::string solutionOneLine_;
+    static const std::string solutionLineSet_;
+    static const std::string solutionMissingLine_;
+    static const std::string solutionMultiCandidates_;
+    static const std::string solutionOverwritten_;
+    static const std::string solutionWrong_;
 };
+
+const std::string SudokuCheckerTest::puzzle_          = "123456780456789120789123450295874630314265890678391240531642970862937510947518360";
+const std::string SudokuCheckerTest::solutionOneLine_ = "123456789456789123789123456295874631314265897678391245531642978862937514947518362";
+const std::string SudokuCheckerTest::solutionLineSet_         = "1:2:3:4:5:6:7:8:9\n4:5:6:7:8:9:1:2:3\n7:8:9:1:2:3:4:5:6\n2:9:5:8:7:4:6:3:1\n3:1:4:2:6:5:8:9:7\n6:7:8:3:9:1:2:4:5\n5:3:1:6:4:2:9:7:8\n8:6:2:9:3:7:5:1:4\n9:4:7:5:1:8:3:6:2\n";
+const std::string SudokuCheckerTest::solutionMissingLine_     = "1:2:3:4:5:6:7:8:9\n4:5:6:7:8:9:1:2:3\n7:8:9:1:2:3:4:5:6\n2:9:5:8:7:4:6:3:1\n3:1:4:2:6:5:8:9:7\n6:7:8:3:9:1:2:4:5\n5:3:1:6:4:2:9:7:8\n8:6:2:9:3:7:5:1:4\n";
+const std::string SudokuCheckerTest::solutionMultiCandidates_ = "1:234:4:5:6:7:8:9\n4:5:6:7:8:9:1:2:3\n7:8:9:1:2:3:4:5:6\n2:9:5:8:7:4:6:3:1\n3:1:4:2:6:5:8:9:7\n6:7:8:3:9:1:2:4:5\n5:3:1:6:4:2:9:7:8\n8:6:2:9:3:7:5:1:4\n9:4:7:5:1:8:3:6:2\n";
+const std::string SudokuCheckerTest::solutionOverwritten_     = "1:2:3:4:5:6:7:8:9\n4:5:6:7:8:9:1:2:3\n7:8:9:1:2:3:4:5:6\n2:9:5:8:7:4:6:3:1\n3:1:4:2:6:5:8:9:7\n6:7:8:3:9:1:2:4:5\n5:3:1:6:4:2:9:7:8\n8:6:2:9:3:7:5:1:4\n9:4:7:5:1:8:3:7:2\n";
+const std::string SudokuCheckerTest::solutionWrong_           = "1:2:3:4:5:6:7:8:9\n4:5:6:7:8:9:1:2:3\n7:8:9:1:2:3:4:5:6\n2:9:5:8:7:4:6:3:1\n3:1:4:2:6:5:8:9:7\n6:7:8:3:9:1:2:4:5\n5:3:1:6:4:2:9:7:8\n8:6:2:9:3:7:5:1:4\n9:4:7:5:1:8:3:6:7\n";
 
 CPPUNIT_TEST_SUITE_REGISTRATION(SudokuCheckerTest);
 
@@ -55,58 +76,168 @@ void SudokuCheckerTest::tearDown() {
 }
 
 void SudokuCheckerTest::test_parse() {
-    const std::string solution = "1:2:3:4:5:6:7:8:9\n4:5:6:7:8:9:1:2:3\n7:8:9:1:2:3:4:5:6\n2:9:5:8:7:4:6:3:1\n3:1:4:2:6:5:8:9:7\n6:7:8:3:9:1:2:4:5\n5:3:1:6:4:2:9:7:8\n8:6:2:9:3:7:5:1:4\n9:4:7:5:1:8:3:6:2\n";
+    constexpr SudokuSolverPrint printSet[] = {SudokuSolverPrint::DO_NOT_PRINT, SudokuSolverPrint::PRINT};
+
+    for(auto solutionPrint : printSet) {
+        SudokuOutStream os;
+        SudokuChecker checker(puzzle_, solutionLineSet_, solutionPrint, &os);
+        CPPUNIT_ASSERT_EQUAL(true, checker.Valid());
+
+        const std::string expected = (solutionPrint == SudokuSolverPrint::DO_NOT_PRINT) ? "" : (solutionOneLine_ + "\n");
+        CPPUNIT_ASSERT_EQUAL(expected, os.str());
+
+        SudokuChecker checkerNull(puzzle_, solutionLineSet_, solutionPrint, nullptr);
+        CPPUNIT_ASSERT_EQUAL(true, checkerNull.Valid());
+
+        auto len = solutionLineSet_.size();
+        for(decltype(len) i = 0; i < len; ++i) {
+            auto solution = solutionLineSet_;
+            auto c = solution.at(i);
+            if (!::isdigit(c)) {
+                continue;
+            }
+
+            solution.at(i) = (c == solution.at(0)) ? solution.at(2) : solution.at(0);
+            SudokuOutStream os;
+            SudokuChecker checker(puzzle_, solution, solutionPrint, &os);
+            CPPUNIT_ASSERT_EQUAL(false, checker.Valid());
+            CPPUNIT_ASSERT_EQUAL(false, os.str().empty());
+
+            SudokuChecker checkerNull(puzzle_, solution, solutionPrint, nullptr);
+            CPPUNIT_ASSERT_EQUAL(false, checkerNull.Valid());
+        }
+    }
+
+    struct Test {
+        std::string line;
+        std::string expected;
+    };
+
+    const Test testSet[] = {
+        {solutionMissingLine_, "Invalid cell arrangement\n"},
+        {solutionMultiCandidates_, "Invalid cell arrangement\n"},
+        {solutionOverwritten_, "Cell 79 overwritten\n"},
+        {solutionWrong_, "Error in row 9\n"}
+    };
+
+    for(auto& test : testSet) {
+        SudokuOutStream os;
+        SudokuChecker checker(puzzle_, test.line, solutionPrint_, &os);
+        CPPUNIT_ASSERT_EQUAL(false, checker.Valid());
+        CPPUNIT_ASSERT_EQUAL(test.expected, os.str());
+    }
+}
+
+void SudokuCheckerTest::test_parseRow() {
+    for(SudokuIndex row = 0; row < Sudoku::SizeOfCellsPerGroup; ++row) {
+        std::string rowLine = "9:8:7:6:5:4:3:2:1";
+        switch (row % 4) {
+        case 1:
+            rowLine += ":";
+            break;
+        case 2:
+            rowLine += "\n";
+            break;
+        case 3:
+            rowLine += ":\n";
+            break;
+        default:
+            break;
+        }
+
+        SudokuChecker::Grid grid = grid_;
+        std::string solutionLine;
+        std::string expected = "987654321";
+        SudokuChecker checkerParseRow("", "", solutionPrint_, nullptr);
+
+        CPPUNIT_ASSERT_EQUAL(true, checkerParseRow.parseRow(row, rowLine, grid, solutionLine));
+        CPPUNIT_ASSERT_EQUAL(expected, solutionLine);
+
+        for(SudokuIndex column = 0; column < Sudoku::SizeOfCellsPerGroup; ++column) {
+            SudokuNumber num = Sudoku::SizeOfCellsPerGroup - column;
+            CPPUNIT_ASSERT_EQUAL(num, grid.at(row).at(column));
+        }
+    }
+
+    std::vector<std::string> rowLineSet = {"", "1:2:3:4:5:6:7:89\n", "1:2:3:4:5:6:7:8:89",
+                                           "1:2:3:4:5:6:7:789", "1:::3:4:5:6:7:8:9\n"};
+    for(auto rowLine : rowLineSet) {
+        SudokuChecker checkerParseRow("", "", solutionPrint_, nullptr);
+        SudokuChecker::Grid grid = grid_;
+        std::string solutionLine;
+        CPPUNIT_ASSERT_EQUAL(false, checkerParseRow.parseRow(0, rowLine, grid, solutionLine));
+
+        SudokuChecker checker(puzzle_, rowLine, solutionPrint_, nullptr);
+        CPPUNIT_ASSERT_EQUAL(false, checker.Valid());
+    }
+}
+
+void SudokuCheckerTest::test_compare() {
     SudokuOutStream os;
-    SudokuChecker checker(solution, &os);
-    CPPUNIT_ASSERT_EQUAL(true, checker.valid());
+    SudokuChecker checker("", "", solutionPrint_, nullptr);
+    CPPUNIT_ASSERT_EQUAL(true, checker.compare(puzzle_, solutionOneLine_, &os));
     CPPUNIT_ASSERT_EQUAL(true, os.str().empty());
 
-    SudokuChecker checkerNull(solution, nullptr);
-    CPPUNIT_ASSERT_EQUAL(true, checkerNull.valid());
+    std::string solution = solutionOneLine_ + "\n";
+    CPPUNIT_ASSERT_EQUAL(true, checker.compare(puzzle_, solution, &os));
+    CPPUNIT_ASSERT_EQUAL(true, os.str().empty());
 
-    auto len = solution.size();
-    for(decltype(len) i = 0; i < len; ++i) {
-        auto arg = solution;
-        auto c = arg.at(i);
-        if (!::isdigit(c)) {
+    std::string puzzle = puzzle_;
+    while(!puzzle.empty()) {
+        puzzle.resize(puzzle.size() - 1);
+        CPPUNIT_ASSERT_EQUAL(true, checker.compare(puzzle, solutionOneLine_, &os));
+        CPPUNIT_ASSERT_EQUAL(true, os.str().empty());
+    }
+
+    {
+        SudokuOutStream os;
+        SudokuChecker checker("", "", solutionPrint_, nullptr);
+        solution = solutionOneLine_;
+        std::string expected = "Invalid solution size\n";
+        solution.resize(solution.size() - 1);
+        CPPUNIT_ASSERT_EQUAL(false, checker.compare(puzzle_, solution, &os));
+        CPPUNIT_ASSERT_EQUAL(expected, os.str());
+    }
+
+    {
+        SudokuOutStream os;
+        SudokuChecker checker("", "", solutionPrint_, nullptr);
+        solution = solutionOneLine_;
+        solution.at(solution.size() - 1) = solution.at(solution.size() - 2);
+        CPPUNIT_ASSERT_EQUAL(false, checker.compare(solutionOneLine_, solution, &os));
+        std::string expected = "Cell 80 overwritten\n";
+        CPPUNIT_ASSERT_EQUAL(expected, os.str());
+    }
+
+    auto length = puzzle_.size();
+    for(decltype(length) i = 0; i < puzzle_.size(); ++i) {
+        char c = puzzle_.at(i);
+        if (c == '0') {
             continue;
         }
 
-        arg.at(i) = (c == arg.at(0)) ? arg.at(2) : arg.at(0);
         SudokuOutStream os;
-        SudokuChecker checker(arg, &os);
-        CPPUNIT_ASSERT_EQUAL(false, checker.valid());
-        CPPUNIT_ASSERT_EQUAL(false, os.str().empty());
-        SudokuChecker checkerNull(arg, nullptr);
-        CPPUNIT_ASSERT_EQUAL(false, checkerNull.valid());
+        SudokuChecker checker("", "", solutionPrint_, nullptr);
+        std::string solution = solutionOneLine_;
+        solution.at(i) = (c == '1') ? '2' : '1';
+
+        CPPUNIT_ASSERT_EQUAL(false, checker.compare(puzzle_, solution, &os));
+        SudokuOutStream expected;
+        expected << "Cell " << i << " overwritten\n";
+        CPPUNIT_ASSERT_EQUAL(expected.str(), os.str());
     }
-
-    SudokuChecker checkerEmpty("", nullptr);
-    CPPUNIT_ASSERT_EQUAL(false, checkerEmpty.valid());
-
-    SudokuChecker checkerShortColumn("1:2:3:4:5:6:7:8:9\n4:5:6:7:8:9:1:2:3\n7:8:9:1:2:3:4:5:6\n2:9:5:8:7:4:6:3:1\n3:1:4:2:6:5:8:9:7\n6:7:8:3:9:1:2:4:5\n5:3:1:6:4:2:9:7:8\n8:6:2:9:3:7:5:1:4\n", nullptr);
-    CPPUNIT_ASSERT_EQUAL(false, checkerShortColumn.valid());
-
-    SudokuChecker checkerShortRow("1:2:3:4:5:6:7:89\n", nullptr);
-    CPPUNIT_ASSERT_EQUAL(false, checkerShortRow.valid());
-
-    SudokuChecker checkerVoid("1::3:4:5:6:7:8:9\n", nullptr);
-    CPPUNIT_ASSERT_EQUAL(false, checkerVoid.valid());
-
-    SudokuChecker checkerTooManyCandidates("1:234:4:5:6:7:8:9\n4:5:6:7:8:9:1:2:3\n7:8:9:1:2:3:4:5:6\n2:9:5:8:7:4:6:3:1\n3:1:4:2:6:5:8:9:7\n6:7:8:3:9:1:2:4:5\n5:3:1:6:4:2:9:7:8\n8:6:2:9:3:7:5:1:4\n9:4:7:5:1:8:3:6:2\n", nullptr);
-    CPPUNIT_ASSERT_EQUAL(false, checkerTooManyCandidates.valid());
 }
 
 void SudokuCheckerTest::test_checkRowSet() {
     SudokuOutStream os;
-    SudokuChecker checker("", &os);
-    CPPUNIT_ASSERT_EQUAL(true, checker.check(grid_, &os));
-    CPPUNIT_ASSERT_EQUAL(true, os.str().empty());
-    CPPUNIT_ASSERT_EQUAL(true, checker.check(grid_, nullptr));
-
+    SudokuChecker checker("", "", solutionPrint_, nullptr);
     CPPUNIT_ASSERT_EQUAL(true, checker.checkRowSet(grid_, &os));
     CPPUNIT_ASSERT_EQUAL(true, os.str().empty());
     CPPUNIT_ASSERT_EQUAL(true, checker.checkRowSet(grid_, nullptr));
+
+    CPPUNIT_ASSERT_EQUAL(true, checker.check(grid_, &os));
+    CPPUNIT_ASSERT_EQUAL(true, os.str().empty());
+    CPPUNIT_ASSERT_EQUAL(true, checker.check(grid_, nullptr));
 
     for(SudokuIndex row = 0; row < Sudoku::SizeOfGroupsPerMap; ++row) {
         for(SudokuIndex column = 0; column < Sudoku::SizeOfCellsPerGroup; ++column) {
@@ -119,14 +250,15 @@ void SudokuCheckerTest::test_checkRowSet() {
             expected += "\n";
             {
                 SudokuOutStream os;
-                SudokuChecker checker("", &os);
+                SudokuChecker checker("", "", solutionPrint_, nullptr);
                 CPPUNIT_ASSERT_EQUAL(false, checker.checkRowSet(grid, &os));
                 CPPUNIT_ASSERT_EQUAL(expected, os.str());
             }
             CPPUNIT_ASSERT_EQUAL(false, checker.checkRowSet(grid, nullptr));
+            CPPUNIT_ASSERT_EQUAL(false, checker.check(grid, nullptr));
             {
                 SudokuOutStream os;
-                SudokuChecker checker("", &os);
+                SudokuChecker checker("", "", solutionPrint_, nullptr);
                 CPPUNIT_ASSERT_EQUAL(false, checker.check(grid, &os));
                 CPPUNIT_ASSERT_EQUAL(expected, os.str());
             }
@@ -136,7 +268,7 @@ void SudokuCheckerTest::test_checkRowSet() {
 
 void SudokuCheckerTest::test_checkColumnSet() {
     SudokuOutStream os;
-    SudokuChecker checker("", &os);
+    SudokuChecker checker("", "", solutionPrint_, nullptr);
     CPPUNIT_ASSERT_EQUAL(true, checker.checkColumnSet(grid_, &os));
     CPPUNIT_ASSERT_EQUAL(true, os.str().empty());
     CPPUNIT_ASSERT_EQUAL(true, checker.checkColumnSet(grid_, nullptr));
@@ -151,7 +283,7 @@ void SudokuCheckerTest::test_checkColumnSet() {
                 expected += '1' + column;
                 expected += "\n";
                 SudokuOutStream os;
-                SudokuChecker checker("", &os);
+                SudokuChecker checker("", "", solutionPrint_, nullptr);
                 CPPUNIT_ASSERT_EQUAL(false, checker.checkColumnSet(grid, &os));
                 CPPUNIT_ASSERT_EQUAL(expected, os.str());
             }
@@ -161,7 +293,7 @@ void SudokuCheckerTest::test_checkColumnSet() {
                 expected += '1' + row;
                 expected += "\n";
                 SudokuOutStream os;
-                SudokuChecker checker("", &os);
+                SudokuChecker checker("", "", solutionPrint_, nullptr);
                 CPPUNIT_ASSERT_EQUAL(false, checker.check(grid, &os));
                 CPPUNIT_ASSERT_EQUAL(expected, os.str());
             }
@@ -171,7 +303,7 @@ void SudokuCheckerTest::test_checkColumnSet() {
 
 void SudokuCheckerTest::test_checkBoxSet() {
     SudokuOutStream os;
-    SudokuChecker checker("", &os);
+    SudokuChecker checker("", "", solutionPrint_, nullptr);
     CPPUNIT_ASSERT_EQUAL(true, checker.checkBoxSet(grid_, &os));
     CPPUNIT_ASSERT_EQUAL(true, os.str().empty());
     CPPUNIT_ASSERT_EQUAL(true, checker.checkBoxSet(grid_, nullptr));
@@ -191,7 +323,7 @@ void SudokuCheckerTest::test_checkBoxSet() {
                 expected += '1' + (column / Sudoku::SizeOfCellsOnBoxEdge) * Sudoku::SizeOfCellsOnBoxEdge;
                 expected += "\n";
                 SudokuOutStream os;
-                SudokuChecker checker("", &os);
+                SudokuChecker checker("", "", solutionPrint_, nullptr);
                 CPPUNIT_ASSERT_EQUAL(false, checker.checkBoxSet(grid, &os));
                 CPPUNIT_ASSERT_EQUAL(expected, os.str());
             }
@@ -201,7 +333,7 @@ void SudokuCheckerTest::test_checkBoxSet() {
                 expected += '1' + row;
                 expected += "\n";
                 SudokuOutStream os;
-                SudokuChecker checker("", &os);
+                SudokuChecker checker("", "", solutionPrint_, nullptr);
                 CPPUNIT_ASSERT_EQUAL(false, checker.check(grid, &os));
                 CPPUNIT_ASSERT_EQUAL(expected, os.str());
             }
@@ -210,35 +342,23 @@ void SudokuCheckerTest::test_checkBoxSet() {
 }
 
 void SudokuCheckerTest::test_checkUnique() {
-    {
-        SudokuChecker::Group line {1, 2, 3, 4, 5, 6, 7, 8, 9};
-        SudokuChecker checker("", nullptr);
-        CPPUNIT_ASSERT_EQUAL(true, checker.checkUnique(line));
-    }
-    {
-        SudokuChecker::Group line {9, 8, 7, 6, 5, 4, 3, 2, 1};
-        SudokuChecker checker("", nullptr);
-        CPPUNIT_ASSERT_EQUAL(true, checker.checkUnique(line));
-    }
-    {
-        SudokuChecker::Group line {1, 9, 2, 8, 3, 7, 4, 6, 5};
-        SudokuChecker checker("", nullptr);
-        CPPUNIT_ASSERT_EQUAL(true, checker.checkUnique(line));
-    }
-    {
-        SudokuChecker::Group line {1, 2, 3, 4, 5, 6, 7, 8, 1};
-        SudokuChecker checker("", nullptr);
-        CPPUNIT_ASSERT_EQUAL(false, checker.checkUnique(line));
-    }
-    {
-        SudokuChecker::Group line {1, 9, 2, 8, 3, 7, 4, 1, 9};
-        SudokuChecker checker("", nullptr);
-        CPPUNIT_ASSERT_EQUAL(false, checker.checkUnique(line));
-    }
-    {
-        SudokuChecker::Group line {1, 2, 3, 4, 5, 6, 7, 8};
-        SudokuChecker checker("", nullptr);
-        CPPUNIT_ASSERT_EQUAL(false, checker.checkUnique(line));
+    struct Test {
+        SudokuChecker::Group line;
+        bool expected;
+    };
+
+    const Test testSet[] = {
+        {{1, 2, 3, 4, 5, 6, 7, 8, 9}, true},
+        {{9, 8, 7, 6, 5, 4, 3, 2, 1}, true},
+        {{1, 9, 2, 8, 3, 7, 4, 6, 5}, true},
+        {{1, 2, 3, 4, 5, 6, 7, 8, 1}, false},
+        {{1, 9, 2, 8, 3, 7, 4, 1, 9}, false},
+        {{1, 2, 3, 4, 5, 6, 7, 8}, false}
+    };
+
+    for(const auto& test : testSet) {
+        SudokuChecker checker("", "", solutionPrint_, nullptr);
+        CPPUNIT_ASSERT_EQUAL(test.expected, checker.checkUnique(test.line));
     }
 }
 
@@ -378,28 +498,44 @@ namespace {
         bool   expected;
         SudokuSolverType solverType;
         SudokuSolverCheck check;
+        SudokuSolverPrint print;
     };
 
     constexpr TestArgsMultiMode testArgsMultiMode[] {
         // 解を一つ求める
         {1, {"sudoku", nullptr, nullptr, nullptr},
-                true, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK},
+                true, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::DO_NOT_PRINT},
         {2, {"sudoku", "../data/sudoku_example1.txt", nullptr, nullptr},
-                false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK},
+                false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::DO_NOT_PRINT},
         {2, {"sudoku", "FileNotExists", nullptr, nullptr},
-                true, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK},
+                true, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::DO_NOT_PRINT},
         {3, {"sudoku", "../data/sudoku_example1.txt", "0", nullptr},
-                false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK},
+                false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::DO_NOT_PRINT},
         {3, {"sudoku", "../data/sudoku_example1.txt", "1", nullptr},
-                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::DO_NOT_PRINT},
         {4, {"sudoku", "../data/sudoku_example1.txt", "c++", "0"},
-                false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK},
+                false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::DO_NOT_PRINT},
         {4, {"sudoku", "../data/sudoku_example1.txt", "c++", "1"},
-                false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::DO_NOT_CHECK},
+                false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::DO_NOT_CHECK,
+                    SudokuSolverPrint::DO_NOT_PRINT},
         {4, {"sudoku", "../data/sudoku_example1.txt", "sse", "0"},
-                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::DO_NOT_PRINT},
         {4, {"sudoku", "../data/sudoku_example1.txt", "avx", "off"},
-                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::DO_NOT_CHECK}
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::DO_NOT_CHECK,
+                    SudokuSolverPrint::DO_NOT_PRINT},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "0", "2"},
+                false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::PRINT},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "avx", "print"},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::PRINT},
     };
 }
 
@@ -507,7 +643,7 @@ void SudokuLoaderTest::test_execMultiFailed() {
     SudokuLoader inst(0, nullptr, nullptr, pSudokuOutStream_.get());
     CPPUNIT_ASSERT_EQUAL(SudokuLoader::ExitStatusFailed, inst.execMulti(&is));
 
-    std::string expected = "Solving in C++\nError in case 1";
+    std::string expected = "Solving in C++\nInvalid cell arrangement\n";
     std::string actual = pSudokuOutStream_->str();
     actual.resize(expected.size());
     CPPUNIT_ASSERT_EQUAL(expected, actual);

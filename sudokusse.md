@@ -166,10 +166,13 @@ SudokuSSE solves the hardest 49151 puzzles
 within 10 seconds.
 
 When the third argument is "1" or "off", SudokuSSE does not check
-whether their solutions are valid and it takes less time.
+whether their solutions are valid and it takes less time.  When the
+third argument is "2" or "print", SudokuSSE checks whether their
+solutions are valid and prints the solutions.
 
 ```bash
 bin/sudokusse.exe filename sse off
+bin/sudokusse.exe filename sse print
 ```
 
 ### Count how many solutions a sudoku puzzle has

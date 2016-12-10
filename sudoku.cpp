@@ -9,10 +9,13 @@
 // sudoku [実行回数 [列挙回数]] < 初期マップ
 //
 // 引数に数字ではなくファイル名を指定したときは、そのファイルの各行を解く
-// 第二引数があり1またはsseの場合はSSEで解く。それ以外の場合はC++で解く。 
-// 第三引数があり1またはoffの場合は、解いた結果を検査しない
+// 第二引数 : 引数があり1またはsseの場合はSSEで解く。
+//   それ以外の場合はC++で解く。
+// 第三引数 : 引数がなければ、解いた結果を検査する
+//   引数があり1またはoffの場合は、解いた結果を検査しない(その分実行時感が短くなる)
+//   引数があり2またはprint場合は、解いた結果を検査し、解を表示する
 //
-// sudoku ファイル名 [0|1] [0|1] < 初期マップ
+// sudoku ファイル名 [0|1] [0|1|2] < 初期マップ
 
 #include <algorithm>
 #include <fstream>
@@ -1476,54 +1479,117 @@ bool SudokuSseSolver::fillCells(SudokuSseMap& map, bool topLevel, bool verbose) 
     return true;
 }
 
-SudokuChecker::SudokuChecker(const std::string& solution, std::ostream* pSudokuOutStream)
-    : valid_(parse(solution, pSudokuOutStream)) {
+SudokuChecker::SudokuChecker(const std::string& puzzle, const std::string& solution,
+                             SudokuSolverPrint printSolution, std::ostream* pSudokuOutStream)
+    : valid_(parse(puzzle, solution, printSolution, pSudokuOutStream)) {
     return;
 }
 
-bool SudokuChecker::valid() const {
+bool SudokuChecker::Valid() const {
     return valid_;
 }
 
-bool SudokuChecker::parse(const std::string& solution, std::ostream* pSudokuOutStream) {
+bool SudokuChecker::parse(const std::string& puzzle, const std::string& solution,
+                          SudokuSolverPrint printSolution, std::ostream* pSudokuOutStream) {
     std::istringstream is(solution);
     Grid grid(Sudoku::SizeOfGroupsPerMap, Group(Sudoku::SizeOfCellsPerGroup, 0));
-
     bool valid = true;
+    std::string solutionLine;
+
     for(SudokuIndex row = 0; valid && (row < Sudoku::SizeOfGroupsPerMap); ++row) {
-        std::string str;
-        getline(is, str);
-        if (str.empty()) {
+        std::string rowLine;
+        getline(is, rowLine);
+        if (rowLine.empty()) {
             valid = false;
             break;
         }
 
-        // 行の要素数が異常
-        if (str.size() < (Sudoku::SizeOfCellsPerGroup * 2 - 1)) {
-            valid = false;
-            break;
-        }
+        valid &= parseRow(row, rowLine, grid, solutionLine);
+    }
 
-        for(SudokuIndex column = 0; valid && (column < Sudoku::SizeOfCellsPerGroup); ++column) {
-            // マスの区切り文字(末尾はなくてもよい)
-            if (((column + 1) < Sudoku::SizeOfCellsPerGroup) && (str.at(column * 2 + 1) != ':')) {
-                valid = false;
-            }
-
-            // マスの数字
-            int num = 0;
-            if (Sudoku::ConvertCharToSudokuCandidate(Sudoku::MinCandidatesNumber, Sudoku::MaxCandidatesNumber,
-                                                     str.at(column * 2), num)) {
-                grid.at(row).at(column) = num;
-            } else {
-                valid = false;
-            }
+    if (!valid) {
+        if (pSudokuOutStream) {
+            *pSudokuOutStream << "Invalid cell arrangement\n";
         }
     }
 
-    return (valid) ? check(grid, pSudokuOutStream) : false;
+    valid = valid && compare(puzzle, solutionLine, pSudokuOutStream);
+    valid = valid && check(grid, pSudokuOutStream);
+    if ((printSolution == SudokuSolverPrint::PRINT) && pSudokuOutStream) {
+        *pSudokuOutStream << solutionLine << "\n";
+    }
+
+    return valid;
 }
 
+bool SudokuChecker::parseRow(SudokuIndex row, const std::string& rowLine, Grid& grid, std::string& solutionLine) {
+    bool valid = true;
+
+    // 行の要素数が異常
+    constexpr auto minLength = Sudoku::SizeOfCellsPerGroup * 2 - 1;
+    if (rowLine.size() < minLength) {
+        valid = false;
+    }
+
+    for(SudokuIndex column = 0; valid && (column < Sudoku::SizeOfCellsPerGroup); ++column) {
+        // マスの区切り文字(末尾はなくてもよい)
+        if ((column + 1) == Sudoku::SizeOfCellsPerGroup) {
+            if ((rowLine.size() > minLength) && ::isdigit(rowLine.at(minLength))) {
+                valid = false;
+            }
+        } else {
+            if (rowLine.at(column * 2 + 1) != ':') {
+                valid = false;
+            }
+        }
+
+        // マスの数字
+        int num = 0;
+        const char c = rowLine.at(column * 2);
+        if (Sudoku::ConvertCharToSudokuCandidate(
+                Sudoku::MinCandidatesNumber, Sudoku::MaxCandidatesNumber, c, num)) {
+            grid.at(row).at(column) = num;
+            solutionLine += c;
+        } else {
+            valid = false;
+        }
+    }
+
+    return valid;
+}
+
+// 問題の初期マスが解にそのまま使われているかどうか調べる
+bool SudokuChecker::compare(const std::string& puzzle, const std::string& solution, std::ostream* pSudokuOutStream) {
+    if (solution.size() < Sudoku::SizeOfAllCells) {
+        if (pSudokuOutStream) {
+            *pSudokuOutStream << "Invalid solution size\n";
+        }
+        return false;
+    }
+
+    std::string fullPuzzle = puzzle;
+    fullPuzzle.resize(solution.size(), '.');
+    bool valid = true;
+
+    for(SudokuIndex i=0; valid && (i < Sudoku::SizeOfAllCells); ++i) {
+        int num = 0;
+        const char c = fullPuzzle.at(i);
+        if (!Sudoku::ConvertCharToSudokuCandidate(Sudoku::MinCandidatesNumber, Sudoku::MaxCandidatesNumber, c, num)) {
+            continue;
+        }
+
+        if (c != solution.at(i)) {
+            if (pSudokuOutStream) {
+                *pSudokuOutStream << "Cell " << i << " overwritten\n";
+            }
+            valid = false;
+        }
+    }
+
+    return valid;
+}
+
+// 解の行、列、箱をすべて調べる
 bool SudokuChecker::check(const Grid& grid, std::ostream* pSudokuOutStream) {
     return checkRowSet(grid, pSudokuOutStream) &&
         checkColumnSet(grid, pSudokuOutStream) &&
@@ -1602,6 +1668,7 @@ const int SudokuLoader::ExitStatusFailed = 1;
 
 SudokuLoader::SudokuLoader(int argc, const char * const argv[], std::istream* pSudokuInStream, std::ostream* pSudokuOutStream)
     : solverType_(SudokuSolverType::SOLVER_GENERAL), check_(SudokuSolverCheck::CHECK),
+      print_(SudokuSolverPrint::DO_NOT_PRINT),
       isBenchmark_(false), verbose_(true), measureCount_(1), printAllCadidate_(0), pSudokuOutStream_(nullptr) {
 
     if (pSudokuOutStream == nullptr) {
@@ -1712,8 +1779,12 @@ bool SudokuLoader::setMultiMode(int argc, const char * const argv[]) {
 
     multiLineFilename_ = argv[1];
     result = true;
-    SudokuOption::setMode(argc, argv, 2, SudokuOption::CommandLineArgSseSolver, solverType_, SudokuSolverType::SOLVER_SSE_4_2);
-    SudokuOption::setMode(argc, argv, 3, SudokuOption::CommandLineNoChecking, check_, SudokuSolverCheck::DO_NOT_CHECK);
+    SudokuOption::setMode(argc, argv, 2, SudokuOption::CommandLineArgSseSolver,
+                          solverType_, SudokuSolverType::SOLVER_SSE_4_2);
+    SudokuOption::setMode(argc, argv, 3, SudokuOption::CommandLineNoChecking,
+                          check_, SudokuSolverCheck::DO_NOT_CHECK);
+    SudokuOption::setMode(argc, argv, 3, SudokuOption::CommandLinePrint,
+                          print_, SudokuSolverPrint::PRINT);
     return result;
 }
 
@@ -1767,9 +1838,9 @@ int SudokuLoader::execMulti(std::istream* pSudokuInStream) {
         }
 
         pSolver->Exec(false, false);
-        if (check_ == SudokuSolverCheck::CHECK) {
-            SudokuChecker checker(ss.str(), pSudokuOutStream_);
-            if (!checker.valid()) {
+        if ((check_ == SudokuSolverCheck::CHECK) || (print_ == SudokuSolverPrint::PRINT)) {
+            SudokuChecker checker(lineStr, ss.str(), print_, pSudokuOutStream_);
+            if (!checker.Valid()) {
                 if (pSudokuOutStream_ != nullptr) {
                     *pSudokuOutStream_ << "Error in case " << lineNum << "\n" << lineStr << "\n" << ss.str();
                 }
