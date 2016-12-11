@@ -46,7 +46,9 @@ CPPUNIT_TEST_SUITE_REGISTRATION( SudokuSseEnumeratorMapTest );
 
 class SudokuSseTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST_SUITE(SudokuSseTest);
+    CPPUNIT_TEST(test_Compare);
     CPPUNIT_TEST(test_MaskLower32bit);
+    CPPUNIT_TEST(test_MaskRegisters);
     CPPUNIT_TEST(test_PowerOf2);
     CPPUNIT_TEST(test_MergeThreeElements);
     CPPUNIT_TEST(test_OrThreeXmmRegs);
@@ -92,7 +94,9 @@ public:
     void setUp() override;
     void tearDown() override;
 protected:
+    void test_Compare();
     void test_MaskLower32bit();
+    void test_MaskRegisters();
     void test_PowerOf2();
     void test_MergeThreeElements();
     void test_OrThreeXmmRegs();
@@ -465,6 +469,66 @@ void SudokuSseTest::rotateRow(uint64_t row[2])
     return;
 }
 
+void SudokuSseTest::test_Compare()
+{
+    struct TestSet {
+        gRegister right;
+        gRegister left;
+        gRegister expectedLE;
+        gRegister expectedG;
+        gRegister expectedGE;
+    };
+
+    constexpr TestSet testSet[] {
+        {0, 0x8000000000000000ull, 1, 0, 0},
+        {0, 0xffffffffffffffffull, 1, 0, 0},
+        {0, 0, 1, 0, 1},
+        {0, 1, 0, 1, 1},
+        {0, 0x7fffffffffffffffull, 0, 1, 1},
+        {0xffffffff, 0x8000000000000000ull, 1, 0, 0},
+        {0xffffffff, 0xffffffffffffffffull, 1, 0, 0},
+        {0xffffffff, 0, 1, 0, 0},
+        {0xffffffff, 0xfffffffe, 1, 0, 0},
+        {0xffffffff, 0xffffffff, 1, 0, 1},
+        {0xffffffff, 0x100000000ull, 0, 1, 1},
+        {0xffffffff, 0x7fffffffffffffffull, 0, 1, 1},
+        {0xffffffffffffffffull, 0x8000000000000000ull, 1, 0, 0},
+        {0xffffffffffffffffull, 0xfffffffffffffffeull, 1, 0, 0},
+        {0xffffffffffffffffull, 0, 0, 1, 1},
+        {0xffffffffffffffffull, 0x7fffffffffffffffull, 0, 1, 1},
+        {0x8000000000000000ull, 0x8000000000000001ull, 0, 1, 1},
+        {0x8000000000000000ull, 0xffffffffffffffffull, 0, 1, 1},
+        {0x8000000000000000ull, 0, 0, 1, 1},
+        {0x8000000000000000ull, 0x7fffffffffffffffull,  0, 1, 1}
+    };
+
+    for(const auto& test : testSet) {
+        gRegister actual = 2;
+        asm volatile (
+            "call testCmovLessEqual\n\t"
+            :"=a"(actual):"b"(test.left),"c"(test.right):"rdx");
+        CPPUNIT_ASSERT_EQUAL(test.expectedLE, actual);
+
+        actual = 2;
+        asm volatile (
+            "call testJumpIfGreater\n\t"
+            :"=a"(actual):"b"(test.left),"c"(test.right):"rdx");
+        CPPUNIT_ASSERT_EQUAL(test.expectedG, actual);
+
+        actual = 2;
+        asm volatile (
+            "call testJumpIfGreaterEqual\n\t"
+            :"=a"(actual):"b"(test.left),"c"(test.right):"rdx");
+        CPPUNIT_ASSERT_EQUAL(test.expectedGE, actual);
+
+        actual = 2;
+        asm volatile (
+            "call testJumpIfLessEqual\n\t"
+            :"=a"(actual):"b"(test.left),"c"(test.right):"rdx");
+        CPPUNIT_ASSERT_EQUAL(test.expectedLE, actual);
+    }
+}
+
 void SudokuSseTest::test_MaskLower32bit()
 {
     struct TestSet {
@@ -498,7 +562,7 @@ void SudokuSseTest::test_MaskLower32bit()
             case Func::MASK:
                 asm volatile (
                     "call testMaskLower32bit\n\t"
-                    :"=b"(result):"a"(arg));
+                    :"=a"(result):"b"(arg));
                 CPPUNIT_ASSERT_EQUAL(test.result, result);
                 break;
             case Func::SPLIT:
@@ -512,6 +576,95 @@ void SudokuSseTest::test_MaskLower32bit()
                 break;
             }
         }
+    }
+
+    return;
+}
+
+void SudokuSseTest::test_MaskRegisters()
+{
+    constexpr gRegister arg = 0xA1B2C3D4E5F67890;
+    constexpr gRegister expected = 0xE5F67890;
+
+    // RBPとRSPは対象外
+    for(int i=0; i<14; ++i) {
+        gRegister actual = arg;
+        switch(i) {
+        case 0:
+            asm volatile (
+                "call testMaskLower32bitAX\n\t"
+                :"=a"(actual):"b"(arg));
+            break;
+        case 1:
+            asm volatile (
+                "call testMaskLower32bitBX\n\t"
+                :"=b"(actual):"a"(arg));
+            break;
+        case 2:
+            asm volatile (
+                "call testMaskLower32bitCX\n\t"
+                :"=b"(actual):"a"(arg):"rcx");
+            break;
+        case 3:
+            asm volatile (
+                "call testMaskLower32bitDX\n\t"
+                :"=b"(actual):"a"(arg):"rdx");
+            break;
+        case 4:
+            asm volatile (
+                "call testMaskLower32bitSI\n\t"
+                :"=b"(actual):"a"(arg):"rsi");
+            break;
+        case 5:
+            asm volatile (
+                "call testMaskLower32bitDI\n\t"
+                :"=b"(actual):"a"(arg):"rdi");
+            break;
+        case 6:
+            asm volatile (
+                "call testMaskLower32bit8\n\t"
+                :"=b"(actual):"a"(arg):"r8");
+            break;
+        case 7:
+            asm volatile (
+                "call testMaskLower32bit9\n\t"
+                :"=b"(actual):"a"(arg):"r9");
+            break;
+        case 8:
+            asm volatile (
+                "call testMaskLower32bit10\n\t"
+                :"=b"(actual):"a"(arg):"r10");
+            break;
+        case 9:
+            asm volatile (
+                "call testMaskLower32bit11\n\t"
+                :"=b"(actual):"a"(arg):"r11");
+            break;
+        case 10:
+            asm volatile (
+                "call testMaskLower32bit12\n\t"
+                :"=b"(actual):"a"(arg):"r12");
+            break;
+        case 11:
+            asm volatile (
+                "call testMaskLower32bit13\n\t"
+                :"=b"(actual):"a"(arg):"r13");
+            break;
+        case 12:
+            asm volatile (
+                "call testMaskLower32bit14\n\t"
+                :"=b"(actual):"a"(arg):"r14");
+            break;
+        case 13:
+            asm volatile (
+                "call testMaskLower32bit15\n\t"
+                :"=b"(actual):"a"(arg):"r15");
+            break;
+        default:
+            break;
+        }
+
+        CPPUNIT_ASSERT_EQUAL(expected, actual);
     }
 
     return;

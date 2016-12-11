@@ -585,6 +585,10 @@ a profiler to SudokuSSE.
 
 * Set optimization level -O2. -O3 makes SudokuSSE slower.
 
+* Read the x86_64 manual closely. The manual tells us not only general
+  optimization guidelines but slight differences on performance such
+  as CMOV instructions.
+
 * To return from a function in assembly, pop + jmp is faster than ret.
 
 ## Bibliography and acknowledgments

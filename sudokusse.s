@@ -299,6 +299,55 @@ testCountRowCellCandidatesRowX:               .quad 0, 0
 .endif
 .endm
 
+# 比較はA/BE(符号なし)より、G/LE(符号あり)の方が速い
+# 負の値を取らず、0x7fffffffを超えることもないなら、速い方を使う
+.macro CmovLessEqual op1, op2
+    cmovle  \op1, \op2
+.endm
+
+.macro JumpIfGreater op1
+    jg   \op1
+.endm
+
+.macro JumpIfGreaterEqual op1
+    jge  \op1
+.endm
+
+.macro JumpIfLessEqual op1
+    jle  \op1
+.endm
+
+    .global testCmovLessEqual
+    .global testJumpIfGreater
+    .global testJumpIfGreaterEqual
+    .global testJumpIfLessEqual
+testCmovLessEqual:
+    xor  rax, rax
+    mov  rdx, 1
+    cmp  rbx, rcx
+    CmovLessEqual rax, rdx
+    ret
+
+testJumpHit:
+    mov  rax, 1
+    ret
+
+.macro TestJumpIf op1
+    xor  rax, rax
+    cmp  rbx, rcx
+    \op1 testJumpHit
+    ret
+.endm
+
+testJumpIfGreater:
+    TestJumpIf JumpIfGreater
+
+testJumpIfGreaterEqual:
+    TestJumpIf JumpIfGreaterEqual
+
+testJumpIfLessEqual:
+    TestJumpIf JumpIfLessEqual
+
 # 0回シフトを防ぐ
 .macro ShlNonZero reg, count
 .if (\count != 0)
@@ -340,29 +389,150 @@ testCountRowCellCandidatesRowX:               .quad 0, 0
 
 # inc/decよりもadd/subの方が、全フラグを書き換えるため早くなる
 .macro FastInc reg
-#       inc    \reg
         add    \reg, 1
 .endm
 
 .macro FastDec reg
-#       dec    \reg
         sub    \reg, 1
 .endm
 
 # 64bitレジスタの下位32bitの候補だけ残す
+# 32bitレジスタ操作は、上位32bitを0にする
 .macro MaskLower32bit regDst
-        # cdq命令はAレジスタにしか使えない
+        .if (\regDst == rax)
+        mov    eax, eax
+        .elseif (\regDst == rbx)
+        mov    ebx, ebx
+        .elseif (\regDst == rcx)
+        mov    ecx, ecx
+        .elseif (\regDst == rdx)
+        mov    edx, edx
+        .elseif (\regDst == rsi)
+        mov    esi, esi
+        .elseif (\regDst == rdi)
+        mov    edi, edi
+        .elseif (\regDst == r8)
+        mov    r8d, r8d
+        .elseif (\regDst == r9)
+        mov    r9d, r9d
+        .elseif (\regDst == r10)
+        mov    r10d, r10d
+        .elseif (\regDst == r11)
+        mov    r11d, r11d
+        .elseif (\regDst == r12)
+        mov    r12d, r12d
+        .elseif (\regDst == r13)
+        mov    r13d, r13d
+        .elseif (\regDst == r14)
+        mov    r14d, r14d
+        .elseif (\regDst == r15)
+        mov    r15d, r15d
+        .else
         ShlNonZero  \regDst, (boxRowByteSize * bitPerByte)
         ShrNonZero  \regDst, (boxRowByteSize * bitPerByte)
+        .endif
 .endm
 
         .global testMaskLower32bit
+        .global testMaskLower32bitAX
+        .global testMaskLower32bitBX
+        .global testMaskLower32bitCX
+        .global testMaskLower32bitDX
+        .global testMaskLower32bitSI
+        .global testMaskLower32bitDI
+        .global testMaskLower32bit8
+        .global testMaskLower32bit9
+        .global testMaskLower32bit10
+        .global testMaskLower32bit11
+        .global testMaskLower32bit12
+        .global testMaskLower32bit13
+        .global testMaskLower32bit14
+        .global testMaskLower32bit15
 testMaskLower32bit:
+testMaskLower32bitAX:
+        mov     rax, rbx
+        MaskLower32bit rax
+        ret
+
+testMaskLower32bitBX:
         mov     rbx, rax
         MaskLower32bit rbx
         ret
 
+testMaskLower32bitCX:
+        mov     rcx, rax
+        MaskLower32bit rcx
+        mov     rbx, rcx
+        ret
+
+testMaskLower32bitDX:
+        mov     rdx, rax
+        MaskLower32bit rdx
+        mov     rbx, rdx
+        ret
+
+testMaskLower32bitSI:
+        mov     rsi, rax
+        MaskLower32bit rsi
+        mov     rbx, rsi
+        ret
+
+testMaskLower32bitDI:
+        mov     rdi, rax
+        MaskLower32bit rdi
+        mov     rbx, rdi
+        ret
+
+testMaskLower32bit8:
+        mov     r8, rax
+        MaskLower32bit r8
+        mov     rbx, r8
+        ret
+
+testMaskLower32bit9:
+        mov     r9, rax
+        MaskLower32bit r9
+        mov     rbx, r9
+        ret
+
+testMaskLower32bit10:
+        mov     r10, rax
+        MaskLower32bit r10
+        mov     rbx, r10
+        ret
+
+testMaskLower32bit11:
+        mov     r11, rax
+        MaskLower32bit r11
+        mov     rbx, r11
+        ret
+
+testMaskLower32bit12:
+        mov     r12, rax
+        MaskLower32bit r12
+        mov     rbx, r12
+        ret
+
+testMaskLower32bit13:
+        mov     r13, rax
+        MaskLower32bit r13
+        mov     rbx, r13
+        ret
+
+testMaskLower32bit14:
+        mov     r14, rax
+        MaskLower32bit r14
+        mov     rbx, r14
+        ret
+
+testMaskLower32bit15:
+        mov     r15, rax
+        MaskLower32bit r15
+        mov     rbx, r15
+        ret
+
 # 64bitレジスタの上下32bitを分離する
+# bextrを使うと却って遅くなる
 .macro SplitRowLowParts regLow, regSrcAndHigh
         mov    \regLow, \regSrcAndHigh
         MaskLower32bit  \regLow
@@ -376,7 +546,8 @@ testSplitRowLowParts:
         ret
 
 # 共通マクロのラベルは3000番台(上から順)
-# 0または2のべき乗なら、<=(符号なし:jbe) その反対は >(符号なし:ja) で分岐
+# 0または2のべき乗なら、<=(符号あり:jle) その反対は >(符号あり:jg) で分岐
+# popcntが64を超えることはないので、符号あり/なしのうち速い方を使う
 .macro IsPowerOf2ToFlags regSrc, regWork1
         popcnt  \regWork1, \regSrc
         cmp     \regWork1, 1
@@ -386,7 +557,7 @@ testSplitRowLowParts:
 testIsPowerOf2ToFlags:
         IsPowerOf2ToFlags rax, rbx
         mov     rbx, 0
-        ja      testIsPowerOf2ToFlagsA
+        JumpIfGreater testIsPowerOf2ToFlagsA
         FastInc rbx
 testIsPowerOf2ToFlagsA:
         ret
@@ -786,7 +957,7 @@ testFillUniqueElement2:
         .set   regElement, \regWork1
         SelectElementInRowParts regElement, \regRowPart, \inBoxShift
         IsPowerOf2ToFlags regElement, \regWork2
-        jbe    1131f
+        JumpIfLessEqual 1131f
 
         .set   regCandidateSet, \regWork1
         SelectElementInRowParts regCandidateSet, \regColumn, \inBoxShift
@@ -844,7 +1015,7 @@ testFillOneUniqueCandidates2:
         popcnt \regWork4, \regNewElement
         cmp    \regWork4, 3
         # cmovで0を代入するより、分岐したほうが速い
-        ja     1121f
+        JumpIfGreater 1121f
 
         MacroMovq regCandidateX, \regNewElement
         PslldqNonZero regCandidateX, (boxRowByteSize * \outBoxShift)
@@ -958,7 +1129,7 @@ testMergeTwoElements2:
         .set  regElement, \regWork2
         SelectElementInRowParts regElement, \regRowPart, \inBoxShift
         IsPowerOf2ToFlags regElement, \regWork3
-        jbe 1081f
+        JumpIfLessEqual 1081f
 
         # 行
         mov  regElement, \regRowPart
@@ -970,7 +1141,7 @@ testMergeTwoElements2:
         mov  \regWork3, \regRowPart
         SelectElementInRowParts regElement, \regWork3, \inBoxShift
         IsPowerOf2ToFlags regElement, \regWork3
-        jbe 1081f
+        JumpIfLessEqual 1081f
 
         # 3x3箱
         mov  regElement, regTwoElements
@@ -980,7 +1151,7 @@ testMergeTwoElements2:
         mov  \regWork3, \regRowPart
         SelectElementInRowParts regElement, \regWork3, \inBoxShift
         IsPowerOf2ToFlags regElement, \regWork3
-        jbe 1081f
+        JumpIfLessEqual 1081f
 
         # 列
         SelectElementInRowParts regElement, \regColumnRowPart, \inBoxShift
@@ -1028,7 +1199,7 @@ testFindThreePartsCandidates:
         SelectRowParts regRowPart, \regRowX, \outBoxShift
         popcnt \regWork4, regRowPart
         cmp    \regWork4, 3
-        jbe    1061f
+        JumpIfLessEqual 1061f
 
         # 行の結果は汎用レジスタにおいて使いまわす
         SelectRowParts regMergedBox, \regBoxX, \outBoxShift
@@ -1274,7 +1445,7 @@ testSaveLoopCnt:
         mov     \regWork1, candidatesTooMany
         add     \regAccumPopCount, \regPopCount
         cmp     \regPopCount, 1
-        cmovbe  \regPopCount, \regWork1
+        CmovLessEqual  \regPopCount, \regWork1
 .endm
 
 .macro TestPopCountOrPowerOf2 inBoxShift
@@ -1324,9 +1495,9 @@ testCompareRegisterSet:
         mov  \regWork2, \outBoxShift
         mov  \regWork3, \inBoxShift
         cmp  \regWork1, \regMinCount
-        cmovbe  \regOutBoxShift, \regWork2
-        cmovbe  \regInBoxShift, \regWork3
-        cmovbe  \regMinCount, \regWork1
+        CmovLessEqual  \regOutBoxShift, \regWork2
+        CmovLessEqual  \regInBoxShift, \regWork3
+        CmovLessEqual  \regMinCount, \regWork1
 .endm
 
 .set  testCountCellCandidatesInvalidShift, 0xffff
@@ -1402,7 +1573,7 @@ testCountRowCellCandidatesSub:
         cmp  \regWork1, outBoxIndexInvalid
         cmovz  \regWork5, \regWork6
         CompareRegisterSet  \regMinCount, \regRowPopCount, \regWork3, \regWork4, 16, \regWork7, \regWork8
-        cmovbe \regWork5, \regWork6
+        CmovLessEqual \regWork5, \regWork6
 
         or  \regWork5, \regWork5
         jnz 301f
@@ -1672,7 +1843,7 @@ abortFilling:
 keepFilling:
         # 強制終了
         cmp     regLoopCnt, sudokuMaxLoopcnt
-        jae     exitFilling
+        JumpIfGreaterEqual exitFilling
         FastInc regLoopCnt
         SaveLoopCnt regLoopCnt, regCurrentPopcnt
 
@@ -2062,7 +2233,7 @@ testFastCollectCandidatesAtColumn88:
 
         popcnt  \regWork2, \regSum
         cmp     \regWork2, candidatesNum
-        jae     10012f
+        JumpIfGreaterEqual 10012f
 
         # ここで打ち切っても速くならない
         .if ((CellsPacked == 0) || ((\rowNumber % 3) != 0))
