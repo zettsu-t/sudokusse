@@ -52,6 +52,11 @@ Set the environment _EnableAvx_ in _sudokusse.s_ passed by
 _Makefile_vars_ to 0 for SSE4.2 and 1 for AVX. This is designated at
 compile-time, not in runtime.
 
+SudokuSSE with AVX uses ANDN instruction of BMI1 (Bit Manipulation
+Instructions), which is available on Haswell and newer
+microarchitecture. If you cannot run on such processors, set
+_EnableAvx_ to 0 or it occurs an invalid opcode exception.
+
 ## Prepare sudoku puzzles
 
 SudokuSSE accepts sudoku puzzles in text files.
