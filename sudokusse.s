@@ -1234,7 +1234,7 @@ testFindRowPartCandidates1:
 testFindRowPartCandidates2:
         TestFindRowPartCandidates 2
 
-.macro FindNineCandidates regTargetRowX, regRow1X, regRow2X, regBoxX, regThreeRow1X, regThreeRow2X, regColumnX, regWork1, regWork2, regWork3, regWork4, regWork5, regWork6, regWork7, regWork8, regWork9, regWork10, regWork11, regWork12, regWork13, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D, regWork6D, regWork7D, regWork8D, regWork9D, regWork10D, regWork11D, regWork12D, regWork13D, regWork1X, regWork2X
+.macro FindNineCandidates regTargetRowX, regRow1X, regRow2X, regBoxX, regThreeRow1X, regThreeRow2X, regColumnX, regWork1, regWork2, regWork3, regWork4, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D, regWork6D, regWork7D, regWork8D, regWork9D, regWork10D, regWork11D, regWork12D, regWork13D, regWork1X, regWork2X
         .set  regRowPart2,  \regWork1
         .set  regRowPart2D, \regWork1D
         .set  regRowPart1,  \regWork2
@@ -1251,8 +1251,7 @@ testFindRowPartCandidates2:
         MacroOrps3op \regBoxX, \regRow1X, \regRow2X
         OrThreeXmmRegs \regColumnX, \regBoxX, \regThreeRow1X, \regThreeRow2X
 
-        # selectRowPartsの繰り返しをまとめる
-        SelectRowAndCount regRowPart2, regRowPart1, \regTargetRowX, \regWork9
+        SelectRowAndCount regRowPart2, regRowPart1, \regTargetRowX, regRowPart0
         jz   1001f
 
         # Clear upper 32 bits
@@ -1267,8 +1266,7 @@ testFindRowPartCandidates2:
         or   regRowCandidatesD, regRowPartCandidates0D
 
         SelectRowParts  regBoxD, \regBoxX, 2
-        # 64-bit is faster than 32-bit
-        MergeThreeElements64  regBox, \regWork9, \regWork10
+        MergeThreeElements32  regBoxD, \regWork9D, \regWork10D
 
         SelectRowParts  regRowPartCandidates2D, \regColumnX, 2
         FindThreePartsCandidates regRowPart2D, regRowCandidatesD, regBoxD, regRowPartCandidates2D, \regWork9D, \regWork10D, \regWork11D, \regWork12D, \regWork13D, \regWork1X, \regWork2X
@@ -1286,38 +1284,36 @@ testFindNineCandidates:
         InitMaskRegister
         MacroXorps xRegRow4to6, xRegRow4to6
         MacroXorps xRegRow7to9, xRegRow7to9
-        FindNineCandidates xRegRow1, xRegRow2, xRegRow3, xRegRow1to3, xRegRow4to6, xRegRow7to9, xRegRowAll, rax, rbx, rcx, rdx, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, eax, ebx, ecx, edx, esi, edi, r8d, r9d, r10d, r11d, r12d, r13d, r14d, xRegWork1, xRegWork2
+        FindNineCandidates xRegRow1, xRegRow2, xRegRow3, xRegRow1to3, xRegRow4to6, xRegRow7to9, xRegRowAll, rax, rbx, rcx, rdx, eax, ebx, ecx, edx, esi, edi, r8d, r9d, r10d, r11d, r12d, r13d, r14d, xRegWork1, xRegWork2
         MacroMovdqa ([rip + testFillNineUniqueCandidatesRowX]),    xmm1
         MacroMovdqa ([rip + testFillNineUniqueCandidatesBoxX]),    xmm10
         MacroMovdqa ([rip + testFillNineUniqueCandidatesColumnX]), xmm0
         ret
 
-.macro Find27UniqueCandidates regRow1X, regRow2X, regRow3X, regBoxX, regThreeRow1X, regThreeRow2X, regColumnX, regWork1, regWork2, regWork3, regWork4, regWork5, regWork6, regWork7, regWork8, regWork9, regWork10, regWork11, regWork12, regWork13, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D, regWork6D, regWork7D, regWork8D, regWork9D, regWork10D, regWork11D, regWork12D, regWork13D, regWork1X, regWork2X
-         FindNineCandidates \regRow1X, \regRow2X, \regRow3X, \regBoxX, \regThreeRow1X, \regThreeRow2X, \regColumnX, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5, \regWork6, \regWork7, \regWork8, \regWork9, \regWork10, \regWork11, \regWork12, \regWork13, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D, \regWork12D, \regWork13D, \regWork1X, \regWork2X
-         FindNineCandidates \regRow2X, \regRow1X, \regRow3X, \regBoxX, \regThreeRow1X, \regThreeRow2X, \regColumnX, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5, \regWork6, \regWork7, \regWork8, \regWork9, \regWork10, \regWork11, \regWork12, \regWork13, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D, \regWork12D, \regWork13D, \regWork1X, \regWork2X
-         FindNineCandidates \regRow3X, \regRow1X, \regRow2X, \regBoxX, \regThreeRow1X, \regThreeRow2X, \regColumnX, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5, \regWork6, \regWork7, \regWork8, \regWork9, \regWork10, \regWork11, \regWork12, \regWork13, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D, \regWork12D, \regWork13D, \regWork1X, \regWork2X
+.macro Find27UniqueCandidates regRow1X, regRow2X, regRow3X, regBoxX, regThreeRow1X, regThreeRow2X, regColumnX, regWork1, regWork2, regWork3, regWork4, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D, regWork6D, regWork7D, regWork8D, regWork9D, regWork10D, regWork11D, regWork12D, regWork13D, regWork1X, regWork2X
+         FindNineCandidates \regRow1X, \regRow2X, \regRow3X, \regBoxX, \regThreeRow1X, \regThreeRow2X, \regColumnX, \regWork1, \regWork2, \regWork3, \regWork4, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D, \regWork12D, \regWork13D, \regWork1X, \regWork2X
+         FindNineCandidates \regRow2X, \regRow1X, \regRow3X, \regBoxX, \regThreeRow1X, \regThreeRow2X, \regColumnX, \regWork1, \regWork2, \regWork3, \regWork4, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D, \regWork12D, \regWork13D, \regWork1X, \regWork2X
+         FindNineCandidates \regRow3X, \regRow1X, \regRow2X, \regBoxX, \regThreeRow1X, \regThreeRow2X, \regColumnX, \regWork1, \regWork2, \regWork3, \regWork4, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D, \regWork12D, \regWork13D, \regWork1X, \regWork2X
 .endm
 
-# 1列、1行および3x3箱にある候補を絞る
-.macro FindCandidates regWork1, regWork2, regWork3, regWork4, regWork5, regWork6, regWork7, regWork8, regWork9, regWork10, regWork11, regWork12, regWork13, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D, regWork6D, regWork7D, regWork8D, regWork9D, regWork10D, regWork11D, regWork12D, regWork13D, regWork1X, regWork2X
+.macro FindCandidates regWork1, regWork2, regWork3, regWork4, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D, regWork6D, regWork7D, regWork8D, regWork9D, regWork10D, regWork11D, regWork12D, regWork13D, regWork1X, regWork2X
         OrThreeXmmRegs xRegRow4to6, xRegRow4, xRegRow5, xRegRow6
         OrThreeXmmRegs xRegRow7to9, xRegRow7, xRegRow8, xRegRow9
-        Find27UniqueCandidates xRegRow1, xRegRow2, xRegRow3, xRegRow1to3, xRegRow4to6, xRegRow7to9, xRegRowAll, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5, \regWork6, \regWork7, \regWork8, \regWork9, \regWork10, \regWork11, \regWork12, \regWork13, \regWork1D \regWork2D, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D, \regWork12D, \regWork13D, \regWork1X, \regWork2X
+        Find27UniqueCandidates xRegRow1, xRegRow2, xRegRow3, xRegRow1to3, xRegRow4to6, xRegRow7to9, xRegRowAll, \regWork1, \regWork2, \regWork3, \regWork4, \regWork1D \regWork2D, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D, \regWork12D, \regWork13D, \regWork1X, \regWork2X
 
         OrThreeXmmRegs xRegRow1to3, xRegRow1, xRegRow2, xRegRow3
-        Find27UniqueCandidates xRegRow4, xRegRow5, xRegRow6, xRegRow4to6, xRegRow1to3, xRegRow7to9, xRegRowAll, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5, \regWork6, \regWork7, \regWork8, \regWork9, \regWork10, \regWork11, \regWork12, \regWork13, \regWork1D \regWork2D, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D, \regWork12D, \regWork13D, \regWork1X, \regWork2X
+        Find27UniqueCandidates xRegRow4, xRegRow5, xRegRow6, xRegRow4to6, xRegRow1to3, xRegRow7to9, xRegRowAll, \regWork1, \regWork2, \regWork3, \regWork4, \regWork1D \regWork2D, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D, \regWork12D, \regWork13D, \regWork1X, \regWork2X
 
         OrThreeXmmRegs xRegRow4to6, xRegRow4, xRegRow5, xRegRow6
-        Find27UniqueCandidates xRegRow7, xRegRow8, xRegRow9, xRegRow7to9, xRegRow1to3, xRegRow4to6, xRegRowAll, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5, \regWork6, \regWork7, \regWork8, \regWork9, \regWork10, \regWork11, \regWork12, \regWork13, \regWork1D \regWork2D, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D, \regWork12D, \regWork13D, \regWork1X, \regWork2X
+        Find27UniqueCandidates xRegRow7, xRegRow8, xRegRow9, xRegRow7to9, xRegRow1to3, xRegRow4to6, xRegRowAll, \regWork1, \regWork2, \regWork3, \regWork4, \regWork1D \regWork2D, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D, \regWork12D, \regWork13D, \regWork1X, \regWork2X
 .endm
 
-# 何マス埋まったか調べる(前回の結果をregPrevPopcntに退避する)
-.macro CountFilledElements reg64LoopCnt, reg64CurrentPopcnt, reg64PrevPopcnt, reg64LoopCntD, reg64CurrentPopcntD, reg64PrevPopcntD, regWork, regWorkD
-        # もしかしたらメモリの方が速いかもしれない
-        MacroPextrq \reg64PrevPopcnt, xLoopPopCnt, 0
-        MacroPextrq \reg64LoopCnt,    xLoopPopCnt, 1
-        MacroPextrq \reg64CurrentPopcnt, xRegRowAll, 0
-        MacroPextrq \regWork,            xRegRowAll, 1
+# Count how many cells are filled after moving previous count to regPrevPopcnt
+.macro CountFilledElements reg64LoopCnt, reg64CurrentPopcnt, reg64PrevPopcnt, regWork
+        MacroPextrq  \reg64PrevPopcnt, xLoopPopCnt, 0
+        MacroPextrq  \reg64LoopCnt,    xLoopPopCnt, 1
+        MacroPextrq  \reg64CurrentPopcnt, xRegRowAll, 0
+        MacroPextrq  \regWork,            xRegRowAll, 1
         popcnt  \reg64CurrentPopcnt, \reg64CurrentPopcnt
         popcnt  \regWork, \regWork
         add     \reg64CurrentPopcnt, \regWork
@@ -1325,40 +1321,39 @@ testFindNineCandidates:
 
         .global testCountFilledElements
 testCountFilledElements:
-        CountFilledElements rax, rbx, rcx, eax, ebx, ecx, r14, r14d
+        CountFilledElements rax, rbx, rcx, r14
         ret
 
-# 前回の結果を保存する
-.macro SaveLoopCnt reg64LoopCnt, regCurrentPopcnt, reg64LoopCntD, regCurrentPopcntD
+.macro SaveLoopCnt reg64LoopCnt, regCurrentPopcnt
         MacroPinsrq xLoopPopCnt, \regCurrentPopcnt, 0
         MacroPinsrq xLoopPopCnt, \reg64LoopCnt, 1
 .endm
 
         .global testSaveLoopCnt
 testSaveLoopCnt:
-        SaveLoopCnt rax, rbx, eax, ebx
+        SaveLoopCnt rax, rbx
         ret
 
 # ----------------------------------------------------------------------------------------------------
-# バックトラッキングでマスを埋めるマクロのラベルは3桁(下から順)
-# 指定ビットより右にマスクを指定位置に設定する
+# Labels in backtracking must have 3-digits number
 
-# マスの候補数を数える
-# regPopCount = 0または2のべき乗のときは大きな値、それ以外は立っているビット数
-# regPopCount += 立っているビット数
-.macro PopCountOrPowerOf2 regPopCount, regAccumPopCount, regSrc, regPopCountD, regAccumPopCountD, regSrcD, inBoxShift, regWork1, regWork1D
+# Count a number of candidates in a cell and set it to regPopCount
+# regPopCount = an out-of-range large number if the cell holds 0 or a power-of-2 number
+#               otherwise population (number of 1-bits) of the cell
+# regAccumPopCount += population of the cell
+.macro PopCountOrPowerOf2 regPopCountD, regAccumPopCountD, regSrcD, inBoxShift, regWork1D
         SelectElementInRowParts  \regWork1D, \regSrcD, \inBoxShift
-        popcnt  \regPopCount, \regWork1
-        mov     \regWork1, candidatesTooMany
-        add     \regAccumPopCount, \regPopCount
-        cmp     \regPopCount, 1
-        CmovLessEqual  \regPopCount, \regWork1
+        popcnt  \regPopCountD, \regWork1D
+        mov     \regWork1D, candidatesTooMany
+        add     \regAccumPopCountD, \regPopCountD
+        cmp     \regPopCountD, 1
+        CmovLessEqual  \regPopCountD, \regWork1D
 .endm
 
 .macro TestPopCountOrPowerOf2 inBoxShift
         InitMaskRegister
         mov  rbx, rdx
-        PopCountOrPowerOf2 rax, rbx, rcx, eax, ebx, ecx, \inBoxShift, r8, r8d
+        PopCountOrPowerOf2 eax, ebx, ecx, \inBoxShift, r8d
         ret
 .endm
 
@@ -1374,7 +1369,8 @@ testPopCountOrPowerOf21:
 testPopCountOrPowerOf22:
         TestPopCountOrPowerOf2 2
 
-# High:Low(幅はbitWidth)の組について、Left > Rightの辞書順に比較する
+# Compare regLeft > regRight in a dictionary order which contain High:Low bitset.
+# [MSB..bitWidth] of regLow and upper bitWidth-bits of bitHigh must be 0.
 .macro CompareRegisterSet regLeftHigh, regLeftLow, regRightHigh, regRightLow, bitWidth, regWork1, regWork2
         mov  \regWork1, \regLeftHigh
         ShlNonZero  \regWork1, \bitWidth
@@ -1385,26 +1381,33 @@ testPopCountOrPowerOf22:
         cmp  \regWork1, \regWork2
 .endm
 
-        .global testCompareRegisterSet
-testCompareRegisterSet:
+.macro testCompareRegisterSet regLeftHigh, regLeftLow, regRightHigh, regRightLow, regWork1, regWork2
         InitMaskRegister
         xor  rax, rax
         xor  rbx, rbx
         mov  r10, 1
-        CompareRegisterSet rcx, rdx, rsi, rdi, 16, r8, r9
+        CompareRegisterSet \regLeftHigh, \regLeftLow, \regRightHigh, \regRightLow, 16, \regWork1, \regWork2
         cmovz  rax, r10
         cmovc  rbx, r10
         ret
+.endm
 
-# マスの候補数がregMinCount以下であれば、そのマスの位置を返す
-.macro CountCellCandidates regOutBoxShift, regInBoxShift, regMinCount, regRowPopCount, regSrc, regOutBoxShiftD, regInBoxShiftD, regMinCountD, regRowPopCountD, regSrcD, outBoxShift, inBoxShift, regWork1, regWork2, regWork3, regWork1D, regWork2D, regWork3D
-        PopCountOrPowerOf2  \regWork1, \regRowPopCount, \regSrc, \regWork1D, \regRowPopCountD, \regSrcD, \inBoxShift, \regWork2, \regWork2D
-        mov  \regWork2, \outBoxShift
-        mov  \regWork3, \inBoxShift
-        cmp  \regWork1, \regMinCount
-        CmovLessEqual  \regOutBoxShift, \regWork2
-        CmovLessEqual  \regInBoxShift, \regWork3
-        CmovLessEqual  \regMinCount, \regWork1
+        .global testCompareRegisterSet64
+        .global testCompareRegisterSet32
+testCompareRegisterSet64:
+        testCompareRegisterSet rcx, rdx, rsi, rdi, r8, r9
+testCompareRegisterSet32:
+        testCompareRegisterSet ecx, edx, esi, edi, r8d, r9d
+
+# Set the position of a cell if the cell has candidates less than or equal to regMinCount
+.macro CountCellCandidates regOutBoxShiftD, regInBoxShiftD, regMinCountD, regRowPopCountD, regSrcD, outBoxShift, inBoxShift, regWork1D, regWork2D, regWork3D
+        PopCountOrPowerOf2  \regWork1D, \regRowPopCountD, \regSrcD, \inBoxShift, \regWork2D
+        mov  \regWork2D, \outBoxShift
+        mov  \regWork3D, \inBoxShift
+        cmp  \regWork1D, \regMinCountD
+        CmovLessEqual  \regOutBoxShiftD, \regWork2D
+        CmovLessEqual  \regInBoxShiftD, \regWork3D
+        CmovLessEqual  \regMinCountD, \regWork1D
 .endm
 
 .set  testCountCellCandidatesInvalidShift, 0xffff
@@ -1417,7 +1420,7 @@ testCompareRegisterSet:
         mov  rbx, testCountCellCandidatesInvalidShift
         mov  rcx, [rsi]
         mov  rdx, [rsi + 8]
-        CountCellCandidates rax, rbx, rcx, rdx, rdi, eax, ebx, ecx, edx, edi, \outBoxShift, \inBoxShift, r8, r9, r10, r8d, r9d, r10d
+        CountCellCandidates eax, ebx, ecx, edx, edi, \outBoxShift, \inBoxShift, r8d, r9d, r10d
         ret
 .endm
 
@@ -1433,10 +1436,10 @@ testCountCellCandidates21:
 testCountCellCandidates02:
         TestCountCellCandidates 0 2
 
-.macro CountThreeCellCandidates regOutBoxShift, regInBoxShift, regMinCount, regRowPopCount, regSrc, regOutBoxShiftD, regInBoxShiftD, regMinCountD, regRowPopCountD, regSrcD, outBoxShift, regWork1, regWork2, regWork3, regWork1D, regWork2D, regWork3D
-        CountCellCandidates \regOutBoxShift, \regInBoxShift, \regMinCount, \regRowPopCount, \regSrc, \regOutBoxShiftD, \regInBoxShiftD, \regMinCountD, \regRowPopCountD, \regSrcD, \outBoxShift, 0, \regWork1, \regWork2, \regWork3, \regWork1D, \regWork2D, \regWork3D
-        CountCellCandidates \regOutBoxShift, \regInBoxShift, \regMinCount, \regRowPopCount, \regSrc, \regOutBoxShiftD, \regInBoxShiftD, \regMinCountD, \regRowPopCountD, \regSrcD, \outBoxShift, 1, \regWork1, \regWork2, \regWork3, \regWork1D, \regWork2D, \regWork3D
-        CountCellCandidates \regOutBoxShift, \regInBoxShift, \regMinCount, \regRowPopCount, \regSrc, \regOutBoxShiftD, \regInBoxShiftD, \regMinCountD, \regRowPopCountD, \regSrcD, \outBoxShift, 2, \regWork1, \regWork2, \regWork3, \regWork1D, \regWork2D, \regWork3D
+.macro CountThreeCellCandidates regOutBoxShiftD, regInBoxShiftD, regMinCountD, regRowPopCountD, regSrcD, outBoxShift, regWork1D, regWork2D, regWork3D
+        CountCellCandidates \regOutBoxShiftD, \regInBoxShiftD, \regMinCountD, \regRowPopCountD, \regSrcD, \outBoxShift, 0, \regWork1D, \regWork2D, \regWork3D
+        CountCellCandidates \regOutBoxShiftD, \regInBoxShiftD, \regMinCountD, \regRowPopCountD, \regSrcD, \outBoxShift, 1, \regWork1D, \regWork2D, \regWork3D
+        CountCellCandidates \regOutBoxShiftD, \regInBoxShiftD, \regMinCountD, \regRowPopCountD, \regSrcD, \outBoxShift, 2, \regWork1D, \regWork2D, \regWork3D
 .endm
 
         .global testCountThreeCellCandidates
@@ -1446,17 +1449,17 @@ testCountThreeCellCandidates:
         mov  rbx, testCountCellCandidatesInvalidShift
         mov  rcx, [rsi]
         mov  rdx, [rsi + 8]
-        CountThreeCellCandidates rax, rbx, rcx, rdx, rdi, rax, ebx, ecx, edx, edi, 2, r8, r9, r10, r8d, r9d, r10d
+        CountThreeCellCandidates eax, ebx, ecx, edx, edi, 2, r8d, r9d, r10d
         ret
 
-.macro CountRowCellCandidatesSub regOutBoxShift, regInBoxShift, regMinCount, regRowPopCount, regOutBoxShiftD, regInBoxShiftD, regMinCountD, regRowPopCountD, xRegRow, regWork1, regWork2, regWork3, regWork4, regWork5, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D
-        xor  \regRowPopCount, \regRowPopCount
+.macro CountRowCellCandidatesSub regOutBoxShiftD, regInBoxShiftD, regMinCountD, regRowPopCountD, xRegRow, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D
+        xor  \regRowPopCountD, \regRowPopCountD
         MacroPextrd  \regWork2D, \xRegRow, 0
-        CountThreeCellCandidates \regOutBoxShift, \regInBoxShift, \regMinCount, \regRowPopCount, \regWork2, \regOutBoxShiftD, \regInBoxShiftD, \regMinCountD, \regRowPopCountD, \regWork2D, 0, \regWork3, \regWork4, \regWork5, \regWork3D, \regWork4D, \regWork5D
+        CountThreeCellCandidates  \regOutBoxShiftD, \regInBoxShiftD, \regMinCountD, \regRowPopCountD, \regWork2D, 0, \regWork3D, \regWork4D, \regWork5D
         MacroPextrd  \regWork1D, \xRegRow, 1
-        CountThreeCellCandidates \regOutBoxShift, \regInBoxShift, \regMinCount, \regRowPopCount, \regWork1, \regOutBoxShiftD, \regInBoxShiftD, \regMinCountD, \regRowPopCountD, \regWork1D, 1, \regWork3, \regWork4, \regWork5, \regWork3D, \regWork4D, \regWork5D
-        MacroPextrq  \regWork1, \xRegRow, 1
-        CountThreeCellCandidates \regOutBoxShift, \regInBoxShift, \regMinCount, \regRowPopCount, \regWork1, \regOutBoxShiftD, \regInBoxShiftD, \regMinCountD, \regRowPopCountD, \regWork1D, 2, \regWork3, \regWork4, \regWork5, \regWork3D, \regWork4D, \regWork5D
+        CountThreeCellCandidates  \regOutBoxShiftD, \regInBoxShiftD, \regMinCountD, \regRowPopCountD, \regWork1D, 1, \regWork3D, \regWork4D, \regWork5D
+        MacroPextrd  \regWork1D, \xRegRow, 2
+        CountThreeCellCandidates  \regOutBoxShiftD, \regInBoxShiftD, \regMinCountD, \regRowPopCountD, \regWork1D, 2, \regWork3D, \regWork4D, \regWork5D
 .endm
 
         .global testCountRowCellCandidatesSub
@@ -1466,32 +1469,32 @@ testCountRowCellCandidatesSub:
         mov  rbx, testCountCellCandidatesInvalidShift
         mov  rcx, [rip + testCountRowCellCandidatesMinCount]
         MacroMovdqa xRegRow1, [rip + testCountRowCellCandidatesRowX]
-        CountRowCellCandidatesSub rax, rbx, rcx, rdx, eax, ebx, ecx, edx, xRegRow1, r8, r9, r10, r11, r12, r8d, r9d, r10d, r11d, r12d
+        CountRowCellCandidatesSub eax, ebx, ecx, edx, xRegRow1, r8d, r9d, r10d, r11d, r12d
         ret
 
-.macro CountRowCellCandidates xRegRowNumber, regOutBoxShift, regInBoxShift, regMinCount, regRowPopCount, regOutBoxShiftD, regInBoxShiftD, regMinCountD, regRowPopCountD, xRegRow, rowNumber, regWork1, regWork2, regWork3, regWork4, regWork5, regWork6, regWork7, regWork8, regWork9, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D, regWork6D, regWork7D, regWork8D, regWork9D
-        mov  \regWork1, outBoxIndexInvalid
-        mov  \regWork2, inBoxIndexInvalid
-        mov  \regWork3, \regMinCount
-        CountRowCellCandidatesSub  \regWork1, \regWork2, \regWork3, \regWork4, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \xRegRow, \regWork5, \regWork6, \regWork7, \regWork8, \regWork9, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D
+.macro CountRowCellCandidates xRegRowNumber, regOutBoxShiftD, regInBoxShiftD, regMinCountD, regRowPopCountD, xRegRow, rowNumber, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D, regWork6D, regWork7D, regWork8D, regWork9D
+        mov  \regWork1D, outBoxIndexInvalid
+        mov  \regWork2D, inBoxIndexInvalid
+        mov  \regWork3D, \regMinCountD
+        CountRowCellCandidatesSub  \regWork1D, \regWork2D, \regWork3D, \regWork4D, \xRegRow, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D
 
-        xor  \regWork5, \regWork5
-        mov  \regWork6, 1
-        cmp  \regWork1, outBoxIndexInvalid
-        cmovz  \regWork5, \regWork6
-        CompareRegisterSet  \regMinCount, \regRowPopCount, \regWork3, \regWork4, 16, \regWork7, \regWork8
-        CmovLessEqual \regWork5, \regWork6
+        xor  \regWork5D, \regWork5D
+        mov  \regWork6D, 1
+        cmp  \regWork1D, outBoxIndexInvalid
+        cmovz  \regWork5D, \regWork6D
+        CompareRegisterSet  \regMinCountD, \regRowPopCountD, \regWork3D, \regWork4D, 16, \regWork7D, \regWork8D
+        CmovLessEqual \regWork5D, \regWork6D
 
-        or  \regWork5, \regWork5
+        or  \regWork5D, \regWork5D
         jnz 301f
 
-        mov  \regOutBoxShift, \regWork1
-        mov  \regInBoxShift, \regWork2
-        mov  \regWork5, \rowNumber
-        MacroPinsrq  \xRegRowNumber, \regWork5, 0
-        mov \regMinCount, \regWork3
-        mov \regRowPopCount, \regWork4
-        cmp \regWork4, (candidatesNum + 2)
+        mov  \regOutBoxShiftD, \regWork1D
+        mov  \regInBoxShiftD, \regWork2D
+        mov  \regWork5D, \rowNumber
+        MacroPinsrd  \xRegRowNumber, \regWork5D, 0
+        mov  \regMinCountD, \regWork3D
+        mov  \regRowPopCountD, \regWork4D
+        cmp  \regWork4D, (candidatesNum + 2)
         jz  302f
 301:
 .endm
@@ -1500,39 +1503,39 @@ testCountRowCellCandidatesSub:
 testCountRowCellCandidates:
         InitMaskRegister
         mov  rax, testCountCellCandidatesInvalidRowNumber
-        MacroPinsrq xRegWork1, rax, 0
+        MacroPinsrd xRegWork1, eax, 0
         mov  rax, testCountCellCandidatesInvalidShift
         mov  rbx, testCountCellCandidatesInvalidShift
         mov  rcx, [rip + testCountRowCellCandidatesMinCount]
         mov  rdx, [rip + testCountRowCellCandidatesRowPopCount]
         MacroMovdqa xRegRow6, [rip + testCountRowCellCandidatesRowX]
-        CountRowCellCandidates xRegWork1, rax, rbx, rcx, rdx, eax, ebx, ecx, edx, xRegRow6, testCountCellCandidatesRowNumber, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, esi, edi, r8d, r9d, r10d, r11d, r12d, r13d, r14d
-        MacroPextrw rsi, xRegWork1, 0
+        CountRowCellCandidates xRegWork1, eax, ebx, ecx, edx, xRegRow6, testCountCellCandidatesRowNumber, esi, edi, r8d, r9d, r10d, r11d, r12d, r13d, r14d
+        MacroPextrd esi, xRegWork1, 0
         ret
 
-.macro CountRowSetCell xRegRowNumber, regOutBoxShift, regInBoxShift, regOutBoxShiftD, regInBoxShiftD, regWork1, regWork2, regWork3, regWork4, regWork5, regWork6, regWork7, regWork8, regWork9, regWork10, regWork11, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D, regWork6D, regWork7D, regWork8D, regWork9D, regWork10D, regWork11D
-        mov  \regOutBoxShift, outBoxIndexInvalid
-        mov  \regInBoxShift, inBoxIndexInvalid
-        mov  \regWork1, rowNumberInvalid
-        MacroPinsrq \xRegRowNumber, \regWork1, 0
-        mov  \regWork1, candidatesTooMany
-        xor  \regWork2, \regWork2
+.macro CountRowSetCell xRegRowNumber, regOutBoxShiftD, regInBoxShiftD, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D, regWork6D, regWork7D, regWork8D, regWork9D, regWork10D, regWork11D
+        mov  \regOutBoxShiftD, outBoxIndexInvalid
+        mov  \regInBoxShiftD, inBoxIndexInvalid
+        mov  \regWork1D, rowNumberInvalid
+        MacroPinsrd  \xRegRowNumber, \regWork1D, 0
+        mov  \regWork1D, candidatesTooMany
+        xor  \regWork2D, \regWork2D
 
-        CountRowCellCandidates  \xRegRowNumber, \regOutBoxShift, \regInBoxShift, \regWork1, \regWork2, \regOutBoxShiftD, \regInBoxShiftD, \regWork1D, \regWork2D, xRegRow1, 0, \regWork3, \regWork4, \regWork5, \regWork6, \regWork7, \regWork8, \regWork9, \regWork10, \regWork11, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D
-        CountRowCellCandidates  \xRegRowNumber, \regOutBoxShift, \regInBoxShift, \regWork1, \regWork2, \regOutBoxShiftD, \regInBoxShiftD, \regWork1D, \regWork2D, xRegRow2, 1, \regWork3, \regWork4, \regWork5, \regWork6, \regWork7, \regWork8, \regWork9, \regWork10, \regWork11, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D
-        CountRowCellCandidates  \xRegRowNumber, \regOutBoxShift, \regInBoxShift, \regWork1, \regWork2, \regOutBoxShiftD, \regInBoxShiftD, \regWork1D, \regWork2D, xRegRow3, 2, \regWork3, \regWork4, \regWork5, \regWork6, \regWork7, \regWork8, \regWork9, \regWork10, \regWork11, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D
-        CountRowCellCandidates  \xRegRowNumber, \regOutBoxShift, \regInBoxShift, \regWork1, \regWork2, \regOutBoxShiftD, \regInBoxShiftD, \regWork1D, \regWork2D, xRegRow4, 3, \regWork3, \regWork4, \regWork5, \regWork6, \regWork7, \regWork8, \regWork9, \regWork10, \regWork11, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D
-        CountRowCellCandidates  \xRegRowNumber, \regOutBoxShift, \regInBoxShift, \regWork1, \regWork2, \regOutBoxShiftD, \regInBoxShiftD, \regWork1D, \regWork2D, xRegRow5, 4, \regWork3, \regWork4, \regWork5, \regWork6, \regWork7, \regWork8, \regWork9, \regWork10, \regWork11, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D
-        CountRowCellCandidates  \xRegRowNumber, \regOutBoxShift, \regInBoxShift, \regWork1, \regWork2, \regOutBoxShiftD, \regInBoxShiftD, \regWork1D, \regWork2D, xRegRow6, 5, \regWork3, \regWork4, \regWork5, \regWork6, \regWork7, \regWork8, \regWork9, \regWork10, \regWork11, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D
-        CountRowCellCandidates  \xRegRowNumber, \regOutBoxShift, \regInBoxShift, \regWork1, \regWork2, \regOutBoxShiftD, \regInBoxShiftD, \regWork1D, \regWork2D, xRegRow7, 6, \regWork3, \regWork4, \regWork5, \regWork6, \regWork7, \regWork8, \regWork9, \regWork10, \regWork11, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D
-        CountRowCellCandidates  \xRegRowNumber, \regOutBoxShift, \regInBoxShift, \regWork1, \regWork2, \regOutBoxShiftD, \regInBoxShiftD, \regWork1D, \regWork2D, xRegRow8, 7, \regWork3, \regWork4, \regWork5, \regWork6, \regWork7, \regWork8, \regWork9, \regWork10, \regWork11, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D
-        CountRowCellCandidates  \xRegRowNumber, \regOutBoxShift, \regInBoxShift, \regWork1, \regWork2, \regOutBoxShiftD, \regInBoxShiftD, \regWork1D, \regWork2D, xRegRow9, 8, \regWork3, \regWork4, \regWork5, \regWork6, \regWork7, \regWork8, \regWork9, \regWork10, \regWork11, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D
+        CountRowCellCandidates  \xRegRowNumber, \regOutBoxShiftD, \regInBoxShiftD, \regWork1D, \regWork2D, xRegRow1, 0, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D
+        CountRowCellCandidates  \xRegRowNumber, \regOutBoxShiftD, \regInBoxShiftD, \regWork1D, \regWork2D, xRegRow2, 1, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D
+        CountRowCellCandidates  \xRegRowNumber, \regOutBoxShiftD, \regInBoxShiftD, \regWork1D, \regWork2D, xRegRow3, 2, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D
+        CountRowCellCandidates  \xRegRowNumber, \regOutBoxShiftD, \regInBoxShiftD, \regWork1D, \regWork2D, xRegRow4, 3, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D
+        CountRowCellCandidates  \xRegRowNumber, \regOutBoxShiftD, \regInBoxShiftD, \regWork1D, \regWork2D, xRegRow5, 4, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D
+        CountRowCellCandidates  \xRegRowNumber, \regOutBoxShiftD, \regInBoxShiftD, \regWork1D, \regWork2D, xRegRow6, 5, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D
+        CountRowCellCandidates  \xRegRowNumber, \regOutBoxShiftD, \regInBoxShiftD, \regWork1D, \regWork2D, xRegRow7, 6, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D
+        CountRowCellCandidates  \xRegRowNumber, \regOutBoxShiftD, \regInBoxShiftD, \regWork1D, \regWork2D, xRegRow8, 7, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D
+        CountRowCellCandidates  \xRegRowNumber, \regOutBoxShiftD, \regInBoxShiftD, \regWork1D, \regWork2D, xRegRow9, 8, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D
 302:
 .endm
 
 .macro SearchNextCandidate
-        CountRowSetCell xRegWork1, rax, rbx, eax, ebx, rcx, rdx, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, ecx, edx, esi, edi, r8d, r9d, r10d, r11d, r12d, r13d, r14d
-        MacroPextrq  rcx, xRegWork1, 0
+        CountRowSetCell xRegWork1, eax, ebx, ecx, edx, esi, edi, r8d, r9d, r10d, r11d, r12d, r13d, r14d
+        MacroPextrd  ecx, xRegWork1, 0
         mov  r8, nextCellFound
         xor  rdx, rdx
         cmp  rcx, rowNumberInvalid
@@ -1557,13 +1560,13 @@ testSearchNextCandidate:
         .global testCheckSetBox
         .global testCheckConsistency
 
-.macro FoldRowParts xRegRow, regWork1, regWork2, regWork3, regWork4, regWork5, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D
+.macro FoldRowParts xRegRow, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D
         MacroPextrd  \regWork1D, \xRegRow, 2
-        MergeThreeElements64  \regWork1, \regWork4, \regWork5
+        MergeThreeElements32  \regWork1D, \regWork4D, \regWork5D
         MacroPextrd  \regWork2D, \xRegRow, 1
-        MergeThreeElements64  \regWork2, \regWork4, \regWork5
+        MergeThreeElements32  \regWork2D, \regWork4D, \regWork5D
         MacroPextrd  \regWork3D, \xRegRow, 0
-        MergeThreeElements64  \regWork3, \regWork4, \regWork5
+        MergeThreeElements32  \regWork3D, \regWork4D, \regWork5D
 .endm
 
 testFoldRowParts:
@@ -1571,118 +1574,118 @@ testFoldRowParts:
         xor  rax, rax
         xor  rbx, rbx
         xor  rcx, rcx
-        FoldRowParts  xRegRow1, rax, rbx, rcx, r8, r9, eax, ebx, ecx, r8d, r9d
+        FoldRowParts  xRegRow1, eax, ebx, ecx, r8d, r9d
         ret
 
-# 列にすべての候補があるかどうか調べて、結果を返す
-# そうであればregResultは不変、そうでなければregInvalidを設定する
-.macro CheckRow xRegRow, regResult, regInvalid, regResultD, regInvalidD, regWork1, regWork2, regWork3, regWork4, regWork5, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D
-        FoldRowParts \xRegRow, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
-        or      \regWork1, \regWork2
-        or      \regWork1, \regWork3
-        popcnt  \regWork1, \regWork1
-        cmp     \regWork1, candidatesNum
-        cmovnz  \regResult, \regInvalid
+# Leave regResult unchanged if all the row contains all 9 candidates.
+# Otherwise set regInvalid to regResult.
+.macro CheckRow xRegRow, regResultD, regInvalidD, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D
+        FoldRowParts \xRegRow, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
+        or      \regWork1D, \regWork2D
+        or      \regWork1D, \regWork3D
+        popcnt  \regWork1D, \regWork1D
+        cmp     \regWork1D, candidatesNum
+        cmovnz  \regResultD, \regInvalidD
 .endm
 
 testCheckRow:
         InitMaskRegister
         xor  rax, rax
         mov  r8, 1
-        CheckRow  xRegRow1, rax, r8, eax, r8d, r9, r10, r11, r12, r13, r9d, r10d, r11d, r12d, r13d
+        CheckRow  xRegRow1, eax, r8d, r9d, r10d, r11d, r12d, r13d
         ret
 
-.macro CheckRowSet regResult, regInvalid, regResultD, regInvalidD, regWork1, regWork2, regWork3, regWork4, regWork5, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D
-        CheckRow xRegRow1, \regResult, \regInvalid, \regResultD, \regInvalidD, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
-        CheckRow xRegRow2, \regResult, \regInvalid, \regResultD, \regInvalidD, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
-        CheckRow xRegRow3, \regResult, \regInvalid, \regResultD, \regInvalidD, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
-        CheckRow xRegRow4, \regResult, \regInvalid, \regResultD, \regInvalidD, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
-        CheckRow xRegRow5, \regResult, \regInvalid, \regResultD, \regInvalidD, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
-        CheckRow xRegRow6, \regResult, \regInvalid, \regResultD, \regInvalidD, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
-        CheckRow xRegRow7, \regResult, \regInvalid, \regResultD, \regInvalidD, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
-        CheckRow xRegRow8, \regResult, \regInvalid, \regResultD, \regInvalidD, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
-        CheckRow xRegRow9, \regResult, \regInvalid, \regResultD, \regInvalidD, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
+.macro CheckRowSet regResultD, regInvalidD, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D
+        CheckRow xRegRow1, \regResultD, \regInvalidD, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
+        CheckRow xRegRow2, \regResultD, \regInvalidD, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
+        CheckRow xRegRow3, \regResultD, \regInvalidD, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
+        CheckRow xRegRow4, \regResultD, \regInvalidD, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
+        CheckRow xRegRow5, \regResultD, \regInvalidD, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
+        CheckRow xRegRow6, \regResultD, \regInvalidD, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
+        CheckRow xRegRow7, \regResultD, \regInvalidD, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
+        CheckRow xRegRow8, \regResultD, \regInvalidD, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
+        CheckRow xRegRow9, \regResultD, \regInvalidD, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
 .endm
 
 testCheckRowSet:
         InitMaskRegister
         xor  rax, rax
         mov  r8, 1
-        CheckRowSet  rax, r8, eax, r8d, r9, r10, r11, r12, r13, r9d, r10d, r11d, r12d, r13d
+        CheckRowSet  eax, r8d, r9d, r10d, r11d, r12d, r13d
         ret
 
-.macro CheckColumn regResult, regInvalid, regResultd, regInvalidd, reg32Work1, reg32Work2, reg32Work3
-        MacroPextrd \reg32Work1, xRegRowAll, 0
-        MacroPextrd \reg32Work2, xRegRowAll, 1
-        MacroPextrd \reg32Work3, xRegRowAll, 2
-        popcnt  \reg32Work1, \reg32Work1
-        popcnt  \reg32Work2, \reg32Work2
-        popcnt  \reg32Work3, \reg32Work3
+.macro CheckColumn regResultD, regInvalidD, regWork1D, regWork2D, regWork3D
+        MacroPextrd \regWork1D, xRegRowAll, 0
+        MacroPextrd \regWork2D, xRegRowAll, 1
+        MacroPextrd \regWork3D, xRegRowAll, 2
+        popcnt  \regWork1D, \regWork1D
+        popcnt  \regWork2D, \regWork2D
+        popcnt  \regWork3D, \regWork3D
 
-        cmp     \reg32Work1, (candidatesNum * rowPartNum)
-        cmovnz  \regResult, \regInvalid
-        cmp     \reg32Work2, (candidatesNum * rowPartNum)
-        cmovnz  \regResult, \regInvalid
-        cmp     \reg32Work3, (candidatesNum * rowPartNum)
-        cmovnz  \regResult, \regInvalid
+        cmp     \regWork1D, (candidatesNum * rowPartNum)
+        cmovnz  \regResultD, \regInvalidD
+        cmp     \regWork2D, (candidatesNum * rowPartNum)
+        cmovnz  \regResultD, \regInvalidD
+        cmp     \regWork3D, (candidatesNum * rowPartNum)
+        cmovnz  \regResultD, \regInvalidD
 .endm
 
 testCheckColumn:
         InitMaskRegister
         xor  rax, rax
         mov  r8, 1
-        CheckColumn  rax, r8, eax, r8d, ebx, ecx, edx
+        CheckColumn  eax, r8d, ebx, ecx, edx
         ret
 
-.macro CheckBox xRegRow, regResult, regInvalid, regResultD, regInvalidD, regWork1, regWork2, regWork3, regWork4, regWork5, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D
-        FoldRowParts \xRegRow, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
+.macro CheckBox xRegRow, regResultD, regInvalidD, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D
+        FoldRowParts \xRegRow, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
 
-        popcnt  \regWork1, \regWork1
-        cmp     \regWork1, candidatesNum
-        cmovnz  \regResult, \regInvalid
+        popcnt  \regWork1D, \regWork1D
+        cmp     \regWork1D, candidatesNum
+        cmovnz  \regResultD, \regInvalidD
 
-        popcnt  \regWork2, \regWork2
-        cmp     \regWork2, candidatesNum
-        cmovnz  \regResult, \regInvalid
+        popcnt  \regWork2D, \regWork2D
+        cmp     \regWork2D, candidatesNum
+        cmovnz  \regResultD, \regInvalidD
 
-        popcnt  \regWork3, \regWork3
-        cmp     \regWork3, candidatesNum
-        cmovnz  \regResult, \regInvalid
+        popcnt  \regWork3D, \regWork3D
+        cmp     \regWork3D, candidatesNum
+        cmovnz  \regResultD, \regInvalidD
 .endm
 
 testCheckBox:
         InitMaskRegister
         xor  rax, rax
         mov  r8, 1
-        CheckBox  xRegRow1to3, rax, r8, eax, r8d, r9, r10, r11, r12, r13, r9d, r10d, r11d, r12d, r13d
+        CheckBox  xRegRow1to3, eax, r8d, r9d, r10d, r11d, r12d, r13d
         ret
 
-.macro CheckSetBox regResult, regInvalid, regResultD, regInvalidD, regWork1, regWork2, regWork3, regWork4, regWork5, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D
-        CheckBox xRegRow1to3, \regResult, \regInvalid, \regResultD, \regInvalidD, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
-        CheckBox xRegRow4to6, \regResult, \regInvalid, \regResultD, \regInvalidD, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
-        CheckBox xRegRow7to9, \regResult, \regInvalid, \regResultD, \regInvalidD, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
+.macro CheckSetBox regResultD, regInvalidD, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D
+        CheckBox xRegRow1to3, \regResultD, \regInvalidD, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
+        CheckBox xRegRow4to6, \regResultD, \regInvalidD, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
+        CheckBox xRegRow7to9, \regResultD, \regInvalidD, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
 .endm
 
 testCheckSetBox:
         InitMaskRegister
         xor  rax, rax
         mov  r8, 1
-        CheckSetBox  rax, r8, eax, r8d, r9, r10, r11, r12, r13, r9d, r10d, r11d, r12d, r13d
+        CheckSetBox  eax, r8d, r9d, r10d, r11d, r12d, r13d
         ret
 
-.macro CheckConsistency regResult, regInvalid, regResultD, regInvalidD, regWork1, regWork2, regWork3, regWork4, regWork5, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D, reg32Work1, reg32Work2, reg32Work3
-        xor  \regResult, \regResult
-        mov  \regInvalid, 1
-        CheckRowSet  \regResult, \regInvalid, \regResultD, \regInvalidD, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
-        cmp  \regResult, \regInvalid
+.macro CheckConsistency regResultD, regInvalidD, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D, reg32Work1, reg32Work2, reg32Work3
+        xor  \regResultD, \regResultD
+        mov  \regInvalidD, 1
+        CheckRowSet  \regResultD, \regInvalidD, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
+        cmp  \regResultD, \regInvalidD
         jz   20001f
 
         OrThreeXmmRegs  xRegRow1to3, xRegRow1, xRegRow2, xRegRow3
         OrThreeXmmRegs  xRegRow4to6, xRegRow4, xRegRow5, xRegRow6
         OrThreeXmmRegs  xRegRow7to9, xRegRow7, xRegRow8, xRegRow9
         OrThreeXmmRegs  xRegRowAll, xRegRow1to3, xRegRow4to6, xRegRow7to9
-        CheckColumn  \regResult, \regInvalid, \regResultD, \regInvalidD, \reg32Work1, \reg32Work2, \reg32Work3
-        CheckSetBox  \regResult, \regInvalid, \regResultD, \regInvalidD, \regWork1, \regWork2, \regWork3, \regWork4, \regWork5, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
+        CheckColumn  \regResultD, \regInvalidD, \reg32Work1, \reg32Work2, \reg32Work3
+        CheckSetBox  \regResultD, \regInvalidD, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
 20001:
 .endm
 
@@ -1690,59 +1693,60 @@ testCheckConsistency:
         InitMaskRegister
         xor  rax, rax
         mov  r8, 1
-        CheckConsistency  rax, r8, eax, r8d, r9, r10, rbx, rcx, rdx, r9d, r10d, ebx, ecx, edx, ebx, ecx, edx
+        CheckConsistency  eax, r8d, r9d, r10d, ebx, ecx, edx, ebx, ecx, edx
         ret
 
-# コードを連続した領域に配置したよいので、テストを挟まず一か所にまとめる
-# C++のインラインアセンブラからサブルーチンとして呼び出すためのシンボル
+# Assign code (text) in a consecutive memory area which its tests do not divide.
+# The symbol that C++ code calls via inline assembly.
         .global solveSudokuAsm
 solveSudokuAsm:
         mov    gRegBitMask, elementBitMask
         xorps  xLoopPopCnt, xLoopPopCnt
         mov    qword ptr [rip + sudokuXmmNextCellFound], 0
 
-        # データ構造
-        # xmmレジスタ = | 32bit:all 0 | 32bit:1行1..3列 | 同4..6列 | 同7..9列 |
-        # xmmレジスタ0..8 = 1..9列目
-        # xmmレジスタの各32bit = |22個の0, c_9, c_8, ... , c_1, 0|
-        # c_n: マスに数字nが入れば1、そうでなければ0|
+        # Data structure holding sudoku cells
+        # XMM registers = 1st .. 9th rows
+        # An XMM register = | 32bit: all 0 | 32bit: 1st row, 1st .. 3rd columns | 32bit: 4..6 | 32bit: 7..9 |
+        # Set of 9 bits in a XMM register = | c_9, c_8, ... , c_1 |
+        # c_n: 1 if n is a candidate of the cell c, 0 otherwise
 
 loopFilling:
-        # 3行ごとに候補をまとめる
+        # Find cadidates per 3 rows
         CollectUniqueCandidatesInThreeLine xRegRow1to3, xRegRow1, xRegRow2, xRegRow3, rax, rbx, rcx, rdx, r8, r9, r10, eax, xRegWork1, xRegWork2
         CollectUniqueCandidatesInThreeLine xRegRow4to6, xRegRow4, xRegRow5, xRegRow6, rax, rbx, rcx, rdx, r8, r9, r10, eax, xRegWork1, xRegWork2
         CollectUniqueCandidatesInThreeLine xRegRow7to9, xRegRow7, xRegRow8, xRegRow9, rax, rbx, rcx, rdx, r8, r9, r10, eax, xRegWork1, xRegWork2
-        # すべての行をまとめる
+        # Hold 3 * 3 rows
         OrThreeXmmRegs xRegRowAll, xRegRow1to3, xRegRow4to6, xRegRow7to9
 
-        # 何マス埋まったか調べる
-        .set    regCurrentPopcnt, r8
-        .set    regCurrentPopcntd, r8d
-        .set    regPrevPopcnt,    r9
-        .set    regPrevPopcntd,    r9d
-        .set    regMaxPopcnt,     r10
-        .set    regMaxPopcntd,     r10d
-        .set    regLoopCnt,       r11
-        .set    regLoopCntd,       r11d
-        CountFilledElements regLoopCnt, regCurrentPopcnt, regPrevPopcnt, regLoopCntd, regCurrentPopcntd, regPrevPopcntd, rcx, ecx
-        mov     regMaxPopcnt, maxElementNumber
+        # Count how many cells are filled
+        .set    regCurrentPopcnt,  r8
+        .set    regCurrentPopcntD, r8d
+        .set    regPrevPopcnt,     r9
+        .set    regPrevPopcntD,    r9d
+        .set    regMaxPopcnt,      r10
+        .set    regMaxPopcntD,     r10d
+        .set    regLoopCnt,        r11
+        .set    regLoopCntD,       r11d
+        CountFilledElements regLoopCnt, regCurrentPopcnt, regPrevPopcnt, rcx
+        mov     regMaxPopcntD, maxElementNumber
 
-        # 全マス埋まったか、マスを埋められなかった(最大のマス数と比較してZF=1)
-        cmp     regCurrentPopcnt, regPrevPopcnt
-        cmovz   regPrevPopcnt, regMaxPopcnt
-        cmp     regPrevPopcnt, regMaxPopcnt
+        # ZF=0 if all cells are filled or no cell is filled in this iteration
+        # ZF=1 otherwise
+        cmp     regCurrentPopcntD, regPrevPopcntD
+        cmovz   regPrevPopcntD, regMaxPopcntD
+        cmp     regPrevPopcntD, regMaxPopcntD
         jnz     keepFilling
 
 exitFilling:
-        .set    regResult, r9
-        .set    regResultd, r9d
+        .set    regResult,  r9
+        .set    regResultD, r9d
         mov     qword ptr [rip + sudokuXmmElementCnt], regCurrentPopcnt
-        CheckConsistency regResult, r10, regResultd, r10d, r11, r12, rbx, rcx, rdx, r11d, r12d, ebx, ecx, edx, ebx, ecx, edx
+        CheckConsistency regResultD, r10d, r11d, r12d, ebx, ecx, edx, ebx, ecx, edx
         mov     qword ptr [rip + sudokuXmmAborted], regResult
-        cmp     regCurrentPopcnt, regMaxPopcnt
+        cmp     regCurrentPopcntD, regMaxPopcntD
         jz      exitFillingCells
 
-        # 全マス埋まっていないときは、バックトラッキングのために決め打ちするマスを選ぶ
+        # Find a cell to guess its candidate if not all cells are filled
         SearchNextCandidate
 exitFillingCells:
         ret
@@ -1753,14 +1757,14 @@ abortFilling:
         ret
 
 keepFilling:
-        # 強制終了
-        cmp     regLoopCnt, sudokuMaxLoopcnt
+        # Abort this loop
+        cmp     regLoopCntD, sudokuMaxLoopcnt
         JumpIfGreaterEqual exitFilling
-        FastInc regLoopCnt
-        SaveLoopCnt regLoopCnt, regCurrentPopcnt, regLoopCntd, regCurrentPopcntd
+        FastInc regLoopCntD
+        SaveLoopCnt regLoopCnt, regCurrentPopcnt
 
         CollectUniqueCandidates r8d, r9d, r10d, r11d, r12d, r13d, r14d, eax, ebx, ecx, edx, xRegWork1, xRegWork2
-        FindCandidates r8, r9, r10, r11, r12, r13, r14, rax, rbx, rcx, rdx, rsi, rdi, r8d, r9d, r10d, r11d, r12d, r13d, r14d, eax, ebx, ecx, edx, esi, edi, xRegWork1, xRegWork2
+        FindCandidates r8, r9, r10, r11, r8d, r9d, r10d, r11d, r12d, r13d, r14d, eax, ebx, ecx, edx, esi, edi, xRegWork1, xRegWork2
         jmp loopFilling
 
         .global loadXmmRegisters
@@ -1802,6 +1806,7 @@ saveXmmRegisters:
         MacroMovdqa (xmmword ptr [rdi+224]), xmm14
         MacroMovdqa (xmmword ptr [rdi+240]), xmm15
         ret
+
 
 # 数独の個数を数える
         # 固定でレジスタを割り当てる(rcxはシフト用)

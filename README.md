@@ -38,8 +38,8 @@ After built successfully, executable files _bin/sudokusse*.exe_ are generated.
 SudokuSSE with AVX uses ANDN instruction of BMI1 (Bit Manipulation
 Instructions), which is available on Haswell and newer
 microarchitecture. If you cannot run on such processors, set
-_EnableAvx_ in _Makefile_vars_ to 0 or it occurs an invalid opcode
-exception.
+_EnableAvx_ in _Makefile_vars_ to 0 or an invalid opcode
+exception occurs.
 
 ## Solve a sudoku puzzle example
 

@@ -55,7 +55,7 @@ compile-time, not in runtime.
 SudokuSSE with AVX uses ANDN instruction of BMI1 (Bit Manipulation
 Instructions), which is available on Haswell and newer
 microarchitecture. If you cannot run on such processors, set
-_EnableAvx_ to 0 or it occurs an invalid opcode exception.
+_EnableAvx_ to 0 or an invalid opcode exception occurs.
 
 ## Prepare sudoku puzzles
 

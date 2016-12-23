@@ -1937,7 +1937,15 @@ void SudokuSseTest::test_CompareRegisterSet() {
         gRegister zeroFlag = 0;
         gRegister carryFlag = 0;
         asm volatile (
-            "call testCompareRegisterSet\n\t"
+            "call testCompareRegisterSet64\n\t"
+            :"=a"(zeroFlag),"=b"(carryFlag):"c"(test.leftHigh),"d"(test.leftLow),"S"(test.rightHigh),"D"(test.rightLow):"r8", "r9", "r10", "r15");
+        CPPUNIT_ASSERT_EQUAL(test.zeroFlag, zeroFlag);
+        CPPUNIT_ASSERT_EQUAL(test.carryFlag, carryFlag);
+
+        zeroFlag = 0;
+        carryFlag = 0;
+        asm volatile (
+            "call testCompareRegisterSet32\n\t"
             :"=a"(zeroFlag),"=b"(carryFlag):"c"(test.leftHigh),"d"(test.leftLow),"S"(test.rightHigh),"D"(test.rightLow):"r8", "r9", "r10", "r15");
         CPPUNIT_ASSERT_EQUAL(test.zeroFlag, zeroFlag);
         CPPUNIT_ASSERT_EQUAL(test.carryFlag, carryFlag);
