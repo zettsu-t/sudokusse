@@ -590,11 +590,23 @@ a profiler to SudokuSSE.
 
 * Set optimization level -O2. -O3 makes SudokuSSE slower.
 
-* Read the x86_64 manual closely. The manual tells us not only general
-  optimization guidelines but slight differences on performance such
-  as CMOV instructions.
+To write fast code in x86_64 assembly, we need to read the x86_64
+manual closely. The manual tells us not only general optimization
+guidelines but slight differences on performance such as CMOV
+instructions.
+
+* Use the x86_64 32-bit registers instead of the 64-bit registers if
+possible.  Output to a 32-bit register clears its upper 32 bits and
+removes redundant bit masking. This rule surely works fine on the
+_using-32bit-registers_ branch.
 
 * To return from a function in assembly, pop + jmp is faster than ret.
+
+I replaced assembly macro parameters as 64-bit registers with 32-bit
+registers manually. If you know how to convert a 64-bit register to
+its 32-bit register alias, for example RAX to EAX register, I would
+like to share your solution on
+[the Stack Overflow Community](http://stackoverflow.com/questions/41107642/how-to-convert-x86-64-64-bit-register-names-to-their-corresponding-32-bit-regist).
 
 ## Bibliography and acknowledgments
 
@@ -624,3 +636,7 @@ a profiler to SudokuSSE.
 5. I use these sudoku puzzles as test cases.
 
   http://staffhome.ecm.uwa.edu.au/~00013890/sudoku17
+
+6. I posted a question for assembly and received some useful advice.
+
+http://stackoverflow.com/questions/41107642/how-to-convert-x86-64-64-bit-register-names-to-their-corresponding-32-bit-regist

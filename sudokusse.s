@@ -1,12 +1,6 @@
 # Sudoku solver with SSE 4.2 / AVX
 # Copyright (C) 2012-2016 Zettsu Tatsuya
 
-# このブランチの目標
-# 64bitレジスタではなく、32bitでレジスタ計算できるところはそうする
-# 理由:
-# - 32bitレジスタへのアクセスは、64bitレジスタの上位32bitを0にするので、同様のマスク操作が不要になる
-# - REX prefixがないと命令長が短くなる
-
 .intel_syntax noprefix
 .file   "sudokusse.s"
         # Makefile designates these flags and they should not be hard-coded here.
@@ -1807,6 +1801,7 @@ saveXmmRegisters:
         MacroMovdqa (xmmword ptr [rdi+240]), xmm15
         ret
 
+# 64bitレジスタではなく、32bitでレジスタ計算できるところはそうする、という変更はここまで
 
 # 数独の個数を数える
         # 固定でレジスタを割り当てる(rcxはシフト用)
