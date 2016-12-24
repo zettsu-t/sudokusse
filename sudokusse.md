@@ -452,7 +452,8 @@ I apply steps described in _Shasha[2007]_.
 
 To find a unique candidate of a cell, collect numbers in cells of a
 row, column, and box that the cell belongs. For example, the size of
-the number is 8, the rest is the unique candidate.
+the number is 8, the rest is the unique candidate. This is commonly
+called _naked single_.
 
 When a row has cells `*23456789`, set 1 to `*`.
 
@@ -484,6 +485,7 @@ complementary set of {1..7}.
 
 For a cell, if there is a number that cannot be set in a row, column
 and box that the cell belongs, we can fill the cell with the number.
+This is commonly called _hidden single_.
 
 Consider an example here.
 ```text
@@ -505,7 +507,9 @@ apply the rule for 7 and set 7 to the cell marked `!`.
 
 #### Step 3 : backtracking
 
-Choose a candidate in a cell in an ongoing sudoku map.
+SudokuSSE does not use the locked candidates method. Before starting
+backtracking, SudokuSSE chooses a candidate in a cell in an ongoing
+sudoku map.
 
 1. Select a cell that has least size (2 or more) of candidates in the
   cells.
