@@ -47,8 +47,6 @@ CPPUNIT_TEST_SUITE_REGISTRATION( SudokuSseEnumeratorMapTest );
 class SudokuSseTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST_SUITE(SudokuSseTest);
     CPPUNIT_TEST(test_Compare);
-    CPPUNIT_TEST(test_MaskLower32bit);
-    CPPUNIT_TEST(test_MaskRegisters);
     CPPUNIT_TEST(test_PowerOf2);
     CPPUNIT_TEST(test_MergeThreeElements);
     CPPUNIT_TEST(test_OrThreeXmmRegs);
@@ -95,8 +93,6 @@ public:
     void tearDown() override;
 protected:
     void test_Compare();
-    void test_MaskLower32bit();
-    void test_MaskRegisters();
     void test_PowerOf2();
     void test_MergeThreeElements();
     void test_OrThreeXmmRegs();
@@ -145,8 +141,10 @@ private:
     static_assert(sizeof(RowRegisterSet) == sizeof(RowRegisterSet::regXmm), "Wrong size");
 
     void callIsPowerOf2ToFlags(gRegister& arg, gRegister& result);
-    void callPowerOf2or0(gRegister& arg, gRegister& result);
-    void callPowerOf2orAll1(gRegister& arg, gRegister& result);
+    void callPowerOf2or0_64(gRegister& arg, gRegister& result);
+    void callPowerOf2or0_32(gRegister& arg, gRegister& result);
+    void callPowerOf2orAll1_64(gRegister& arg, gRegister& result);
+    void callPowerOf2orAll1_32(gRegister& arg, gRegister& result);
     gRegister rotateRowPart(gRegister arg);
     void rotateRow(uint64_t row[2]);
     void checkSearchNextCandidate(XmmRegisterSet& xmmRegSet, gRegister expectedFound,
@@ -529,167 +527,42 @@ void SudokuSseTest::test_Compare()
     }
 }
 
-void SudokuSseTest::test_MaskLower32bit()
-{
-    struct TestSet {
-        gRegister arg;
-        gRegister result;
-        gRegister resulthigh;
-        gRegister resultlow;
-    };
-
-    enum class Func {
-        MINFUNC,
-        MASK = MINFUNC,
-        SPLIT,
-        MAXFUNC,
-    };
-
-    constexpr TestSet testSet[] {
-        {0, 0},
-        {0x87654321, 0x87654321, 0, 0x87654321},
-        {0x1234567800000000, 0, 0x12345678, 0},
-        {0xA1B2C3D4E5F67890, 0xE5F67890, 0xA1B2C3D4, 0xE5F67890}
-    };
-
-    for(const auto& test : testSet) {
-        for(Func e=Func::MINFUNC; e<Func::MAXFUNC; e=static_cast<Func>(static_cast<int>(e)+1)) {
-            gRegister arg = test.arg;
-            gRegister result = 0;
-            gRegister resulthigh;
-            gRegister resultlow;
-            switch(e) {
-            case Func::MASK:
-                asm volatile (
-                    "call testMaskLower32bit\n\t"
-                    :"=a"(result):"b"(arg));
-                CPPUNIT_ASSERT_EQUAL(test.result, result);
-                break;
-            case Func::SPLIT:
-                asm volatile (
-                    "call testSplitRowLowParts\n\t"
-                    :"=b"(resulthigh),"=c"(resultlow):"a"(arg));
-                CPPUNIT_ASSERT_EQUAL(test.resulthigh, resulthigh);
-                CPPUNIT_ASSERT_EQUAL(test.resultlow, resultlow);
-                break;
-            default:
-                break;
-            }
-        }
-    }
-
-    return;
-}
-
-void SudokuSseTest::test_MaskRegisters()
-{
-    constexpr gRegister arg = 0xA1B2C3D4E5F67890;
-    constexpr gRegister expected = 0xE5F67890;
-
-    // RBPとRSPは対象外
-    for(int i=0; i<14; ++i) {
-        gRegister actual = arg;
-        switch(i) {
-        case 0:
-            asm volatile (
-                "call testMaskLower32bitAX\n\t"
-                :"=a"(actual):"b"(arg));
-            break;
-        case 1:
-            asm volatile (
-                "call testMaskLower32bitBX\n\t"
-                :"=b"(actual):"a"(arg));
-            break;
-        case 2:
-            asm volatile (
-                "call testMaskLower32bitCX\n\t"
-                :"=b"(actual):"a"(arg):"rcx");
-            break;
-        case 3:
-            asm volatile (
-                "call testMaskLower32bitDX\n\t"
-                :"=b"(actual):"a"(arg):"rdx");
-            break;
-        case 4:
-            asm volatile (
-                "call testMaskLower32bitSI\n\t"
-                :"=b"(actual):"a"(arg):"rsi");
-            break;
-        case 5:
-            asm volatile (
-                "call testMaskLower32bitDI\n\t"
-                :"=b"(actual):"a"(arg):"rdi");
-            break;
-        case 6:
-            asm volatile (
-                "call testMaskLower32bit8\n\t"
-                :"=b"(actual):"a"(arg):"r8");
-            break;
-        case 7:
-            asm volatile (
-                "call testMaskLower32bit9\n\t"
-                :"=b"(actual):"a"(arg):"r9");
-            break;
-        case 8:
-            asm volatile (
-                "call testMaskLower32bit10\n\t"
-                :"=b"(actual):"a"(arg):"r10");
-            break;
-        case 9:
-            asm volatile (
-                "call testMaskLower32bit11\n\t"
-                :"=b"(actual):"a"(arg):"r11");
-            break;
-        case 10:
-            asm volatile (
-                "call testMaskLower32bit12\n\t"
-                :"=b"(actual):"a"(arg):"r12");
-            break;
-        case 11:
-            asm volatile (
-                "call testMaskLower32bit13\n\t"
-                :"=b"(actual):"a"(arg):"r13");
-            break;
-        case 12:
-            asm volatile (
-                "call testMaskLower32bit14\n\t"
-                :"=b"(actual):"a"(arg):"r14");
-            break;
-        case 13:
-            asm volatile (
-                "call testMaskLower32bit15\n\t"
-                :"=b"(actual):"a"(arg):"r15");
-            break;
-        default:
-            break;
-        }
-
-        CPPUNIT_ASSERT_EQUAL(expected, actual);
-    }
-
-    return;
-}
-
 void SudokuSseTest::callIsPowerOf2ToFlags(gRegister& arg, gRegister& result)
 {
     asm volatile (
         "call testIsPowerOf2ToFlags\n\t"
-        :"=b"(result):"a"(arg));
-    return;
-}
-
-void SudokuSseTest::callPowerOf2or0(gRegister& arg, gRegister& result)
-{
-    asm volatile (
-        "call testPowerOf2or0\n\t"
         :"=b"(result):"a"(arg):"rcx");
     return;
 }
 
-void SudokuSseTest::callPowerOf2orAll1(gRegister& arg, gRegister& result)
+void SudokuSseTest::callPowerOf2or0_64(gRegister& arg, gRegister& result)
 {
     asm volatile (
-        "call testPowerOf2orAll1\n\t"
+        "call testPowerOf2or064\n\t"
+        :"=b"(result):"a"(arg):"rcx");
+    return;
+}
+
+void SudokuSseTest::callPowerOf2or0_32(gRegister& arg, gRegister& result)
+{
+    asm volatile (
+        "call testPowerOf2or032\n\t"
+        :"=b"(result):"a"(arg):"rcx");
+    return;
+}
+
+void SudokuSseTest::callPowerOf2orAll1_64(gRegister& arg, gRegister& result)
+{
+    asm volatile (
+        "call testPowerOf2orAll164\n\t"
+        :"=b"(result):"a"(arg):"rcx");
+    return;
+}
+
+void SudokuSseTest::callPowerOf2orAll1_32(gRegister& arg, gRegister& result)
+{
+    asm volatile (
+        "call testPowerOf2orAll132\n\t"
         :"=b"(result):"a"(arg):"rcx");
     return;
 }
@@ -697,30 +570,49 @@ void SudokuSseTest::callPowerOf2orAll1(gRegister& arg, gRegister& result)
 void SudokuSseTest::test_PowerOf2()
 {
     constexpr gRegister expectedAll0 = 0;
-    constexpr gRegister expectedAll1 = ~0;
+    constexpr gRegister expectedAll1_64 = ~0;
+    constexpr gRegister expectedAll1_32 = 0xffffffff;
     gRegister arg = 0;
     gRegister result = 0;
-    gRegister expected = 1;
+    constexpr gRegister expected = 2;
 
     // 0
     callIsPowerOf2ToFlags(arg, result);
     CPPUNIT_ASSERT_EQUAL(expected, result);
-    expected = 0;
-    callPowerOf2or0(arg, result);
-    CPPUNIT_ASSERT_EQUAL(expected, result);
-    callPowerOf2orAll1(arg, result);
-    CPPUNIT_ASSERT_EQUAL(expectedAll1, result);
+    constexpr gRegister expected2or0 = 0;
+
+    callPowerOf2or0_64(arg, result);
+    CPPUNIT_ASSERT_EQUAL(expected2or0, result);
+    callPowerOf2orAll1_64(arg, result);
+    CPPUNIT_ASSERT_EQUAL(expectedAll1_64, result);
+
+    callPowerOf2or0_32(arg, result);
+    CPPUNIT_ASSERT_EQUAL(expected2or0, result);
+    callPowerOf2orAll1_32(arg, result);
+    CPPUNIT_ASSERT_EQUAL(expectedAll1_32, result);
 
     // 2のべき乗
-    expected = 1;
     arg = 1;
     for(size_t i=0; i < 64; ++i) {
         callIsPowerOf2ToFlags(arg, result);
         CPPUNIT_ASSERT_EQUAL(expected, result);
-        callPowerOf2or0(arg, result);
+        callPowerOf2or0_64(arg, result);
         CPPUNIT_ASSERT_EQUAL(arg, result);
-        callPowerOf2orAll1(arg, result);
+        callPowerOf2orAll1_64(arg, result);
         CPPUNIT_ASSERT_EQUAL(arg, result);
+
+        if (i < 32) {
+            callPowerOf2or0_32(arg, result);
+            CPPUNIT_ASSERT_EQUAL(arg, result);
+            callPowerOf2orAll1_32(arg, result);
+            CPPUNIT_ASSERT_EQUAL(arg, result);
+
+            gRegister arg64 = arg | 0x100000000ull;
+            callPowerOf2or0_32(arg64, result);
+            CPPUNIT_ASSERT_EQUAL(arg, result);
+            callPowerOf2orAll1_32(arg64, result);
+            CPPUNIT_ASSERT_EQUAL(arg, result);
+        }
         arg <<= 1;
     }
 
@@ -729,10 +621,18 @@ void SudokuSseTest::test_PowerOf2()
     for(size_t i=0; i < 64; ++i) {
         callIsPowerOf2ToFlags(arg, result);
         CPPUNIT_ASSERT_EQUAL(expectedAll0, result);
-        callPowerOf2or0(arg, result);
+        callPowerOf2or0_64(arg, result);
         CPPUNIT_ASSERT_EQUAL(expectedAll0, result);
-        callPowerOf2orAll1(arg, result);
-        CPPUNIT_ASSERT_EQUAL(expectedAll1, result);
+        callPowerOf2orAll1_64(arg, result);
+        CPPUNIT_ASSERT_EQUAL(expectedAll1_64, result);
+
+        if (i < 32) {
+            callPowerOf2or0_32(arg, result);
+            CPPUNIT_ASSERT_EQUAL(expectedAll0, result);
+            callPowerOf2orAll1_32(arg, result);
+            CPPUNIT_ASSERT_EQUAL(expectedAll1_32, result);
+        }
+
         arg <<= 1;
         arg |= 1;
     }
@@ -761,11 +661,13 @@ void SudokuSseTest::test_MergeThreeElements()
         const gRegister arg = test.arg;
         gRegister result = 0;
         asm volatile (
-            "call testMergeThreeElements\n\t"
-            :"=b"(result):"a"(arg):"rcx","r15");
+            "call testMergeThreeElements64\n\t"
+            :"=b"(result):"a"(arg):"rcx","rdx","r15");
         CPPUNIT_ASSERT_EQUAL(test.expected, result);
+
+        result = 0;
         asm volatile (
-            "call testMergeThreeElements2\n\t"
+            "call testMergeThreeElements32\n\t"
             :"=b"(result):"a"(arg):"rcx","rdx","r15");
         CPPUNIT_ASSERT_EQUAL(test.expected, result);
     }
@@ -905,7 +807,7 @@ void SudokuSseTest::test_CollectUniqueCandidatesInRowPart()
             :"=b"(sum),"=c"(haszero):"a"(arg):"r10","r11","r12","r13","r14","r15");
         CPPUNIT_ASSERT_EQUAL(test.sum, sum);
         CPPUNIT_ASSERT(((test.haszero == 0) && (haszero <= 0x1ff)) ||
-                       ((test.haszero != 0) && (haszero > 0x7fffffffffffffff)));
+                       ((test.haszero != 0) && (haszero > 0x7fffffff) && (haszero < 0x100000000ull)));
     }
 
     return;
@@ -2035,7 +1937,15 @@ void SudokuSseTest::test_CompareRegisterSet() {
         gRegister zeroFlag = 0;
         gRegister carryFlag = 0;
         asm volatile (
-            "call testCompareRegisterSet\n\t"
+            "call testCompareRegisterSet64\n\t"
+            :"=a"(zeroFlag),"=b"(carryFlag):"c"(test.leftHigh),"d"(test.leftLow),"S"(test.rightHigh),"D"(test.rightLow):"r8", "r9", "r10", "r15");
+        CPPUNIT_ASSERT_EQUAL(test.zeroFlag, zeroFlag);
+        CPPUNIT_ASSERT_EQUAL(test.carryFlag, carryFlag);
+
+        zeroFlag = 0;
+        carryFlag = 0;
+        asm volatile (
+            "call testCompareRegisterSet32\n\t"
             :"=a"(zeroFlag),"=b"(carryFlag):"c"(test.leftHigh),"d"(test.leftLow),"S"(test.rightHigh),"D"(test.rightLow):"r8", "r9", "r10", "r15");
         CPPUNIT_ASSERT_EQUAL(test.zeroFlag, zeroFlag);
         CPPUNIT_ASSERT_EQUAL(test.carryFlag, carryFlag);
