@@ -61,6 +61,12 @@ format.
 bin/sudokusse.exe sudoku17
 ```
 
+## License
+
+Copyright (c) 2016 Zettsu Tatsuya
+
+This software is released under the MIT License, see [LICENSE.txt](LICENSE.txt).
+
 ## And more
 
 SudokuSSE uses bitboards to represent sudoku puzzles.
