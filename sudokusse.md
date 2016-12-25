@@ -438,6 +438,26 @@ movdqa xmm0, xmmword ptr [rip + sudokuXmmToPrint]
 is right. MinGW-w64 may accept non-RIP-relative addressing but Cygwin
 causes link errors.
 
+### Footprints
+
+Here is a size (41,163 bytes) of core code solving sudoku puzzles in
+assembly. This is 26% larger than the L1 I-cache size (32 KBytes per
+core) in my CPU.
+
+```bash
+$ objdump -x --section=.text bin/sudokusse | sort
+```
+
+|Label|Base Address [hex]|Size [bytes, dec]|Macro|
+|:------|:------|------:|:------|
+|solveSudokuAsm|0x423251|3,044|CollectUniqueCandidatesInThreeLine|
+|countFilledElementsLabel|0x423e35|59|CountFilledElements|
+|exitFilling|0x423e70|1,334|CheckConsistency|
+|searchNextCandidateLabel|0x4243a6|5,692|SearchNextCandidate|
+|exitFillingCells|0x4259e2|13,685|CollectUniqueCandidates|
+|findCandidatesLabel|0x428f57|17,349|FindCandidates|
+|loadXmmRegisters|0x42d31c|-|-|
+
 ### Algorithm to solve sudoku puzzles
 
 I apply steps described in _Shasha[2007]_.

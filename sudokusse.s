@@ -1721,6 +1721,7 @@ loopFilling:
         .set    regMaxPopcntD,     r10d
         .set    regLoopCnt,        r11
         .set    regLoopCntD,       r11d
+countFilledElementsLabel:
         CountFilledElements regLoopCnt, regCurrentPopcnt, regPrevPopcnt, rcx
         mov     regMaxPopcntD, maxElementNumber
 
@@ -1741,6 +1742,7 @@ exitFilling:
         jz      exitFillingCells
 
         # Find a cell to guess its candidate if not all cells are filled
+searchNextCandidateLabel:
         SearchNextCandidate
 exitFillingCells:
         ret
@@ -1758,6 +1760,7 @@ keepFilling:
         SaveLoopCnt regLoopCnt, regCurrentPopcnt
 
         CollectUniqueCandidates r8d, r9d, r10d, r11d, r12d, r13d, r14d, eax, ebx, ecx, edx, xRegWork1, xRegWork2
+findCandidatesLabel:
         FindCandidates r8, r9, r10, r11, r8d, r9d, r10d, r11d, r12d, r13d, r14d, eax, ebx, ecx, edx, esi, edi, xRegWork1, xRegWork2
         jmp loopFilling
 
