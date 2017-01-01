@@ -57,6 +57,20 @@ Instructions), which is available on Haswell and newer
 microarchitecture. If you cannot run on such processors, set
 _EnableAvx_ to 0 or an invalid opcode exception occurs.
 
+### Solve parallel
+
+Add `-DSOLVE_PARALLEL` to _CPPFLAGS_SSE_AVX_ in _Makefile_vars_ and
+SudokuSSE solves sudoku puzzles in a file parallel. It is effective on
+the C++ solver.
+
+This feature is still experimental and will be changeable via command
+line options.
+
+Known issues are:
+* The SSE4.2 / AVX solver cannot run parallel because it is not thread-safe.
+* Compiling sudoku.cpp fails on MinGW
+* Checking solutions on Cygwin is very slow
+
 ## Prepare sudoku puzzles
 
 SudokuSSE accepts sudoku puzzles in text files.
@@ -137,6 +151,9 @@ I assume the average is much longer than the least for these reasons.
   `sched_setaffinity()` improves the cold cache problem.
 1. A CPU reaches its thermal limit and slows down. Setting of the
   Windows power option may relax this situation.
+
+Process affinity must not set in using std::future because it prevents
+running a process on multi-core.
 
 #### Print steps to solve a sudoku puzzle
 

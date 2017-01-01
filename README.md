@@ -63,7 +63,7 @@ bin/sudokusse.exe sudoku17
 
 ## License
 
-Copyright (c) 2016 Zettsu Tatsuya
+Copyright (c) 2016, 2017 Zettsu Tatsuya
 
 This software is released under the MIT License, see [LICENSE.txt](LICENSE.txt).
 

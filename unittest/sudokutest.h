@@ -90,6 +90,7 @@ namespace SudokuTestPosition {
 namespace SudokuTestPattern {
     constexpr SudokuIndex ConflictedCell = 0xfe;  // 矛盾したので何が書かれるか不定
     const std::string NoBacktrackString = "........77.4...893..68.2.....75286...8...67.19.34...8....7.49..6...9....459...1.8";
+    const std::string NoBacktrackStringSolution = "815349267724651893396872415147528639582936741963417582231784956678195324459263178";
     const std::string BacktrackString =   ".3.....4..1..97.5...25.86....3...8..9....43....76....4..98.54...7.....2..5..71.8.";
     const std::string BacktrackString2 =  ".30_0_.40_10_97.50_.25.860_0_30_.80_90_0_430_0_760_0_40_98.540_.70_0_.20_50_71.8.";
     const std::string ConflictString =    "123456789123456789123456789123456789123456789123456789123456789123456789123456...";
@@ -121,7 +122,7 @@ namespace SudokuTestPattern {
         bool   isBenchmark;   // ベンチマークかどうか
         bool   verbose;       // 解く過程を示すかどうか
         int    measureCount;  // 測定回数
-        SudokuPatternCount printAllCadidate;  // 候補の数
+        SudokuPatternCount printAllCandidate;  // 候補の数
     };
 
     constexpr TestArgs testArgs[] {
