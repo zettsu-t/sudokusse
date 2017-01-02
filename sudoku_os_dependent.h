@@ -1,5 +1,5 @@
 // Sudoku solver with SSE 4.2 / AVX
-// Copyright (C) 2012-2016 Zettsu Tatsuya
+// Copyright (C) 2012-2017 Zettsu Tatsuya
 // WindowsとLinuxの違いを吸収する
 
 #ifndef SUDOKU_OS_DEPENDENT_H_INCLUDED
@@ -62,6 +62,8 @@ namespace Sudoku {
         BaseTimer(void) = default;
     public:
         virtual ~BaseTimer(void) = default;
+        BaseTimer(const BaseTimer&) = delete;
+        BaseTimer& operator =(const BaseTimer&) = delete;
         virtual void StartClock(void) override { getTimeOfClock(startClockCount_); }
         virtual void StopClock(void) override { getTimeOfClock(stopClockCount_); }
         virtual SudokuTime GetClockInterval(void) override {
@@ -166,6 +168,8 @@ namespace Sudoku {
     public:
         ProcessorBinder(void);  // 使うCPUを固定する
         virtual ~ProcessorBinder(void) = default;  // 使うCPUを固定したら戻さない
+        ProcessorBinder(const ProcessorBinder&) = delete;
+        ProcessorBinder& operator =(const ProcessorBinder&) = delete;
     private:
         bool failed_ {false};  // 設定に失敗した
     };

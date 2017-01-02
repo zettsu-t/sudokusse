@@ -1,10 +1,11 @@
 // Sudoku solver with SSE 4.2 / AVX
-// Copyright (C) 2012-2015 Zettsu Tatsuya
+// Copyright (C) 2012-2017 Zettsu Tatsuya
 
 #ifndef SUDOKU_H_INCLUDED
 #define SUDOKU_H_INCLUDED
 
 #include <stdint.h>
+#include <array>
 #include <string>
 #include <vector>
 #include <nmmintrin.h>
@@ -44,6 +45,7 @@ constexpr size_t arraySizeof(const T (&)[n]) {
 
 // コマンドライン引数
 namespace SudokuOption {
+    const char * const CommandLineArgParallel = "-N";
     const char * const CommandLineArgSseSolver[] = {"1", "sse", "avx"};
     const char * const CommandLineNoChecking[] = {"1", "off"};
     const char * const CommandLinePrint[] = {"2", "print"};
@@ -75,6 +77,7 @@ using SudokuSseElement = uint32_t;           // SSE4.2命令で解く場合のN 
 using gRegister = uint64_t;                  // 汎用レジスタ(必ず符号なし)
 using xmmRegister = __m128;                  // XMMレジスタ
 using SudokuPatternCount = uint64_t;         // 解の数
+using SudokuPuzzleCount = size_t;            // 問題の数
 
 static_assert(sizeof(SudokuSseElement) == 4, "Unexpected SudokuSseElement size");
 static_assert(sizeof(xmmRegister) == 16, "Unexpected xmmRegister size");
@@ -112,6 +115,8 @@ namespace Sudoku {
     constexpr SudokuSseElement AllThreeCandidates = 0x7ffffff;   // 3マスの全集合(bit8..0が1)
     constexpr short MinCandidatesNumber = 1;          // マスの初期設定の候補となる数字の最小値
     constexpr short MaxCandidatesNumber = 9;          // マスの初期設定の候補となる数字の最大値
+    // ヒープのfalse sharingを防ぐために、std::stringで確保する要素数 >= キャッシュラインサイズ
+    constexpr uint32_t CacheGuardSize = 128;
 }
 
 // 共通関数
@@ -154,6 +159,8 @@ public:
     virtual void PrintType(void) = 0;
 protected:
     SudokuBaseSolver(std::ostream* pSudokuOutStream);
+    SudokuBaseSolver(const SudokuBaseSolver&) = delete;
+    SudokuBaseSolver& operator =(const SudokuBaseSolver&) = delete;
     virtual void printType(const std::string& presetStr, std::ostream* pSudokuOutStream);
     int            count_;             // 手順を試した回数
     std::ostream*  pSudokuOutStream_;  // 結果の出力先
@@ -295,7 +302,7 @@ class SudokuSolver : public SudokuBaseSolver {
     template <class TestedT, class CandidatesT> friend class SudokuSolverCommonTest;
 public:
     SudokuSolver(const std::string& presetStr, SudokuIndex seed, std::ostream* pSudokuOutStream);
-    SudokuSolver(const std::string& presetStr, SudokuIndex seed, std::ostream* pSudokuOutStream, SudokuPatternCount printAllCadidate);
+    SudokuSolver(const std::string& presetStr, SudokuIndex seed, std::ostream* pSudokuOutStream, SudokuPatternCount printAllCandidate);
     virtual ~SudokuSolver();
     virtual bool Exec(bool silent, bool verbose) override;
     virtual void PrintType(void) override;
@@ -333,22 +340,22 @@ private:
 
 // ASMで定義する
 extern "C" {
-    // パラメータ(説明はASMを参照)
-    extern volatile uint64_t sudokuXmmAborted;
-    extern volatile uint64_t sudokuXmmNextCellFound;
-    extern volatile uint64_t sudokuXmmNextOutBoxShift;
-    extern volatile uint64_t sudokuXmmNextInBoxShift;
-    extern volatile uint64_t sudokuXmmNextRowNumber;
-    extern volatile uint64_t sudokuXmmElementCnt;
+    // グローバル変数なので、このままではマルチスレッド化できない
+    // SudokuSseEnumeratorMapのメンバ関数
     extern volatile uint64_t sudokuXmmPrintAllCandidate;
     extern volatile uint64_t sudokuXmmRightBottomElement;
     extern volatile uint64_t sudokuXmmRightBottomSolved;
     extern volatile uint64_t sudokuXmmAllPatternCnt;
-    extern volatile uint64_t sudokuXmmPrintFunc;
-    extern volatile uint64_t sudokuXmmAssumeCellsPacked;
-    extern volatile uint64_t sudokuXmmUseAvx;
-    extern volatile uint64_t sudokuXmmDebug;
+    // PrintPattern() -> SudokuSseEnumeratorMap::PrintFromAsm
     extern XmmRegisterSet sudokuXmmToPrint;
+
+    // マルチスレッド実行する前に設定して、後は読み取るだけなので、グローバル変数でよい
+    extern volatile uint64_t sudokuXmmPrintFunc;  // main()
+    extern volatile uint64_t sudokuXmmAssumeCellsPacked; // SudokuLoader::CanLaunch()
+    extern volatile uint64_t sudokuXmmUseAvx;     // 未使用
+
+    // デバッグ専用なのでマルチスレッド化しない
+    extern volatile uint64_t sudokuXmmDebug;
 }
 
 // バックトラッキング候補
@@ -356,6 +363,16 @@ struct SudokuSseCandidateCell {
     size_t           regIndex;  // マスが入っている汎用レジスタの番号
     SudokuSseElement shift;     // マスが入っている汎用レジスタのビット位置
     SudokuSseElement mask;      // マスが入っている汎用レジスタのビットマスク
+};
+
+// sudokusse.sで解いた結果
+struct SudokuSseMapResult {
+    gRegister aborted;
+    gRegister elementCnt;
+    gRegister nextCellFound;
+    gRegister nextOutBoxIndex;
+    gRegister nextInBoxIndex;
+    gRegister nextRowNumber;
 };
 
 // 全マス(SSE4.2)
@@ -374,8 +391,8 @@ public:
     // 初期化と出力
     void Preset(const std::string& presetStr);
     void Print(std::ostream* pSudokuOutStream) const;
-    void FillCrossing(bool loadXmm);
-    INLINE bool GetNextCell(SudokuSseCandidateCell& cell);
+    void FillCrossing(bool loadXmm, SudokuSseMapResult& result);
+    INLINE bool GetNextCell(const SudokuSseMapResult& result, SudokuSseCandidateCell& cell);
     INLINE bool CanSetUniqueCell(const SudokuSseCandidateCell& cell, SudokuCellCandidates candidate) const;
     INLINE void SetUniqueCell(const SudokuSseCandidateCell& cell, SudokuCellCandidates candidate);
 };
@@ -398,7 +415,7 @@ public:
     SudokuSseEnumeratorMap(std::ostream* pSudokuOutStream);
     virtual ~SudokuSseEnumeratorMap();
     // 初期化と出力
-    void SetToPrint(SudokuPatternCount printAllCadidate);
+    void SetToPrint(SudokuPatternCount printAllCandidate);
     void Preset(const std::string& presetStr);
     void Print(void) const;
     void Print(bool solved, const XmmRegisterSet& xmmRegSet) const;
@@ -418,8 +435,8 @@ class SudokuSseSolver : public SudokuBaseSolver {
     template <class TestedT, class CandidatesT> friend class SudokuSolverCommonTest;
 
 public:
-    SudokuSseSolver(const std::string& presetStr, std::ostream* pSudokuOutStream, SudokuPatternCount printAllCadidate);
-    SudokuSseSolver(const std::string& presetStr, SudokuIndex seed, std::ostream* pSudokuOutStream, SudokuPatternCount printAllCadidate);
+    SudokuSseSolver(const std::string& presetStr, std::ostream* pSudokuOutStream, SudokuPatternCount printAllCandidate);
+    SudokuSseSolver(const std::string& presetStr, SudokuIndex seed, std::ostream* pSudokuOutStream, SudokuPatternCount printAllCandidate);
     virtual ~SudokuSseSolver();
     virtual bool Exec(bool silent, bool verbose) override;
     virtual void Enumerate(void);
@@ -427,11 +444,11 @@ public:
 private:
     void initialize(const std::string& presetStr, std::ostream* pSudokuOutStream);
     bool solve(SudokuSseMap& map, bool topLevel, bool verbose);
-    bool fillCells(SudokuSseMap& map, bool topLevel, bool verbose);
+    bool fillCells(SudokuSseMap& map, bool topLevel, bool verbose, SudokuSseMapResult& result);
     // メンバ
     SudokuSseMap map_;    // 数独
     SudokuSseEnumeratorMap enumeratorMap_;
-    SudokuPatternCount printAllCadidate_;
+    SudokuPatternCount printAllCandidate_;
 };
 
 // 解が正しいかどうか判定する
@@ -442,10 +459,13 @@ class SudokuChecker {
 public:
     SudokuChecker(const std::string& puzzle, const std::string& solution, SudokuSolverPrint printSolution, std::ostream* pSudokuOutStream);
     virtual ~SudokuChecker() = default;
+    SudokuChecker(const SudokuChecker&) = delete;
+    SudokuChecker& operator =(const SudokuChecker&) = delete;
     bool Valid() const;  // 解が正しければtrue
 private:
-    using Group = std::vector<SudokuNumber>;
-    using Grid = std::vector<Group>;
+    // ヒープに確保すると、スレッド間でfalse shareingが発生するのでスタックに置く
+    using Group = std::array<SudokuNumber, Sudoku::SizeOfCellsPerGroup>;
+    using Grid = std::array<Group, Sudoku::SizeOfGroupsPerMap>;
     bool parse(const std::string& puzzle, const std::string& solution, SudokuSolverPrint printSolution, std::ostream* pSudokuOutStream);
     bool parseRow(SudokuIndex row, const std::string& rowLine, Grid& grid, std::string& solutionLine);
     bool compare(const std::string& puzzle, const std::string& solution, std::ostream* pSudokuOutStream);
@@ -457,10 +477,61 @@ private:
     bool valid_;
 };
 
+class SudokuDispatcherTest;
+class SudokuMultiDispatcherTest;
+
+// 単一パズルの読み込みと実行を単一スレッドで行う
+// インスタンスをポインタではなく値としてvectorに入れるために、
+// 継承不可かつムーブ可能にする
+class SudokuDispatcher final {
+    // Unit test
+    friend class SudokuDispatcherTest;
+    friend class SudokuMultiDispatcherTest;
+    friend class SudokuLoaderTest;
+public:
+    SudokuDispatcher(SudokuSolverType solverType, SudokuSolverCheck check, SudokuSolverPrint print,
+                     SudokuPatternCount printAllCandidate, SudokuPuzzleCount puzzleNum, const std::string& puzzleLine);
+    // ムーブ可能にするため、デストラクタを定義しない
+    bool Exec(void);
+    const std::string& GetMessage(void) const;
+private:
+    bool exec(SudokuBaseSolver& solver, std::ostringstream& ss);
+    SudokuSolverType   solverType_;   // 各行に数独パズルを書いたファイルを解く方法
+    SudokuSolverCheck  check_;        // 解いた結果を検査するかどうか
+    SudokuSolverPrint  print_;        // 複数の問題を解くときに、結果を表示するかどうか
+    SudokuPatternCount printAllCandidate_;
+    SudokuPuzzleCount  puzzleNum_;
+    std::string puzzleLine_;
+    std::string message_;  // 出力ストリームに書き込む文字列
+};
+
+// 複数パズルの読み込みと実行を単一スレッドで行う
+class SudokuMultiDispatcher {
+public:
+    // Unit tests
+    friend class SudokuMultiDispatcherTest;
+    friend class SudokuLoaderTest;
+
+    SudokuMultiDispatcher(SudokuSolverType solverType, SudokuSolverCheck check, SudokuSolverPrint print, SudokuPatternCount printAllCandidate);
+    virtual ~SudokuMultiDispatcher() = default;
+    SudokuMultiDispatcher(const SudokuMultiDispatcher&) = delete;
+    SudokuMultiDispatcher& operator =(const SudokuMultiDispatcher&) = delete;
+    virtual void AddPuzzle(SudokuPuzzleCount puzzleNum, const std::string& puzzleLine);
+    virtual bool ExecAll(void);
+    virtual const std::string& GetMessage(size_t index) const;
+private:
+    std::vector<SudokuDispatcher> dipatcherSet_;
+    SudokuSolverType   solverType_;   // 各行に数独パズルを書いたファイルを解く方法
+    SudokuSolverCheck  check_;        // 解いた結果を検査するかどうか
+    SudokuSolverPrint  print_;        // 複数の問題を解くときに、結果を表示するかどうか
+    SudokuPatternCount printAllCandidate_;
+};
+
 // 読み込みと実行時間測定
 class SudokuLoader {
-    // Unit test
+    // Unit tests
     friend class SudokuLoaderTest;
+    friend struct SudokuTestArgsMultiMode;
 
 public:
     SudokuLoader(int argc, const char * const argv[], std::istream* pSudokuInStream, std::ostream* pSudokuOutStream);
@@ -468,31 +539,46 @@ public:
 #ifndef NO_DESTRUCTOR
     ALLOW_VIRTUAL ~SudokuLoader();
 #endif
+    SudokuLoader(const SudokuLoader&) = delete;
+    SudokuLoader& operator =(const SudokuLoader&) = delete;
     int Exec(void);
     static bool CanLaunch(int argc, const char * const argv[]);
 private:
+    using ExitStatusCode = int;
+    using NumberOfCores = size_t;
+    using DispatcherPtr = std::unique_ptr<SudokuMultiDispatcher>;
+    using DispatcherPtrSet = std::vector<DispatcherPtr>;
+
     static int getMeasureCount(const char *arg);
     void setSingleMode(int argc, const char * const argv[], std::istream* pSudokuInStream);
     bool setMultiMode(int argc, const char * const argv[]);
-    int execSingle(void);
-    int execMulti(void);
-    int execMulti(std::istream* pSudokuInStream);
+    bool setNumberOfThreads(int argc, const char * const argv[], int argIndex);
+    ExitStatusCode execSingle(void);
+    ExitStatusCode execMulti(void);
+    ExitStatusCode execMulti(std::istream* pSudokuInStream);
+    void printHeader(SudokuSolverType solverType, std::ostream* pSudokuOutStream);
+    NumberOfCores getNumberOfCores(void);
+    SudokuPuzzleCount readLines(NumberOfCores numberOfCores, std::istream* pSudokuInStream, DispatcherPtrSet& dispatcherSet);
+    ExitStatusCode execAll(NumberOfCores numberOfCores, DispatcherPtrSet& dispatcherSet);
+    void writeMessage(NumberOfCores numberOfCores, SudokuPuzzleCount sizeOfPuzzle, DispatcherPtrSet& dispatcherSet, std::ostream* pSudokuOutStream);
     void measureTimeToSolve(SudokuSolverType solverType);
     SudokuTime solveSudoku(SudokuSolverType solverType, int count, bool warmup);
     SudokuTime enumerateSudoku(void);
     // メンバ
     std::string sudokuStr_; // 初期マップの文字列
-    std::string multiLineFilename_;  // 各行に数独パズルを書いたファイル名
+    std::string multiLineFilename_;     // 各行に数独パズルを書いたファイル名
+    NumberOfCores     numberOfThreads_; // 並列度
     SudokuSolverType  solverType_;   // 各行に数独パズルを書いたファイルを解く方法
     SudokuSolverCheck check_;        // 解いた結果を検査するかどうか
     SudokuSolverPrint print_;        // 複数の問題を解くときに、結果を表示するかどうか
     bool   isBenchmark_;    // ベンチマークかどうか
     bool   verbose_;        // 解く過程を示すかどうか
     int    measureCount_;   // 測定回数
-    SudokuPatternCount printAllCadidate_;
+    SudokuPatternCount printAllCandidate_;
     std::ostream* pSudokuOutStream_;  // 結果の出力先
-    static const int ExitStatusPassed;  // 正常終了
-    static const int ExitStatusFailed;  // 異常終了
+    static constexpr NumberOfCores DefaultNumberOfThreads = 1;  // デフォルトの並列度
+    static const ExitStatusCode ExitStatusPassed;  // 正常終了
+    static const ExitStatusCode ExitStatusFailed;  // 異常終了
 };
 
 extern "C" {

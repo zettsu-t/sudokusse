@@ -1,29 +1,36 @@
 // Sudoku solver with SSE 4.2 / AVX
-// Copyright (C) 2012-2015 Zettsu Tatsuya
+// Copyright (C) 2012-2017 Zettsu Tatsuya
 //
 // 数独を解く
 // 第一引数を何かつけると、その回数だけ実行し、経過時間以外は表示しない
 // 実行回数の前に-を付けると、解く過程を示しながらその回数だけ実行する(-5なら5回)
 // 実行回数を0にすると、取り得る解を数える。第二引数があればその数だけ解を列挙する。
 //
-// sudoku [実行回数 [列挙回数]] < 初期マップ
+//   sudoku [実行回数 [列挙回数]] < 初期マップ
 //
 // 引数に数字ではなくファイル名を指定したときは、そのファイルの各行を解く
+//
+//   sudoku ファイル名 [-Nnum] [0|1|sse] [0|1|2|off|print]
+//
+// -Nnum : 並列度(同時実行スレッド数)を指定する。省略時は1(シングルスレッド)。
+//   -N2とすると、2スレッドで解く(数字は1以上の整数)
+//   -Nとすると、CPUの論理コア数(2コア、ハイパースレッディングなら4)と同じスレッド数にする
 // 第二引数 : 引数があり1またはsseの場合はSSEで解く。
 //   それ以外の場合はC++で解く。
 // 第三引数 : 引数がなければ、解いた結果を検査する
 //   引数があり1またはoffの場合は、解いた結果を検査しない(その分実行時感が短くなる)
 //   引数があり2またはprint場合は、解いた結果を検査し、解を表示する
-//
-// sudoku ファイル名 [0|1] [0|1|2] < 初期マップ
 
 #include <algorithm>
 #include <fstream>
+#include <future>
 #include <iomanip>
 #include <iostream>
 #include <limits>
 #include <sstream>
+#include <thread>
 #include <typeinfo>
+#include <type_traits>
 #include <cassert>
 #include <ctime>
 #include <cstring>
@@ -951,8 +958,8 @@ SudokuSseEnumeratorMap::~SudokuSseEnumeratorMap() {
     return;
 }
 
-void SudokuSseEnumeratorMap::SetToPrint(SudokuPatternCount printAllCadidate) {
-    sudokuXmmPrintAllCandidate = printAllCadidate;
+void SudokuSseEnumeratorMap::SetToPrint(SudokuPatternCount printAllCandidate) {
+    sudokuXmmPrintAllCandidate = printAllCandidate;
     return;
 }
 
@@ -1098,9 +1105,9 @@ SudokuSolver::SudokuSolver(const std::string& presetStr, SudokuIndex seed, std::
     return;
 }
 
-SudokuSolver::SudokuSolver(const std::string& presetStr, SudokuIndex seed, std::ostream* pSudokuOutStream, SudokuPatternCount printAllCadidate)
+SudokuSolver::SudokuSolver(const std::string& presetStr, SudokuIndex seed, std::ostream* pSudokuOutStream, SudokuPatternCount printAllCandidate)
     : SudokuBaseSolver(pSudokuOutStream) {
-    // printAllCadidate はSSE版との互換
+    // printAllCandidate はSSE版との互換
     map_.Preset(presetStr, 0);
     return;
 }
@@ -1286,13 +1293,13 @@ void SudokuSseMap::Preset(const std::string& presetStr) {
 }
 
 // 解く
-void SudokuSseMap::FillCrossing(bool loadXmm) {
+void SudokuSseMap::FillCrossing(bool loadXmm, SudokuSseMapResult& result) {
     Sudoku::LoadXmmRegistersFromMem(xmmRegSet_.regXmmVal_);
 
     // 使うレジスタはすべて記述する(Cygwinではレジスタが無いとエラーが出る)
     asm volatile (
         "call solveSudokuAsm\n\t"
-        :::"rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
+        :"=a"(result.aborted),"=b"(result.elementCnt),"=c"(result.nextCellFound),"=d"(result.nextOutBoxIndex),"=S"(result.nextInBoxIndex),"=D"(result.nextRowNumber)::"r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
 
     Sudoku::SaveXmmRegistersToMem(xmmRegSet_.regXmmVal_);
     return;
@@ -1330,15 +1337,12 @@ void SudokuSseMap::Print(std::ostream* pSudokuOutStream) const {
 }
 
 // C++版と同じ方法で次のバックトラッキング候補を見つける
-INLINE bool SudokuSseMap::GetNextCell(SudokuSseCandidateCell& cell) {
-    const bool found = (sudokuXmmNextCellFound != 0);
+INLINE bool SudokuSseMap::GetNextCell(const SudokuSseMapResult& result, SudokuSseCandidateCell& cell) {
+    const bool found = (result.nextCellFound != 0);
 
     if (found) {
-        const gRegister outBoxIndex = sudokuXmmNextOutBoxShift;
-        const gRegister inBoxIndex = sudokuXmmNextInBoxShift;
-        const gRegister rowNumber = sudokuXmmNextRowNumber;
-        cell.regIndex = (SudokuSseMap::InitialRegisterNum + rowNumber) * SudokuSse::RegisterWordCnt + outBoxIndex;
-        cell.shift = inBoxIndex * Sudoku::SizeOfCandidates;
+        cell.regIndex = (SudokuSseMap::InitialRegisterNum + result.nextRowNumber) * SudokuSse::RegisterWordCnt + result.nextOutBoxIndex;
+        cell.shift = result.nextInBoxIndex * Sudoku::SizeOfCandidates;
         cell.mask = Sudoku::AllCandidates << cell.shift;
     }
 
@@ -1360,16 +1364,16 @@ INLINE void SudokuSseMap::SetUniqueCell(const SudokuSseCandidateCell& cell, Sudo
 
 // コンストラクタ
 SudokuSseSolver::SudokuSseSolver(const std::string& presetStr, std::ostream* pSudokuOutStream,
-                                 SudokuPatternCount printAllCadidate)
-    : SudokuBaseSolver(pSudokuOutStream), enumeratorMap_(pSudokuOutStream), printAllCadidate_(printAllCadidate) {
+                                 SudokuPatternCount printAllCandidate)
+    : SudokuBaseSolver(pSudokuOutStream), enumeratorMap_(pSudokuOutStream), printAllCandidate_(printAllCandidate) {
     initialize(presetStr, pSudokuOutStream);
     return;
 }
 
 // seedはSSE版との互換
 SudokuSseSolver::SudokuSseSolver(const std::string& presetStr, SudokuIndex seed,
-                                 std::ostream* pSudokuOutStream, SudokuPatternCount printAllCadidate)
-    : SudokuBaseSolver(pSudokuOutStream), enumeratorMap_(pSudokuOutStream), printAllCadidate_(printAllCadidate) {
+                                 std::ostream* pSudokuOutStream, SudokuPatternCount printAllCandidate)
+    : SudokuBaseSolver(pSudokuOutStream), enumeratorMap_(pSudokuOutStream), printAllCandidate_(printAllCandidate) {
     initialize(presetStr, pSudokuOutStream);
     return;
 }
@@ -1396,8 +1400,8 @@ bool SudokuSseSolver::Exec(bool silent, bool verbose) {
 
 // 解を数える
 void SudokuSseSolver::Enumerate(void) {
-    if (printAllCadidate_) {
-        enumeratorMap_.SetToPrint(printAllCadidate_);
+    if (printAllCandidate_) {
+        enumeratorMap_.SetToPrint(printAllCandidate_);
     }
     const auto result = enumeratorMap_.Enumerate();
     (*pSudokuOutStream_) << "Number of solutions : " << result << "\n";
@@ -1414,20 +1418,21 @@ void SudokuSseSolver::PrintType(void) {
 bool SudokuSseSolver::solve(SudokuSseMap& map, bool topLevel, bool verbose) {
     for(;;) {
         // 解けるところまで解く
-        fillCells(map, topLevel, verbose);
+        SudokuSseMapResult result;
+        fillCells(map, topLevel, verbose, result);
         // バックトラッキング中に矛盾を発見したのでバックトラッキングをやり直す
-        if (sudokuXmmAborted) {
+        if (result.aborted) {
             return false;
         }
 
         // 全マス埋めた
-        if (sudokuXmmElementCnt == Sudoku::SizeOfAllCells) {
+        if (result.elementCnt == Sudoku::SizeOfAllCells) {
             return true;
         }
 
         // 減らないので候補を決め打ちしてバックトラッキングする
         SudokuSseCandidateCell cell;
-        auto found = map.GetNextCell(cell);
+        auto found = map.GetNextCell(result, cell);
         if (!found) {
             return false;
         }
@@ -1468,14 +1473,14 @@ bool SudokuSseSolver::solve(SudokuSseMap& map, bool topLevel, bool verbose) {
     return false;
 }
 
-bool SudokuSseSolver::fillCells(SudokuSseMap& map, bool topLevel, bool verbose) {
+bool SudokuSseSolver::fillCells(SudokuSseMap& map, bool topLevel, bool verbose, SudokuSseMapResult& result) {
     ++count_;
     if (verbose) {
         if (pSudokuOutStream_ != nullptr) {
             (*pSudokuOutStream_) << "Step " << count_ << "\n";
         }
     }
-    map.FillCrossing(topLevel);
+    map.FillCrossing(topLevel, result);
     return true;
 }
 
@@ -1491,13 +1496,18 @@ bool SudokuChecker::Valid() const {
 
 bool SudokuChecker::parse(const std::string& puzzle, const std::string& solution,
                           SudokuSolverPrint printSolution, std::ostream* pSudokuOutStream) {
-    std::istringstream is(solution);
-    Grid grid(Sudoku::SizeOfGroupsPerMap, Group(Sudoku::SizeOfCellsPerGroup, 0));
+    Grid grid {0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,
+               0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,
+               0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0};
     bool valid = true;
     std::string solutionLine;
+    solutionLine.reserve(Sudoku::CacheGuardSize);
 
+    std::istringstream is(solution);
     for(SudokuIndex row = 0; valid && (row < Sudoku::SizeOfGroupsPerMap); ++row) {
         std::string rowLine;
+        rowLine.reserve(Sudoku::CacheGuardSize);
+
         getline(is, rowLine);
         if (rowLine.empty()) {
             valid = false;
@@ -1548,6 +1558,9 @@ bool SudokuChecker::parseRow(SudokuIndex row, const std::string& rowLine, Grid& 
         const char c = rowLine.at(column * 2);
         if (Sudoku::ConvertCharToSudokuCandidate(
                 Sudoku::MinCandidatesNumber, Sudoku::MaxCandidatesNumber, c, num)) {
+            if ((grid.size() <= row) || (grid.at(0).size() <= column)) {
+                return false;
+            }
             grid.at(row).at(column) = num;
             solutionLine += c;
         } else {
@@ -1614,9 +1627,12 @@ bool SudokuChecker::checkRowSet(const Grid& grid, std::ostream* pSudokuOutStream
 bool SudokuChecker::checkColumnSet(const Grid& grid, std::ostream* pSudokuOutStream) {
     // 各列のマスが一意
     for(SudokuIndex column = 0; column < Sudoku::SizeOfGroupsPerMap; ++column) {
-        Group group;
+        Group group {0,0,0,0,0,0,0,0,0};
         for(SudokuIndex row = 0; row < Sudoku::SizeOfCellsPerGroup; ++row) {
-            group.push_back(grid.at(row).at(column));
+            if (group.size() <= row) {
+                return false;
+            }
+            group.at(row) = grid.at(row).at(column);
         }
 
         auto valid = checkUnique(group);
@@ -1635,10 +1651,15 @@ bool SudokuChecker::checkBoxSet(const Grid& grid, std::ostream* pSudokuOutStream
     // 各3x3箱のマスが一意
     for(SudokuIndex column = 0; column < Sudoku::SizeOfGroupsPerMap; column += Sudoku::SizeOfBoxesOnEdge) {
         for(SudokuIndex row = 0; row < Sudoku::SizeOfCellsPerGroup; row += Sudoku::SizeOfBoxesOnEdge) {
-            Group group;
+            Group group {0,0,0,0,0,0,0,0,0};
+            Group::size_type index = 0;
             for(SudokuIndex x = 0; x < Sudoku::SizeOfCellsOnBoxEdge; ++x) {
                 for(SudokuIndex y = 0; y < Sudoku::SizeOfCellsOnBoxEdge; ++y) {
-                    group.push_back(grid.at(row + y).at(column + x));
+                    if (group.size() <= index) {
+                        return false;
+                    }
+                    group.at(index) = grid.at(row + y).at(column + x);
+                    ++index;
                 }
             }
 
@@ -1657,19 +1678,95 @@ bool SudokuChecker::checkBoxSet(const Grid& grid, std::ostream* pSudokuOutStream
 
 // 行、列、3x3箱のメンバが一意かどうか調べる
 bool SudokuChecker::checkUnique(const Group& line) {
-    Group row = line;
-    std::sort(row.begin(), row.end());
-    row.erase(std::unique(row.begin(), row.end()), row.end());
-    return (row.size() == Sudoku::SizeOfCellsPerGroup);
+    std::array<int, Sudoku::SizeOfCellsPerGroup + 1> cellMap {0,0,0,0,0,0,0,0,0,0};
+
+    for(const auto n : line) {
+        if ((n < Sudoku::MinCandidatesNumber) || (n > Sudoku::MaxCandidatesNumber)
+            || (cellMap.size() <= static_cast<decltype(cellMap.size())>(n))) {
+            return false;
+        }
+        if (cellMap.at(n)) {
+            return false;
+        }
+        cellMap.at(n) = 1;
+    }
+
+    return true;
 }
 
-const int SudokuLoader::ExitStatusPassed = 0;
-const int SudokuLoader::ExitStatusFailed = 1;
+SudokuDispatcher::SudokuDispatcher(SudokuSolverType solverType, SudokuSolverCheck check, SudokuSolverPrint print,
+                                   SudokuPatternCount printAllCandidate, SudokuPuzzleCount puzzleNum,
+                                   const std::string& puzzleLine)
+    : solverType_(solverType), check_(check), print_(print),
+      printAllCandidate_(printAllCandidate), puzzleNum_(puzzleNum), puzzleLine_(puzzleLine) {
+    return;
+}
+
+bool SudokuDispatcher::Exec(void) {
+    std::ostringstream ss;
+    if (solverType_ == SudokuSolverType::SOLVER_SSE_4_2) {
+        SudokuSseSolver solver(puzzleLine_, &ss, printAllCandidate_);
+        return exec(solver, ss);
+    }
+
+    SudokuSolver solver(puzzleLine_, 0, &ss, printAllCandidate_);
+    return exec(solver, ss);
+}
+
+bool SudokuDispatcher::exec(SudokuBaseSolver& solver, std::ostringstream& ss) {
+    bool failed = false;
+    solver.Exec(false, false);
+
+    if ((check_ == SudokuSolverCheck::CHECK) || (print_ == SudokuSolverPrint::PRINT)) {
+        std::ostringstream os;
+        SudokuChecker checker(puzzleLine_, ss.str(), print_, &os);
+        if (!checker.Valid()) {
+            os << "Error in case " << puzzleNum_ << "\n" << puzzleLine_ << "\n" << ss.str();
+            failed = true;
+        }
+        message_ = os.str();
+    }
+
+    return failed;
+}
+
+const std::string& SudokuDispatcher::GetMessage(void) const {
+    return message_;
+}
+
+SudokuMultiDispatcher::SudokuMultiDispatcher(SudokuSolverType solverType, SudokuSolverCheck check, SudokuSolverPrint print,
+                                             SudokuPatternCount printAllCandidate)
+    : solverType_(solverType), check_(check), print_(print), printAllCandidate_(printAllCandidate) {
+    return;
+}
+
+void SudokuMultiDispatcher::AddPuzzle(SudokuPuzzleCount puzzleNum, const std::string& puzzleLine) {
+    dipatcherSet_.push_back(SudokuDispatcher(solverType_, check_, print_, printAllCandidate_, puzzleNum, puzzleLine));
+    return;
+}
+
+bool SudokuMultiDispatcher::ExecAll(void) {
+    bool failed = false;
+
+    for(auto& dipatcher : dipatcherSet_) {
+        failed |= dipatcher.Exec();
+    }
+
+    return failed;
+}
+
+// indexはこのMultiDispatcherにおける通し番号
+const std::string& SudokuMultiDispatcher::GetMessage(size_t index) const {
+    return dipatcherSet_.at(index).GetMessage();
+}
+
+const SudokuLoader::ExitStatusCode SudokuLoader::ExitStatusPassed = 0;
+const SudokuLoader::ExitStatusCode SudokuLoader::ExitStatusFailed = 1;
 
 SudokuLoader::SudokuLoader(int argc, const char * const argv[], std::istream* pSudokuInStream, std::ostream* pSudokuOutStream)
-    : solverType_(SudokuSolverType::SOLVER_GENERAL), check_(SudokuSolverCheck::CHECK),
+    : numberOfThreads_(DefaultNumberOfThreads), solverType_(SudokuSolverType::SOLVER_GENERAL), check_(SudokuSolverCheck::CHECK),
       print_(SudokuSolverPrint::DO_NOT_PRINT),
-      isBenchmark_(false), verbose_(true), measureCount_(1), printAllCadidate_(0), pSudokuOutStream_(nullptr) {
+      isBenchmark_(false), verbose_(true), measureCount_(1), printAllCandidate_(0), pSudokuOutStream_(nullptr) {
 
     if (pSudokuOutStream == nullptr) {
         return;
@@ -1743,7 +1840,7 @@ void SudokuLoader::setSingleMode(int argc, const char * const argv[], std::istre
             int patternCount = 0;
             std::istringstream candidateStream(argv[2]);
             candidateStream >> patternCount;
-            printAllCadidate_ = (patternCount >= 0) ? patternCount : 0;
+            printAllCandidate_ = (patternCount >= 0) ? patternCount : 0;
         }
     }
 
@@ -1779,16 +1876,54 @@ bool SudokuLoader::setMultiMode(int argc, const char * const argv[]) {
 
     multiLineFilename_ = argv[1];
     result = true;
-    SudokuOption::setMode(argc, argv, 2, SudokuOption::CommandLineArgSseSolver,
-                          solverType_, SudokuSolverType::SOLVER_SSE_4_2);
-    SudokuOption::setMode(argc, argv, 3, SudokuOption::CommandLineNoChecking,
-                          check_, SudokuSolverCheck::DO_NOT_CHECK);
-    SudokuOption::setMode(argc, argv, 3, SudokuOption::CommandLinePrint,
-                          print_, SudokuSolverPrint::PRINT);
+
+    int argIndex = 2;
+    int valueIndex = 2;
+    for(;argc > argIndex; ++argIndex) {
+        if (setNumberOfThreads(argc, argv, argIndex)) {
+            continue;
+        }
+
+        switch(valueIndex) {
+        case 2:
+            SudokuOption::setMode(argc, argv, argIndex, SudokuOption::CommandLineArgSseSolver,
+                                  solverType_, SudokuSolverType::SOLVER_SSE_4_2);
+            break;
+        case 3:
+            SudokuOption::setMode(argc, argv, argIndex, SudokuOption::CommandLineNoChecking,
+                                  check_, SudokuSolverCheck::DO_NOT_CHECK);
+            SudokuOption::setMode(argc, argv, argIndex, SudokuOption::CommandLinePrint,
+                                  print_, SudokuSolverPrint::PRINT);
+            break;
+        default:
+            break;
+        }
+        ++valueIndex;
+    }
+
     return result;
 }
 
-int SudokuLoader::execSingle(void) {
+bool SudokuLoader::setNumberOfThreads(int argc, const char * const argv[], int argIndex) {
+    if ((argc <= argIndex) || (argv[argIndex] == nullptr)) {
+        return false;
+    }
+
+    const std::string header = SudokuOption::CommandLineArgParallel;
+    std::string arg = argv[argIndex];
+    if ((arg.find(header) != 0) || (arg.size() < header.size())) {
+        return false;
+    }
+
+    const char* pStr = arg.c_str() + header.size();
+    int num = ::atoi(pStr);
+    numberOfThreads_ = (num >= 1) ? num : getNumberOfCores();
+    return true;
+}
+
+SudokuLoader::ExitStatusCode SudokuLoader::execSingle(void) {
+    auto pProcessorBinder = Sudoku::CreateProcessorBinder();
+
     if (measureCount_) {
         measureTimeToSolve(SudokuSolverType::SOLVER_GENERAL);
     }
@@ -1796,65 +1931,138 @@ int SudokuLoader::execSingle(void) {
     return ExitStatusPassed;
 }
 
-int SudokuLoader::execMulti(void) {
+SudokuLoader::ExitStatusCode SudokuLoader::execMulti(void) {
     std::ifstream is(multiLineFilename_);
     return execMulti(&is);
 }
 
-int SudokuLoader::execMulti(std::istream* pSudokuInStream) {
+SudokuLoader::ExitStatusCode SudokuLoader::execMulti(std::istream* pSudokuInStream) {
+    // マルチスレッドでは指定しない
+    // auto pProcessorBinder = Sudoku::CreateProcessorBinder();
+
     if (pSudokuInStream == nullptr) {
         return ExitStatusFailed;
     }
 
-    switch(solverType_) {
+    printHeader(solverType_, pSudokuOutStream_);
+
+    DispatcherPtrSet dispatcherSet;
+    for(decltype(numberOfThreads_) i=0; i<numberOfThreads_; ++i) {
+        dispatcherSet.push_back(std::move(DispatcherPtr(
+                                              new SudokuMultiDispatcher(solverType_, check_, print_, printAllCandidate_))));
+    }
+
+    auto sizeOfPuzzle = readLines(numberOfThreads_, pSudokuInStream, dispatcherSet);
+    auto result = execAll(numberOfThreads_, dispatcherSet);
+    writeMessage(numberOfThreads_, sizeOfPuzzle, dispatcherSet, pSudokuOutStream_);
+
+    std::string message = (check_ == SudokuSolverCheck::DO_NOT_CHECK) ? "solved" : "passed";
+    if (result == ExitStatusPassed) {
+        *pSudokuOutStream_ << "All " << sizeOfPuzzle << " cases " << message << ".\n";
+    }
+
+    return result;
+}
+
+void SudokuLoader::printHeader(SudokuSolverType solverType, std::ostream* pSudokuOutStream) {
+    if (pSudokuOutStream == nullptr) {
+        return;
+    }
+
+    switch(solverType) {
     case SudokuSolverType::SOLVER_SSE_4_2:
-        *pSudokuOutStream_ << "Solving with SSE/AVX\n";
+        *pSudokuOutStream << "Solving with SSE/AVX\n";
         break;
     case SudokuSolverType::SOLVER_GENERAL:
     default:
-        *pSudokuOutStream_ << "Solving in C++\n";
+        *pSudokuOutStream << "Solving in C++\n";
         break;
     }
 
-    int result = ExitStatusPassed;
-    size_t lineNum = 1;
-    for(;;++lineNum) {
+    return;
+}
+
+SudokuLoader::NumberOfCores SudokuLoader::getNumberOfCores(void) {
+#ifdef NO_SOLVE_PARALLEL
+    return 1;
+#else
+    // unsigned int
+    auto numberOfCores = std::thread::hardware_concurrency();
+    static_assert(std::is_convertible<decltype(numberOfCores), NumberOfCores>::value == true, "Too narrow");
+    return std::max(numberOfCores, static_cast<decltype(numberOfCores)>(1));
+#endif
+}
+
+SudokuPuzzleCount SudokuLoader::readLines(NumberOfCores numberOfCores, std::istream* pSudokuInStream,
+                                          DispatcherPtrSet& dispatcherSet) {
+    SudokuPuzzleCount sizeOfPuzzle = 0;
+    SudokuPuzzleCount lineNum = 1;
+    decltype(numberOfCores) indexOfCore = 0;
+
+    for(;;) {
         std::string lineStr;
         getline(*pSudokuInStream, lineStr);
         if (lineStr.empty()) {
             break;
         }
 
-        std::unique_ptr<SudokuBaseSolver> pSolver;
-        std::ostringstream ss;
-        switch(solverType_) {
-        case SudokuSolverType::SOLVER_SSE_4_2:
-            pSolver = std::unique_ptr<SudokuBaseSolver>(new SudokuSseSolver(lineStr, &ss, printAllCadidate_));
-            break;
-        case SudokuSolverType::SOLVER_GENERAL:
-        default:
-            pSolver = std::unique_ptr<SudokuBaseSolver>(new SudokuSolver(lineStr, 0, &ss, printAllCadidate_));
-            break;
-        }
+        dispatcherSet.at(indexOfCore)->AddPuzzle(lineNum, lineStr);
+        ++sizeOfPuzzle;
+        ++lineNum;
+        ++indexOfCore;
+        indexOfCore = (indexOfCore >= numberOfCores) ? 0 : indexOfCore;
+    }
 
-        pSolver->Exec(false, false);
-        if ((check_ == SudokuSolverCheck::CHECK) || (print_ == SudokuSolverPrint::PRINT)) {
-            SudokuChecker checker(lineStr, ss.str(), print_, pSudokuOutStream_);
-            if (!checker.Valid()) {
-                if (pSudokuOutStream_ != nullptr) {
-                    *pSudokuOutStream_ << "Error in case " << lineNum << "\n" << lineStr << "\n" << ss.str();
-                }
+    return sizeOfPuzzle;
+}
+
+SudokuLoader::ExitStatusCode SudokuLoader::execAll(NumberOfCores numberOfCores, DispatcherPtrSet& dispatcherSet) {
+    auto result = ExitStatusPassed;
+
+#ifndef NO_SOLVE_PARALLEL
+    if (numberOfCores <= 1) {
+#endif
+        for(auto& dispatcher : dispatcherSet) {
+            if (dispatcher->ExecAll()) {
+                result = ExitStatusFailed;
+            }
+        }
+#ifndef NO_SOLVE_PARALLEL
+    } else {
+        std::vector<std::future<bool>> futureSet;
+        for(auto& dispatcher : dispatcherSet) {
+            futureSet.push_back(std::async(std::launch::async, [&dispatcher] { return dispatcher->ExecAll(); }));
+        }
+        for (auto& f : futureSet) {
+            if (f.get()) {
                 result = ExitStatusFailed;
             }
         }
     }
-
-    std::string message = (check_ == SudokuSolverCheck::DO_NOT_CHECK) ? "solved" : "passed";
-    if (result == ExitStatusPassed) {
-        *pSudokuOutStream_ << "All " << (lineNum - 1) << " cases " << message << ".\n";
-    }
+#endif
 
     return result;
+}
+
+void SudokuLoader::writeMessage(NumberOfCores numberOfCores, SudokuPuzzleCount sizeOfPuzzle,
+                                DispatcherPtrSet& dispatcherSet, std::ostream* pSudokuOutStream) {
+    if (pSudokuOutStream == nullptr) {
+        return;
+    }
+
+    decltype(numberOfCores) indexOfCore = 0;
+    size_t indexInDispatcher = 0;
+
+    for(decltype(sizeOfPuzzle) i = 0; i < sizeOfPuzzle; ++i) {
+        *pSudokuOutStream << dispatcherSet.at(indexOfCore)->GetMessage(indexInDispatcher);
+        ++indexOfCore;
+        if (indexOfCore >= numberOfCores) {
+            indexOfCore = 0;
+            ++indexInDispatcher;
+        }
+    }
+
+    return;
 }
 
 // 解く時間を測る
@@ -1900,7 +2108,7 @@ void SudokuLoader::measureTimeToSolve(SudokuSolverType solverType) {
 SudokuTime SudokuLoader::solveSudoku(SudokuSolverType solverType, int count, bool warmup) {
     const SudokuIndex solverseed = static_cast<decltype(solverseed)>(count);
     SudokuSolver cppSolver(sudokuStr_, solverseed, pSudokuOutStream_);
-    SudokuSseSolver sseSolver(sudokuStr_, pSudokuOutStream_, printAllCadidate_);
+    SudokuSseSolver sseSolver(sudokuStr_, pSudokuOutStream_, printAllCandidate_);
     SudokuBaseSolver* pSolver = nullptr;
 
     switch(solverType) {
@@ -1931,7 +2139,7 @@ SudokuTime SudokuLoader::solveSudoku(SudokuSolverType solverType, int count, boo
 
 // 数える
 SudokuTime SudokuLoader::enumerateSudoku(void) {
-    SudokuSseSolver sseSolver(sudokuStr_, pSudokuOutStream_, printAllCadidate_);
+    SudokuSseSolver sseSolver(sudokuStr_, pSudokuOutStream_, printAllCandidate_);
 
     std::unique_ptr<Sudoku::ITimer> pTimer(Sudoku::CreateTimerInstance());
     pTimer->StartClock();

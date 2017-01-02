@@ -57,6 +57,20 @@ Instructions), which is available on Haswell and newer
 microarchitecture. If you cannot run on such processors, set
 _EnableAvx_ to 0 or an invalid opcode exception occurs.
 
+### Solve parallel
+
+Compiling sudoku.cpp with std::future fails on MinGW. To avoid it, add
+`-DNO_SOLVE_PARALLEL` to _CPPFLAGS_PARALLEL_ in _Makefile_vars_.
+
+Checking sudoku solutions on Cygwin may be very slow. I applied these
+items below to improve this issue. I guess the false sharing issue
+occurs on heap memory holding string buffers. This issue does not
+occur on Bash on Ubuntu on Windows.
+
+* Use std::array instead of std::vector if available
+* Call std::string::reserve(N) to separate string buffers on heap
+  memory. N is larger than a size of a cache line in bytes.
+
 ## Prepare sudoku puzzles
 
 SudokuSSE accepts sudoku puzzles in text files.
@@ -138,6 +152,9 @@ I assume the average is much longer than the least for these reasons.
 1. A CPU reaches its thermal limit and slows down. Setting of the
   Windows power option may relax this situation.
 
+Process affinity must not set in using std::future because it prevents
+running a process on multi-core.
+
 #### Print steps to solve a sudoku puzzle
 
 When SudokuSSE prints steps to solve a sudoku puzzle, each line of the
@@ -178,6 +195,18 @@ solutions are valid and prints the solutions.
 ```bash
 bin/sudokusse.exe filename sse off
 bin/sudokusse.exe filename sse print
+```
+
+When you place an argument "-Nnumber" or "-N" following a filename,
+SudokuSSE solves in sudoku puzzles of the file with _number_ of
+threads. If you omit the number, the number is set to the number of
+threads of a processor on which SudokuSSE runs (actually this is
+std::thread::hardware_concurrency()). My CPU (Intel Core i3 4160)
+has 4 threads (2 cores with hyper-threading).
+
+```bash
+bin/sudokusse.exe filename -N8 sse
+bin/sudokusse.exe filename -N sse
 ```
 
 ### Count how many solutions a sudoku puzzle has
@@ -572,6 +601,9 @@ is true.
 Note that rightmost and bottom cells always have only one candidate in
 backtracking and we can avoid setting candidates to them in the
 recursion.
+
+Counting solutions can run on a single thread only. To run on multiple
+threads, it needs to eliminate global variables.
 
 ### Make SudokuSSE faster
 

@@ -14,10 +14,31 @@ else
 CPPFLAGS_SSE_AVX=-mavx2
 endif
 
-# -O2 optimization is better than -O3 in this program
-CPPFLAGS=-std=c++11 -O2 -Wall -masm=intel -m64 $(CPPFLAGS_SSE_AVX)
+ifneq ($(OS),Windows_NT)
+# Workaround for GCC 4.8 and std::thread
+GCC_MAJOR_VERSION:=$(shell export LC_ALL=C ; gcc -v 2>&1 | tail -1 | cut -d " " -f 3 | cut -d "." -f1)
+ifeq ($(GCC_MAJOR_VERSION),4)
+LDFLAGS=-Wl,--no-as-needed
+LIBS=-lpthread
+else
 LDFLAGS=
 LIBS=
+endif
+CPPFLAGS_PARALLEL=
+
+else
+LDFLAGS=
+LIBS=
+ifneq (,$(findstring cygwin,$(shell gcc -dumpmachine)))
+CPPFLAGS_PARALLEL=
+else
+# MinGW does not support C++11 thread
+CPPFLAGS_PARALLEL=-DNO_SOLVE_PARALLEL
+endif
+endif
+
+# -O2 optimization is better than -O3 in this program
+CPPFLAGS=-std=c++11 -O2 -Wall -masm=intel -m64 $(CPPFLAGS_SSE_AVX) $(CPPFLAGS_PARALLEL)
 
 CELLS_UNPACKED_TARGET=bin/sudokusse
 CELLS_PACKED_TARGET=bin/sudokusse_cells_packed
@@ -41,7 +62,7 @@ GENERATOR_SCRIPT=sudokumap.rb
 ALL_UPDATED_VARIABLES= \
 	LD CXX AS RUBY \
 	USE_AVX_VALUE ASFLAGS_SSE_AVX CPPFLAGS_SSE_AVX \
-	CPPFLAGS LDFLAGS \
+	LDFLAGS LIBS GCC_MAJOR_VERSION CPPFLAGS_PARALLEL CPPFLAGS \
 	CELLS_UNPACKED_TARGET CELLS_PACKED_TARGET TARGETS \
 	OS_DEPENDENT_OBJ CELLS_COMMON_OBJS CELLS_UNPACKED_OBJS CELLS_PACKED_OBJS OBJS \
 	HEADERS GENERATED_CODE GENERATOR_SCRIPT \

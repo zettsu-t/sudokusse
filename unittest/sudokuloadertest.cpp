@@ -1,5 +1,5 @@
 // SudokuLoaderクラスをテストする
-// Copyright (C) 2012-2015 Zettsu Tatsuya
+// Copyright (C) 2012-2017 Zettsu Tatsuya
 //
 // クラス定義は下記から流用
 // http://www.atmarkit.co.jp/fdotnet/cpptest/cpptest02/cpptest02_02.html
@@ -14,6 +14,7 @@
 
 class SudokuCheckerTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST_SUITE(SudokuCheckerTest);
+    CPPUNIT_TEST(test_initializeGrid);
     CPPUNIT_TEST(test_parse);
     CPPUNIT_TEST(test_parseRow);
     CPPUNIT_TEST(test_compare);
@@ -27,6 +28,7 @@ public:
     void setUp() override;
     void tearDown() override;
 protected:
+    void test_initializeGrid();
     void test_parse();
     void test_parseRow();
     void test_compare();
@@ -73,6 +75,13 @@ void SudokuCheckerTest::setUp() {
 
 void SudokuCheckerTest::tearDown() {
     return;
+}
+
+void SudokuCheckerTest::test_initializeGrid() {
+    SudokuChecker::Group group {{0}};
+    for(auto e : group) {
+        CPPUNIT_ASSERT_EQUAL(static_cast<decltype(e)>(0), e);
+    }
 }
 
 void SudokuCheckerTest::test_parse() {
@@ -155,6 +164,7 @@ void SudokuCheckerTest::test_parseRow() {
 
         for(SudokuIndex column = 0; column < Sudoku::SizeOfCellsPerGroup; ++column) {
             SudokuNumber num = Sudoku::SizeOfCellsPerGroup - column;
+            CPPUNIT_ASSERT(grid.size() > row);
             CPPUNIT_ASSERT_EQUAL(num, grid.at(row).at(column));
         }
     }
@@ -243,6 +253,8 @@ void SudokuCheckerTest::test_checkRowSet() {
         for(SudokuIndex column = 0; column < Sudoku::SizeOfCellsPerGroup; ++column) {
             SudokuChecker::Grid grid = grid_;
             auto fromColumn = ((column + 1) == Sudoku::SizeOfCellsPerGroup) ? (column - 1) : (column + 1);
+            CPPUNIT_ASSERT(grid.size() > row);
+            CPPUNIT_ASSERT(grid.at(0).size() > column);
             grid.at(row).at(column) = grid.at(row).at(fromColumn);
 
             std::string expected = "Error in row ";
@@ -277,6 +289,8 @@ void SudokuCheckerTest::test_checkColumnSet() {
         for(SudokuIndex row = 0; row < Sudoku::SizeOfCellsPerGroup; ++row) {
             SudokuChecker::Grid grid = grid_;
             auto fromRow = ((row + 1) == Sudoku::SizeOfCellsPerGroup) ? (row - 1) : (row + 1);
+            CPPUNIT_ASSERT(grid.size() > row);
+            CPPUNIT_ASSERT(grid.at(0).size() > column);
             grid.at(row).at(column) = grid.at(fromRow).at(column);
             {
                 std::string expected = "Error in column ";
@@ -315,6 +329,9 @@ void SudokuCheckerTest::test_checkBoxSet() {
                 (column + Sudoku::SizeOfCellsOnBoxEdge - 1) : (column - 1);
             auto fromRow = ((row % Sudoku::SizeOfCellsOnBoxEdge) == 0) ?
                 (row + Sudoku::SizeOfCellsOnBoxEdge - 1) : (row - 1);
+
+            CPPUNIT_ASSERT(grid.size() > row);
+            CPPUNIT_ASSERT(grid.at(0).size() > column);
             grid.at(row).at(column) = grid.at(fromRow).at(fromColumn);
             {
                 std::string expected = "Error in a box with row ";
@@ -362,17 +379,343 @@ void SudokuCheckerTest::test_checkUnique() {
     }
 }
 
+class SudokuDispatcherTest : public CPPUNIT_NS::TestFixture {
+    CPPUNIT_TEST_SUITE(SudokuDispatcherTest);
+    CPPUNIT_TEST(test_Constructor);
+    CPPUNIT_TEST(test_Exec);
+    CPPUNIT_TEST(test_exec);
+    CPPUNIT_TEST(test_execError);
+    CPPUNIT_TEST(test_GetMessage);
+    CPPUNIT_TEST_SUITE_END();
+
+public:
+    void setUp() override;
+    void tearDown() override;
+protected:
+    void test_Constructor();
+    void test_Exec();
+    void test_exec();
+    void test_execError();
+    void test_GetMessage();
+};
+
+CPPUNIT_TEST_SUITE_REGISTRATION(SudokuDispatcherTest);
+
+namespace {
+    void CheckDispatcherErrorMessage(bool printLineInError, bool failed, SudokuSolverPrint print,
+                                     const std::string& message, const std::string& caseNumberStr) {
+        std::string errorMessage = "Error in case ";
+        errorMessage += caseNumberStr;
+        auto resultPos = message.find(errorMessage);
+        auto solutionPos = message.find("123456789123");
+
+        if (failed) {
+            CPPUNIT_ASSERT(std::string::npos != resultPos);
+        } else {
+            CPPUNIT_ASSERT_EQUAL(std::string::npos, resultPos);
+        }
+
+        if ((failed && printLineInError) || (print == SudokuSolverPrint::PRINT)) {
+            CPPUNIT_ASSERT(std::string::npos != solutionPos);
+        } else {
+            CPPUNIT_ASSERT_EQUAL(std::string::npos, solutionPos);
+        }
+
+        return;
+    }
+}
+
+void SudokuDispatcherTest::setUp() {
+    return;
+}
+
+void SudokuDispatcherTest::tearDown() {
+    return;
+}
+
+void SudokuDispatcherTest::test_Constructor() {
+    struct Test {
+        SudokuSolverType solverType;
+        SudokuSolverCheck check;
+        SudokuSolverPrint print;
+        SudokuPatternCount printAllCandidate;
+        SudokuPuzzleCount puzzleNum;
+        std::string puzzleLine;
+    };
+
+    const Test testSet[] = {
+        {SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
+         SudokuSolverPrint::DO_NOT_PRINT, 1, 30, "12345678"},
+        {SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::DO_NOT_CHECK,
+         SudokuSolverPrint::PRINT, 2, 40, "98765432"}
+    };
+
+    for(const auto& test : testSet) {
+        SudokuDispatcher inst(test.solverType, test.check, test.print, test.printAllCandidate,
+                              test.puzzleNum, test.puzzleLine);
+        CPPUNIT_ASSERT(test.solverType == inst.solverType_);
+        CPPUNIT_ASSERT(test.check == inst.check_);
+        CPPUNIT_ASSERT(test.print == inst.print_);
+        CPPUNIT_ASSERT_EQUAL(test.printAllCandidate, inst.printAllCandidate_);
+        CPPUNIT_ASSERT_EQUAL(test.puzzleNum, inst.puzzleNum_);
+        CPPUNIT_ASSERT_EQUAL(test.puzzleLine, inst.puzzleLine_);
+    }
+
+    return;
+}
+
+void SudokuDispatcherTest::test_Exec() {
+    struct Test {
+        SudokuSolverCheck check;
+        SudokuSolverPrint print;
+        SudokuPatternCount printAllCandidate;
+        SudokuPuzzleCount puzzleNum;
+    };
+
+    constexpr Test testSet[] = {
+        {SudokuSolverCheck::CHECK, SudokuSolverPrint::DO_NOT_PRINT, 0, 1},
+        {SudokuSolverCheck::CHECK, SudokuSolverPrint::PRINT, 0, 1},
+        {SudokuSolverCheck::DO_NOT_CHECK, SudokuSolverPrint::DO_NOT_PRINT, 0, 1},
+        {SudokuSolverCheck::DO_NOT_CHECK, SudokuSolverPrint::DO_NOT_PRINT, 1, 1}
+    };
+
+    constexpr SudokuSolverType solverTypeSet[] = {SudokuSolverType::SOLVER_GENERAL, SudokuSolverType::SOLVER_SSE_4_2};
+    for(const auto& test : testSet) {
+        for(const auto solverType : solverTypeSet) {
+            SudokuDispatcher inst(solverType, test.check, test.print, test.printAllCandidate, test.puzzleNum,
+                                  SudokuTestPattern::NoBacktrackString);
+            CPPUNIT_ASSERT(!inst.Exec());
+
+            if (test.print == SudokuSolverPrint::PRINT) {
+                std::string expected = SudokuTestPattern::NoBacktrackStringSolution;
+                expected += "\n";
+                CPPUNIT_ASSERT_EQUAL(expected, inst.GetMessage());
+            } else {
+                CPPUNIT_ASSERT(inst.GetMessage().empty());
+            }
+        }
+    }
+
+    return;
+}
+
+void SudokuDispatcherTest::test_exec() {
+    struct Test {
+        SudokuSolverCheck check;
+        SudokuSolverPrint print;
+        std::string expected;
+    };
+
+    const Test testSet[] = {
+        {SudokuSolverCheck::DO_NOT_CHECK, SudokuSolverPrint::DO_NOT_PRINT, ""},
+        {SudokuSolverCheck::CHECK, SudokuSolverPrint::DO_NOT_PRINT, ""},
+        {SudokuSolverCheck::CHECK, SudokuSolverPrint::PRINT, SudokuTestPattern::NoBacktrackStringSolution}
+    };
+
+    for(const auto& test : testSet) {
+        SudokuDispatcher inst(SudokuSolverType::SOLVER_GENERAL, test.check, test.print, 0, 0, "");
+        std::ostringstream ss;
+        SudokuSolver solver(SudokuTestPattern::NoBacktrackString, 0, &ss, 0);
+
+        CPPUNIT_ASSERT(!inst.exec(solver, ss));
+        std::string expected = test.expected;
+        if (!expected.empty()) {
+            expected += "\n";
+            CPPUNIT_ASSERT_EQUAL(expected, inst.GetMessage());
+        } else {
+            CPPUNIT_ASSERT(inst.GetMessage().empty());
+        }
+    }
+
+    return;
+}
+
+void SudokuDispatcherTest::test_execError() {
+    struct TestConflict {
+        SudokuSolverCheck check;
+        SudokuSolverPrint print;
+        bool expected;
+    };
+
+    constexpr TestConflict testSetConflict[] = {
+        {SudokuSolverCheck::DO_NOT_CHECK, SudokuSolverPrint::DO_NOT_PRINT, false},
+        {SudokuSolverCheck::CHECK, SudokuSolverPrint::DO_NOT_PRINT, true},
+        {SudokuSolverCheck::CHECK, SudokuSolverPrint::PRINT, true}
+    };
+
+    for(const auto& test : testSetConflict) {
+        const std::string puzzleLine = "Puzzle Line";
+        SudokuDispatcher inst(SudokuSolverType::SOLVER_GENERAL, test.check, test.print, 0, 12, puzzleLine);
+        std::ostringstream ss;
+
+        SudokuSolver solver(SudokuTestPattern::ConflictString, 0, &ss, 0);
+        CPPUNIT_ASSERT_EQUAL(test.expected, inst.exec(solver, ss));
+
+        auto message = inst.GetMessage();
+        auto pos = message.find(puzzleLine);
+        CPPUNIT_ASSERT(!test.expected || (std::string::npos != pos));
+        CheckDispatcherErrorMessage(false, test.expected, test.print, message, "12");
+    }
+
+    return;
+}
+
+void SudokuDispatcherTest::test_GetMessage() {
+    SudokuDispatcher inst(SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
+                          SudokuSolverPrint::DO_NOT_PRINT, 0, 0, "");
+    const std::string expected = "Message string";
+    inst.message_ = expected;
+    CPPUNIT_ASSERT_EQUAL(expected, inst.GetMessage());
+    return;
+}
+
+class SudokuMultiDispatcherTest : public CPPUNIT_NS::TestFixture {
+    CPPUNIT_TEST_SUITE(SudokuMultiDispatcherTest);
+    CPPUNIT_TEST(test_Constructor);
+    CPPUNIT_TEST(test_AddPuzzle);
+    CPPUNIT_TEST(test_ExecAll);
+    CPPUNIT_TEST(test_GetMessage);
+    CPPUNIT_TEST_SUITE_END();
+
+public:
+    void setUp() override;
+    void tearDown() override;
+protected:
+    void test_Constructor();
+    void test_AddPuzzle();
+    void test_ExecAll();
+    void test_GetMessage();
+};
+
+CPPUNIT_TEST_SUITE_REGISTRATION(SudokuMultiDispatcherTest);
+
+void SudokuMultiDispatcherTest::setUp() {
+    return;
+}
+
+void SudokuMultiDispatcherTest::tearDown() {
+    return;
+}
+
+void SudokuMultiDispatcherTest::test_Constructor() {
+    struct Test {
+        SudokuSolverType solverType;
+        SudokuSolverCheck check;
+        SudokuSolverPrint print;
+        SudokuPatternCount printAllCandidate;
+    };
+
+    constexpr Test testSet[] = {
+        {SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK, SudokuSolverPrint::DO_NOT_PRINT, 1},
+        {SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::DO_NOT_CHECK, SudokuSolverPrint::PRINT, 2}
+    };
+
+    for(const auto& test : testSet) {
+        SudokuMultiDispatcher inst(test.solverType, test.check, test.print, test.printAllCandidate);
+        CPPUNIT_ASSERT(test.solverType == inst.solverType_);
+        CPPUNIT_ASSERT(test.check == inst.check_);
+        CPPUNIT_ASSERT(test.print == inst.print_);
+        CPPUNIT_ASSERT_EQUAL(test.printAllCandidate, inst.printAllCandidate_);
+    }
+
+    return;
+}
+
+void SudokuMultiDispatcherTest::test_AddPuzzle() {
+    SudokuPuzzleCount puzzleNum = 21;
+    const std::string puzzleLine = "123456789";
+    SudokuMultiDispatcher inst(SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::DO_NOT_CHECK,
+                               SudokuSolverPrint::DO_NOT_PRINT, 0);
+
+    inst.AddPuzzle(puzzleNum, puzzleLine);
+    CPPUNIT_ASSERT(!inst.dipatcherSet_.empty());
+    CPPUNIT_ASSERT_EQUAL(puzzleNum, inst.dipatcherSet_.at(0).puzzleNum_);
+    CPPUNIT_ASSERT_EQUAL(puzzleLine, inst.dipatcherSet_.at(0).puzzleLine_);
+    return;
+}
+
+void SudokuMultiDispatcherTest::test_ExecAll() {
+    {
+        SudokuMultiDispatcher inst(SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
+                                   SudokuSolverPrint::DO_NOT_PRINT, 0);
+        CPPUNIT_ASSERT(!inst.ExecAll());
+    }
+    {
+        SudokuMultiDispatcher inst(SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
+                                   SudokuSolverPrint::DO_NOT_PRINT, 0);
+        inst.AddPuzzle(1, SudokuTestPattern::NoBacktrackString);
+        CPPUNIT_ASSERT(!inst.ExecAll());
+        CPPUNIT_ASSERT(inst.GetMessage(0).empty());
+    }
+    {
+        SudokuMultiDispatcher inst(SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
+                                   SudokuSolverPrint::DO_NOT_PRINT, 0);
+        inst.AddPuzzle(1, SudokuTestPattern::NoBacktrackString);
+        inst.AddPuzzle(2, SudokuTestPattern::ConflictString);
+        CPPUNIT_ASSERT(inst.ExecAll());
+        CPPUNIT_ASSERT(inst.GetMessage(0).empty());
+        CPPUNIT_ASSERT(!inst.GetMessage(1).empty());
+    }
+    return;
+}
+
+void SudokuMultiDispatcherTest::test_GetMessage() {
+    struct Test {
+        SudokuSolverCheck check;
+        SudokuSolverPrint print;
+        bool failed;
+    };
+
+    constexpr Test testSet[] = {
+        {SudokuSolverCheck::DO_NOT_CHECK, SudokuSolverPrint::DO_NOT_PRINT, false},
+        {SudokuSolverCheck::CHECK, SudokuSolverPrint::DO_NOT_PRINT, true},
+        {SudokuSolverCheck::CHECK, SudokuSolverPrint::PRINT, true}
+    };
+
+    for(const auto& test : testSet) {
+        SudokuMultiDispatcher inst(SudokuSolverType::SOLVER_GENERAL, test.check, test.print, 0);
+        inst.AddPuzzle(23, SudokuTestPattern::NoBacktrackString);
+        CPPUNIT_ASSERT(!inst.ExecAll());
+
+        std::string expected = SudokuTestPattern::NoBacktrackStringSolution;
+        expected += "\n";
+        auto message = inst.GetMessage(0);
+        auto pos = message.find(expected);
+
+        if (test.print == SudokuSolverPrint::PRINT) {
+            CPPUNIT_ASSERT(std::string::npos != pos);
+        } else {
+            CPPUNIT_ASSERT(message.empty());
+        }
+    }
+
+    for(const auto& test : testSet) {
+        SudokuMultiDispatcher inst(SudokuSolverType::SOLVER_GENERAL, test.check, test.print, 0);
+        inst.AddPuzzle(23, SudokuTestPattern::ConflictString);
+        CPPUNIT_ASSERT_EQUAL(test.failed, inst.ExecAll());
+        CheckDispatcherErrorMessage(true, test.failed, test.print, inst.GetMessage(0), "23");
+    }
+
+    return;
+}
+
 class SudokuLoaderTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST_SUITE(SudokuLoaderTest);
     CPPUNIT_TEST(test_Constructor);
     CPPUNIT_TEST(test_CanLaunch);
     CPPUNIT_TEST(test_setSingleMode);
     CPPUNIT_TEST(test_setMultiMode);
+    CPPUNIT_TEST(test_setNumberOfThreads);
     CPPUNIT_TEST(test_getMeasureCount);
     CPPUNIT_TEST(test_execSingle);
     CPPUNIT_TEST(test_execMultiPassedCpp);
     CPPUNIT_TEST(test_execMultiPassedSse);
     CPPUNIT_TEST(test_execMultiFailed);
+    CPPUNIT_TEST(test_printHeader);
+    CPPUNIT_TEST(test_getNumberOfCores);
+    CPPUNIT_TEST(test_readLines);
+    CPPUNIT_TEST(test_execAll);
+    CPPUNIT_TEST(test_writeMessage);
     CPPUNIT_TEST(test_solveSudoku);
     CPPUNIT_TEST(test_enumerateSudoku);
     CPPUNIT_TEST_SUITE_END();
@@ -384,12 +727,18 @@ protected:
     void test_Constructor();
     void test_setSingleMode();
     void test_setMultiMode();
+    void test_setNumberOfThreads();
     void test_CanLaunch();
     void test_getMeasureCount();
     void test_execSingle();
     void test_execMultiPassedCpp();
     void test_execMultiPassedSse();
     void test_execMultiFailed();
+    void test_printHeader();
+    void test_getNumberOfCores();
+    void test_readLines();
+    void test_execAll();
+    void test_writeMessage();
     void test_solveSudoku();
     void test_enumerateSudoku();
 private:
@@ -448,7 +797,7 @@ void SudokuLoaderTest::test_Constructor() {
     CPPUNIT_ASSERT(inst.isBenchmark_ == false);
     CPPUNIT_ASSERT(inst.verbose_ == true);
     CPPUNIT_ASSERT(inst.measureCount_ == 1);
-    CPPUNIT_ASSERT(inst.printAllCadidate_ == 0);
+    CPPUNIT_ASSERT(inst.printAllCandidate_ == 0);
 }
 
 // これ以降はテスト・ケースの実装内容
@@ -462,7 +811,7 @@ void SudokuLoaderTest::test_setSingleMode() {
         CPPUNIT_ASSERT_EQUAL(test.isBenchmark, inst.isBenchmark_);
         CPPUNIT_ASSERT_EQUAL(test.verbose, inst.verbose_);
         CPPUNIT_ASSERT_EQUAL(test.measureCount, inst.measureCount_);
-        CPPUNIT_ASSERT_EQUAL(test.printAllCadidate, inst.printAllCadidate_);
+        CPPUNIT_ASSERT_EQUAL(test.printAllCandidate, inst.printAllCandidate_);
         CPPUNIT_ASSERT(pSudokuOutStream_.get() == pInstance_->pSudokuOutStream_);
         streamIndex = (streamIndex + 1) % arraySizeof(SudokuTestPattern::testSet);
     }
@@ -477,7 +826,7 @@ void SudokuLoaderTest::test_setSingleMode() {
         CPPUNIT_ASSERT_EQUAL(test.isBenchmark, inst.isBenchmark_);
         CPPUNIT_ASSERT_EQUAL(test.verbose, inst.verbose_);
         CPPUNIT_ASSERT_EQUAL(test.measureCount, inst.measureCount_);
-        CPPUNIT_ASSERT_EQUAL(test.printAllCadidate, inst.printAllCadidate_);
+        CPPUNIT_ASSERT_EQUAL(test.printAllCandidate, inst.printAllCandidate_);
         streamIndex = (streamIndex + 1) % arraySizeof(SudokuTestPattern::testSet);
     }
 
@@ -491,51 +840,91 @@ void SudokuLoaderTest::test_setSingleMode() {
     return;
 }
 
-namespace {
-    struct TestArgsMultiMode {
-        int    argc;
-        const char* argv[4];
-        bool   expected;
-        SudokuSolverType solverType;
-        SudokuSolverCheck check;
-        SudokuSolverPrint print;
-    };
+struct SudokuTestArgsMultiMode {
+    int    argc;
+    const char* argv[5];
+    bool   expected;
+    SudokuSolverType solverType;
+    SudokuSolverCheck check;
+    SudokuSolverPrint print;
+    SudokuLoader::NumberOfCores numberOfThreads;
+};
 
-    constexpr TestArgsMultiMode testArgsMultiMode[] {
+namespace {
+    constexpr SudokuTestArgsMultiMode testArgsMultiMode[] {
         // 解を一つ求める
-        {1, {"sudoku", nullptr, nullptr, nullptr},
+        {1, {"sudoku", nullptr, nullptr, nullptr, nullptr},
                 true, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
-                    SudokuSolverPrint::DO_NOT_PRINT},
-        {2, {"sudoku", "../data/sudoku_example1.txt", nullptr, nullptr},
+                    SudokuSolverPrint::DO_NOT_PRINT, 1},
+        {2, {"sudoku", "../data/sudoku_example1.txt", nullptr, nullptr, nullptr},
                 false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
-                    SudokuSolverPrint::DO_NOT_PRINT},
-        {2, {"sudoku", "FileNotExists", nullptr, nullptr},
+                    SudokuSolverPrint::DO_NOT_PRINT, 1},
+        {2, {"sudoku", "FileNotExists", nullptr, nullptr, nullptr},
                 true, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
-                    SudokuSolverPrint::DO_NOT_PRINT},
-        {3, {"sudoku", "../data/sudoku_example1.txt", "0", nullptr},
+                    SudokuSolverPrint::DO_NOT_PRINT, 1},
+        {3, {"sudoku", "../data/sudoku_example1.txt", "INVALID", nullptr, nullptr},
                 false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
-                    SudokuSolverPrint::DO_NOT_PRINT},
-        {3, {"sudoku", "../data/sudoku_example1.txt", "1", nullptr},
+                    SudokuSolverPrint::DO_NOT_PRINT, 1},
+        {3, {"sudoku", "../data/sudoku_example1.txt", "0", nullptr, nullptr},
+                false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::DO_NOT_PRINT, 1},
+        {3, {"sudoku", "../data/sudoku_example1.txt", "1", nullptr, nullptr},
                 false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
-                    SudokuSolverPrint::DO_NOT_PRINT},
-        {4, {"sudoku", "../data/sudoku_example1.txt", "c++", "0"},
+                    SudokuSolverPrint::DO_NOT_PRINT, 1},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "c++", "0", nullptr},
                 false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
-                    SudokuSolverPrint::DO_NOT_PRINT},
-        {4, {"sudoku", "../data/sudoku_example1.txt", "c++", "1"},
+                    SudokuSolverPrint::DO_NOT_PRINT, 1},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "c++", "1", nullptr},
                 false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::DO_NOT_CHECK,
-                    SudokuSolverPrint::DO_NOT_PRINT},
-        {4, {"sudoku", "../data/sudoku_example1.txt", "sse", "0"},
+                    SudokuSolverPrint::DO_NOT_PRINT, 1},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "sse", "0", nullptr},
                 false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
-                    SudokuSolverPrint::DO_NOT_PRINT},
-        {4, {"sudoku", "../data/sudoku_example1.txt", "avx", "off"},
+                    SudokuSolverPrint::DO_NOT_PRINT, 1},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "avx", "off", nullptr},
                 false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::DO_NOT_CHECK,
-                    SudokuSolverPrint::DO_NOT_PRINT},
-        {4, {"sudoku", "../data/sudoku_example1.txt", "0", "2"},
+                    SudokuSolverPrint::DO_NOT_PRINT, 1},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "0", "2", nullptr},
                 false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
-                    SudokuSolverPrint::PRINT},
-        {4, {"sudoku", "../data/sudoku_example1.txt", "avx", "print"},
+                    SudokuSolverPrint::PRINT, 1},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "avx", "print", nullptr},
                 false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
-                    SudokuSolverPrint::PRINT},
+                    SudokuSolverPrint::PRINT, 1},
+        {3, {"sudoku", "../data/sudoku_example1.txt", "-N3", nullptr, nullptr},
+                false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::DO_NOT_PRINT, 3},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "sse", "-N3", nullptr},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::DO_NOT_PRINT, 3},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "-N3", "sse", nullptr},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::DO_NOT_PRINT, 3},
+        {5, {"sudoku", "../data/sudoku_example1.txt", "avx", "print", "-N5"},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::PRINT, 5},
+        {5, {"sudoku", "../data/sudoku_example1.txt", "avx", "-N5", "print"},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::PRINT, 5},
+        {5, {"sudoku", "../data/sudoku_example1.txt", "-N5", "avx", "print"},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::PRINT, 5},
+        {5, {"sudoku", "../data/sudoku_example1.txt", "-N5", "-N3", "sse"},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::DO_NOT_PRINT, 3},
+        {5, {"sudoku", "../data/sudoku_example1.txt", "-N", "avx", "print"},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::PRINT, 0},
+        {5, {"sudoku", "../data/sudoku_example1.txt", "-Nx", "avx", "print"},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::PRINT, 0},
+        {5, {"sudoku", "../data/sudoku_example1.txt", "-N-1", "avx", "print"},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::PRINT, 0},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "sse", " -N3", nullptr},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::DO_NOT_PRINT, 1},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "sse", "pre-N", nullptr},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::DO_NOT_PRINT, 1},
     };
 }
 
@@ -545,6 +934,8 @@ void SudokuLoaderTest::test_setMultiMode() {
         SudokuLoader inst(test.argc, test.argv, nullptr, pSudokuOutStream_.get());
         CPPUNIT_ASSERT_EQUAL(test.expected, inst.multiLineFilename_.empty());
         CPPUNIT_ASSERT_EQUAL(static_cast<int>(test.solverType), static_cast<int>(inst.solverType_));
+        auto expected = (test.numberOfThreads == 0) ? inst.getNumberOfCores() : test.numberOfThreads;
+        CPPUNIT_ASSERT_EQUAL(expected, inst.numberOfThreads_);
     }
 
     for(const auto& test : testArgsMultiMode) {
@@ -552,10 +943,45 @@ void SudokuLoaderTest::test_setMultiMode() {
         SudokuLoader inst(0, nullptr, nullptr, nullptr);
         CPPUNIT_ASSERT_EQUAL(!test.expected, inst.setMultiMode(test.argc, test.argv));
         CPPUNIT_ASSERT_EQUAL(static_cast<int>(test.solverType), static_cast<int>(inst.solverType_));
+        auto expected = (test.numberOfThreads == 0) ? inst.getNumberOfCores() : test.numberOfThreads;
+        CPPUNIT_ASSERT_EQUAL(expected, inst.numberOfThreads_);
         if (!test.expected) {
             decltype(inst.multiLineFilename_) str = test.argv[1];
             CPPUNIT_ASSERT_EQUAL(str, inst.multiLineFilename_);
         }
+    }
+}
+
+void SudokuLoaderTest::test_setNumberOfThreads() {
+    struct Test {
+        int argc;
+        const char * const argv[3];
+        int argIndex;
+        bool expected;
+        SudokuLoader::NumberOfCores numberOfThreads;
+    };
+
+    constexpr Test testSet[] = {
+        {0, {nullptr, nullptr, nullptr},   0, false, 1},
+        {1, {nullptr, nullptr, nullptr},   0, false, 1},
+        {1, {"command", nullptr, nullptr}, 0, false, 1},
+        {1, {"command", nullptr, nullptr}, 1, false, 1},
+        {1, {"command", nullptr, nullptr}, 2, false, 1},
+        {2, {"......", "file-N", nullptr}, 1, false, 1},
+        {2, {".....", "file-N3", nullptr}, 1, false, 1},
+        {2, {"command", "-N1", nullptr},  1, true, 1},
+        {2, {"command", "-N2", nullptr},  1, true, 2},
+        {2, {"command", "-N32", nullptr}, 1, true, 32},
+        {2, {"command", "-N", nullptr},   1, true, 0},
+        {2, {"command", "-Nx", nullptr},  1, true, 0},
+        {2, {"command", "-N-1", nullptr}, 1, true, 0}
+    };
+
+    for(const auto& test : testSet) {
+        SudokuLoader inst(0, nullptr, nullptr, pSudokuOutStream_.get());
+        CPPUNIT_ASSERT_EQUAL(test.expected, inst.setNumberOfThreads(test.argc, test.argv, test.argIndex));
+        auto expected = (test.numberOfThreads == 0) ? inst.getNumberOfCores() : test.numberOfThreads;
+        CPPUNIT_ASSERT_EQUAL(expected, inst.numberOfThreads_);
     }
 }
 
@@ -647,6 +1073,154 @@ void SudokuLoaderTest::test_execMultiFailed() {
     std::string actual = pSudokuOutStream_->str();
     actual.resize(expected.size());
     CPPUNIT_ASSERT_EQUAL(expected, actual);
+    return;
+}
+
+void SudokuLoaderTest::test_printHeader() {
+    struct Test {
+        SudokuSolverType solverType;
+        std::string expected;
+    };
+
+    const Test testSet[] = {
+        {SudokuSolverType::SOLVER_GENERAL, "C++"},
+        {SudokuSolverType::SOLVER_SSE_4_2, "SSE"}
+    };
+
+    SudokuLoader inst(0, nullptr, nullptr, pSudokuOutStream_.get());
+    inst.printHeader(SudokuSolverType::SOLVER_GENERAL, nullptr);
+    for(const auto& test : testSet) {
+        std::ostringstream os;
+        inst.printHeader(test.solverType, &os);
+        auto pos = os.str().find(test.expected);
+        CPPUNIT_ASSERT(std::string::npos != pos);
+    }
+
+    return;
+}
+
+void SudokuLoaderTest::test_getNumberOfCores() {
+    SudokuLoader inst(0, nullptr, nullptr, pSudokuOutStream_.get());
+    CPPUNIT_ASSERT(inst.getNumberOfCores() > 0);
+}
+
+void SudokuLoaderTest::test_readLines() {
+    constexpr SudokuPuzzleCount numberOfPuzzles = 3;
+
+    struct Test {
+        SudokuLoader::NumberOfCores numberOfCores;
+        std::vector<SudokuLoader::DispatcherPtrSet::size_type> sizeSet;
+        std::vector<SudokuPuzzleCount> numSet;
+    };
+
+    const Test testSet[] = {
+        {1, {3, 0, 0}, {1, 2, 3}},
+        {2, {2, 1, 0}, {1, 3, 0}},
+        {3, {1, 1, 1}, {1, 0, 0}}
+    };
+
+    std::string pattern = SudokuTestPattern::NoBacktrackString;
+    pattern += "\n" + SudokuTestPattern::BacktrackString;
+    pattern += "\n" + SudokuTestPattern::BacktrackString2;
+
+    for(const auto& test : testSet) {
+        SudokuLoader::DispatcherPtrSet dispatcherSet;
+        for(SudokuPuzzleCount i=0; i<numberOfPuzzles; ++i) {
+            dispatcherSet.push_back(
+                std::move(SudokuLoader::DispatcherPtr(
+                              new SudokuMultiDispatcher(
+                                  SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::DO_NOT_CHECK,
+                                  SudokuSolverPrint::DO_NOT_PRINT, 0))));
+        }
+
+        SudokuInStream is(pattern);
+        SudokuLoader inst(0, nullptr, nullptr, pSudokuOutStream_.get());
+        CPPUNIT_ASSERT_EQUAL(numberOfPuzzles, inst.readLines(test.numberOfCores, &is, dispatcherSet));
+
+        for(SudokuPuzzleCount i = 0; i < numberOfPuzzles; ++i) {
+            CPPUNIT_ASSERT_EQUAL(test.sizeSet.at(i), dispatcherSet.at(i)->dipatcherSet_.size());
+        }
+
+        for(SudokuPuzzleCount i = 0; i < numberOfPuzzles; ++i) {
+            if (i < dispatcherSet.at(0)->dipatcherSet_.size()) {
+                CPPUNIT_ASSERT_EQUAL(test.numSet.at(i), dispatcherSet.at(0)->dipatcherSet_.at(i).puzzleNum_);
+            }
+        }
+    }
+
+    return;
+}
+
+void SudokuLoaderTest::test_execAll() {
+    const int resultSet[] = {SudokuLoader::ExitStatusPassed, SudokuLoader::ExitStatusFailed};
+    for(auto result : resultSet) {
+        constexpr SudokuPuzzleCount sizeOfPuzzles = 32;
+        std::string pattern;
+        for(SudokuPuzzleCount i=0; i<sizeOfPuzzles; ++i) {
+            if (((i + 1) == sizeOfPuzzles) && (result == SudokuLoader::ExitStatusFailed)) {
+                pattern += SudokuTestPattern::ConflictString;
+            } else {
+                pattern += SudokuTestPattern::NoBacktrackString;
+            }
+            pattern += "\n";
+        }
+
+        for (SudokuLoader::NumberOfCores numberOfCores=1; numberOfCores<=16; ++numberOfCores) {
+            SudokuLoader::DispatcherPtrSet dispatcherSet;
+
+            for(SudokuLoader::NumberOfCores i=0; i<numberOfCores; ++i) {
+                dispatcherSet.push_back(
+                    std::move(SudokuLoader::DispatcherPtr(
+                                  new SudokuMultiDispatcher(
+                                      SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
+                                      SudokuSolverPrint::DO_NOT_PRINT, 0))));
+            }
+
+            SudokuInStream is(pattern);
+            SudokuLoader inst(0, nullptr, nullptr, pSudokuOutStream_.get());
+            inst.readLines(numberOfCores, &is, dispatcherSet);
+            CPPUNIT_ASSERT_EQUAL(result, inst.execAll(numberOfCores, dispatcherSet));
+        }
+    }
+
+    return;
+}
+
+void SudokuLoaderTest::test_writeMessage() {
+    SudokuLoader::DispatcherPtrSet dispatcherSet;
+    constexpr SudokuLoader::NumberOfCores numberOfCores = 3;
+    for(SudokuLoader::NumberOfCores i=0; i<numberOfCores; ++i) {
+        dispatcherSet.push_back(
+            std::move(SudokuLoader::DispatcherPtr(
+                          new SudokuMultiDispatcher(
+                              SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::DO_NOT_CHECK,
+                              SudokuSolverPrint::DO_NOT_PRINT, 0))));
+    }
+
+    constexpr SudokuPuzzleCount sizeOfPuzzles = 7;
+    std::string pattern;
+    for(SudokuPuzzleCount i=0; i<sizeOfPuzzles; ++i) {
+        pattern += SudokuTestPattern::NoBacktrackString;
+        pattern += "\n";
+    }
+    SudokuInStream is(pattern);
+
+    SudokuLoader inst(0, nullptr, nullptr, pSudokuOutStream_.get());
+    CPPUNIT_ASSERT_EQUAL(sizeOfPuzzles, inst.readLines(numberOfCores, &is, dispatcherSet));
+
+    dispatcherSet.at(0)->dipatcherSet_.at(0).message_ = "A";
+    dispatcherSet.at(0)->dipatcherSet_.at(1).message_ = "D";
+    dispatcherSet.at(0)->dipatcherSet_.at(2).message_ = "G";
+    dispatcherSet.at(1)->dipatcherSet_.at(0).message_ = "B";
+    dispatcherSet.at(1)->dipatcherSet_.at(1).message_ = "E";
+    dispatcherSet.at(2)->dipatcherSet_.at(0).message_ = "C";
+    dispatcherSet.at(2)->dipatcherSet_.at(1).message_ = "F";
+
+    std::ostringstream os;
+    inst.writeMessage(0, 0, dispatcherSet, nullptr);
+    inst.writeMessage(numberOfCores, sizeOfPuzzles, dispatcherSet, &os);
+    std::string expected = "ABCDEFG";
+    CPPUNIT_ASSERT_EQUAL(expected, os.str());
     return;
 }
 

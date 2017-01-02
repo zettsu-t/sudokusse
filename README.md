@@ -61,9 +61,16 @@ format.
 bin/sudokusse.exe sudoku17
 ```
 
+When you place an argument "-N" following a filename, SudokuSSE
+solves puzzles with multi-threading.
+
+```bash
+bin/sudokusse.exe sudoku17 -N
+```
+
 ## License
 
-Copyright (c) 2016 Zettsu Tatsuya
+Copyright (c) 2016, 2017 Zettsu Tatsuya
 
 This software is released under the MIT License, see [LICENSE.txt](LICENSE.txt).
 

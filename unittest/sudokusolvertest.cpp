@@ -19,6 +19,8 @@ public:
     void test_Exec();
     void test_PrintType(const char *pExpectedStr);
     void test_solve();
+    bool call_fillCells(SudokuSolver& inst);
+    bool call_fillCells(SudokuSseSolver& inst);
     void test_fillCells();
     void CheckCells(SudokuSolver *pInst, const SudokuIndex* expectedIndexes);
 
@@ -247,13 +249,25 @@ bool SudokuSolverCommonTest<SudokuSseSolver, SudokuSseElement>::filterRetvalFill
     return true;
 }
 
+
+template <class TestedT, class CandidatesT>
+bool SudokuSolverCommonTest<TestedT, CandidatesT>::call_fillCells(SudokuSolver& inst) {
+    return inst.fillCells(inst.map_, true, false);
+}
+
+template <class TestedT, class CandidatesT>
+bool SudokuSolverCommonTest<TestedT, CandidatesT>::call_fillCells(SudokuSseSolver& inst) {
+    SudokuSseMapResult result;
+    return inst.fillCells(inst.map_, true, false, result);
+}
+
 template <class TestedT, class CandidatesT>
 void SudokuSolverCommonTest<TestedT, CandidatesT>::test_fillCells() {
     for(const auto& test : SudokuTestPattern::testSet) {
         SudokuOutStream sudokuOutStream;  // SudokuSolverインスタンスの解体後に解体する
         {
             TestedT inst(test.presetStr, 0, &sudokuOutStream, 0);
-            CPPUNIT_ASSERT_EQUAL(filterRetvalFillCells(test.result), inst.fillCells(inst.map_, true, false));
+            CPPUNIT_ASSERT_EQUAL(filterRetvalFillCells(test.result), call_fillCells(inst));
             CPPUNIT_ASSERT_EQUAL(static_cast<int>(1), inst.count_);
         }
     }
