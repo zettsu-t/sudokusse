@@ -6,16 +6,20 @@
 // 実行回数の前に-を付けると、解く過程を示しながらその回数だけ実行する(-5なら5回)
 // 実行回数を0にすると、取り得る解を数える。第二引数があればその数だけ解を列挙する。
 //
-// sudoku [実行回数 [列挙回数]] < 初期マップ
+//   sudoku [実行回数 [列挙回数]] < 初期マップ
 //
 // 引数に数字ではなくファイル名を指定したときは、そのファイルの各行を解く
+//
+//   sudoku ファイル名 [-Nnum] [0|1|sse] [0|1|2|off|print]
+//
+// -Nnum : 並列度(同時実行スレッド数)を指定する。省略時は1(シングルスレッド)。
+//   -N2とすると、2スレッドで解く(数字は1以上の整数)
+//   -Nとすると、CPUの論理コア数(2コア、ハイパースレッディングなら4)と同じスレッド数にする
 // 第二引数 : 引数があり1またはsseの場合はSSEで解く。
 //   それ以外の場合はC++で解く。
 // 第三引数 : 引数がなければ、解いた結果を検査する
 //   引数があり1またはoffの場合は、解いた結果を検査しない(その分実行時感が短くなる)
 //   引数があり2またはprint場合は、解いた結果を検査し、解を表示する
-//
-// sudoku ファイル名 [0|1] [0|1|2] < 初期マップ
 
 #include <algorithm>
 #include <fstream>
@@ -1690,30 +1694,6 @@ bool SudokuChecker::checkUnique(const Group& line) {
     return true;
 }
 
-const int SudokuLoader::ExitStatusPassed = 0;
-const int SudokuLoader::ExitStatusFailed = 1;
-
-SudokuLoader::SudokuLoader(int argc, const char * const argv[], std::istream* pSudokuInStream, std::ostream* pSudokuOutStream)
-    : solverType_(SudokuSolverType::SOLVER_GENERAL), check_(SudokuSolverCheck::CHECK),
-      print_(SudokuSolverPrint::DO_NOT_PRINT),
-      isBenchmark_(false), verbose_(true), measureCount_(1), printAllCandidate_(0), pSudokuOutStream_(nullptr) {
-
-    if (pSudokuOutStream == nullptr) {
-        return;
-    }
-    pSudokuOutStream_ = pSudokuOutStream;
-
-    // 各行に数独パズルを書いたファイル名を、可能なら設定する
-    if (!setMultiMode(argc, argv)) {
-        if (pSudokuInStream == nullptr) {
-            return;
-        }
-        setSingleMode(argc, argv, pSudokuInStream);
-    }
-
-    return;
-}
-
 SudokuDispatcher::SudokuDispatcher(SudokuSolverType solverType, SudokuSolverCheck check, SudokuSolverPrint print,
                                    SudokuPatternCount printAllCandidate, SudokuPuzzleCount puzzleNum,
                                    const std::string& puzzleLine)
@@ -1778,6 +1758,30 @@ bool SudokuMultiDispatcher::ExecAll(void) {
 // indexはこのMultiDispatcherにおける通し番号
 const std::string& SudokuMultiDispatcher::GetMessage(size_t index) const {
     return dipatcherSet_.at(index).GetMessage();
+}
+
+const SudokuLoader::ExitStatusCode SudokuLoader::ExitStatusPassed = 0;
+const SudokuLoader::ExitStatusCode SudokuLoader::ExitStatusFailed = 1;
+
+SudokuLoader::SudokuLoader(int argc, const char * const argv[], std::istream* pSudokuInStream, std::ostream* pSudokuOutStream)
+    : numberOfThreads_(DefaultNumberOfThreads), solverType_(SudokuSolverType::SOLVER_GENERAL), check_(SudokuSolverCheck::CHECK),
+      print_(SudokuSolverPrint::DO_NOT_PRINT),
+      isBenchmark_(false), verbose_(true), measureCount_(1), printAllCandidate_(0), pSudokuOutStream_(nullptr) {
+
+    if (pSudokuOutStream == nullptr) {
+        return;
+    }
+    pSudokuOutStream_ = pSudokuOutStream;
+
+    // 各行に数独パズルを書いたファイル名を、可能なら設定する
+    if (!setMultiMode(argc, argv)) {
+        if (pSudokuInStream == nullptr) {
+            return;
+        }
+        setSingleMode(argc, argv, pSudokuInStream);
+    }
+
+    return;
 }
 
 // デストラクタ
@@ -1872,16 +1876,52 @@ bool SudokuLoader::setMultiMode(int argc, const char * const argv[]) {
 
     multiLineFilename_ = argv[1];
     result = true;
-    SudokuOption::setMode(argc, argv, 2, SudokuOption::CommandLineArgSseSolver,
-                          solverType_, SudokuSolverType::SOLVER_SSE_4_2);
-    SudokuOption::setMode(argc, argv, 3, SudokuOption::CommandLineNoChecking,
-                          check_, SudokuSolverCheck::DO_NOT_CHECK);
-    SudokuOption::setMode(argc, argv, 3, SudokuOption::CommandLinePrint,
-                          print_, SudokuSolverPrint::PRINT);
+
+    int argIndex = 2;
+    int valueIndex = 2;
+    for(;argc > argIndex; ++argIndex) {
+        if (setNumberOfThreads(argc, argv, argIndex)) {
+            continue;
+        }
+
+        switch(valueIndex) {
+        case 2:
+            SudokuOption::setMode(argc, argv, argIndex, SudokuOption::CommandLineArgSseSolver,
+                                  solverType_, SudokuSolverType::SOLVER_SSE_4_2);
+            break;
+        case 3:
+            SudokuOption::setMode(argc, argv, argIndex, SudokuOption::CommandLineNoChecking,
+                                  check_, SudokuSolverCheck::DO_NOT_CHECK);
+            SudokuOption::setMode(argc, argv, argIndex, SudokuOption::CommandLinePrint,
+                                  print_, SudokuSolverPrint::PRINT);
+            break;
+        default:
+            break;
+        }
+        ++valueIndex;
+    }
+
     return result;
 }
 
-int SudokuLoader::execSingle(void) {
+bool SudokuLoader::setNumberOfThreads(int argc, const char * const argv[], int argIndex) {
+    if ((argc <= argIndex) || (argv[argIndex] == nullptr)) {
+        return false;
+    }
+
+    const std::string header = SudokuOption::CommandLineArgParallel;
+    std::string arg = argv[argIndex];
+    if ((arg.find(header) != 0) || (arg.size() < header.size())) {
+        return false;
+    }
+
+    const char* pStr = arg.c_str() + header.size();
+    int num = ::atoi(pStr);
+    numberOfThreads_ = (num >= 1) ? num : getNumberOfCores();
+    return true;
+}
+
+SudokuLoader::ExitStatusCode SudokuLoader::execSingle(void) {
     auto pProcessorBinder = Sudoku::CreateProcessorBinder();
 
     if (measureCount_) {
@@ -1891,12 +1931,12 @@ int SudokuLoader::execSingle(void) {
     return ExitStatusPassed;
 }
 
-int SudokuLoader::execMulti(void) {
+SudokuLoader::ExitStatusCode SudokuLoader::execMulti(void) {
     std::ifstream is(multiLineFilename_);
     return execMulti(&is);
 }
 
-int SudokuLoader::execMulti(std::istream* pSudokuInStream) {
+SudokuLoader::ExitStatusCode SudokuLoader::execMulti(std::istream* pSudokuInStream) {
     // マルチスレッドでは指定しない
     // auto pProcessorBinder = Sudoku::CreateProcessorBinder();
 
@@ -1907,15 +1947,14 @@ int SudokuLoader::execMulti(std::istream* pSudokuInStream) {
     printHeader(solverType_, pSudokuOutStream_);
 
     DispatcherPtrSet dispatcherSet;
-    auto numberOfCores = getNumberOfCores();
-    for(decltype(numberOfCores) i=0; i<numberOfCores; ++i) {
+    for(decltype(numberOfThreads_) i=0; i<numberOfThreads_; ++i) {
         dispatcherSet.push_back(std::move(DispatcherPtr(
                                               new SudokuMultiDispatcher(solverType_, check_, print_, printAllCandidate_))));
     }
 
-    auto sizeOfPuzzle = readLines(numberOfCores, pSudokuInStream, dispatcherSet);
-    auto result = execAll(numberOfCores, dispatcherSet);
-    writeMessage(numberOfCores, sizeOfPuzzle, dispatcherSet, pSudokuOutStream_);
+    auto sizeOfPuzzle = readLines(numberOfThreads_, pSudokuInStream, dispatcherSet);
+    auto result = execAll(numberOfThreads_, dispatcherSet);
+    writeMessage(numberOfThreads_, sizeOfPuzzle, dispatcherSet, pSudokuOutStream_);
 
     std::string message = (check_ == SudokuSolverCheck::DO_NOT_CHECK) ? "solved" : "passed";
     if (result == ExitStatusPassed) {
@@ -1944,13 +1983,13 @@ void SudokuLoader::printHeader(SudokuSolverType solverType, std::ostream* pSudok
 }
 
 SudokuLoader::NumberOfCores SudokuLoader::getNumberOfCores(void) {
-#ifdef SOLVE_PARALLEL
+#ifdef NO_SOLVE_PARALLEL
+    return 1;
+#else
     // unsigned int
     auto numberOfCores = std::thread::hardware_concurrency();
     static_assert(std::is_convertible<decltype(numberOfCores), NumberOfCores>::value == true, "Too narrow");
     return std::max(numberOfCores, static_cast<decltype(numberOfCores)>(1));
-#else
-    return 1;
 #endif
 }
 
@@ -1977,26 +2016,18 @@ SudokuPuzzleCount SudokuLoader::readLines(NumberOfCores numberOfCores, std::istr
     return sizeOfPuzzle;
 }
 
-int SudokuLoader::execAll(NumberOfCores numberOfCores, DispatcherPtrSet& dispatcherSet) {
-#if !defined(NO_SOLVE_PARALLEL)
-#if defined(SOLVE_PARALLEL)
-    constexpr bool noParallel = false;
-#else
-    constexpr bool noParallel = true;
-#endif
-#endif
+SudokuLoader::ExitStatusCode SudokuLoader::execAll(NumberOfCores numberOfCores, DispatcherPtrSet& dispatcherSet) {
+    auto result = ExitStatusPassed;
 
-    int result = ExitStatusPassed;
-
-#if !defined(NO_SOLVE_PARALLEL)
-    if (noParallel || (numberOfCores <= 1)) {
+#ifndef NO_SOLVE_PARALLEL
+    if (numberOfCores <= 1) {
 #endif
         for(auto& dispatcher : dispatcherSet) {
             if (dispatcher->ExecAll()) {
                 result = ExitStatusFailed;
             }
         }
-#if !defined(NO_SOLVE_PARALLEL)
+#ifndef NO_SOLVE_PARALLEL
     } else {
         std::vector<std::future<bool>> futureSet;
         for(auto& dispatcher : dispatcherSet) {

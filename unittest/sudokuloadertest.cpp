@@ -705,6 +705,7 @@ class SudokuLoaderTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST(test_CanLaunch);
     CPPUNIT_TEST(test_setSingleMode);
     CPPUNIT_TEST(test_setMultiMode);
+    CPPUNIT_TEST(test_setNumberOfThreads);
     CPPUNIT_TEST(test_getMeasureCount);
     CPPUNIT_TEST(test_execSingle);
     CPPUNIT_TEST(test_execMultiPassedCpp);
@@ -726,6 +727,7 @@ protected:
     void test_Constructor();
     void test_setSingleMode();
     void test_setMultiMode();
+    void test_setNumberOfThreads();
     void test_CanLaunch();
     void test_getMeasureCount();
     void test_execSingle();
@@ -838,51 +840,91 @@ void SudokuLoaderTest::test_setSingleMode() {
     return;
 }
 
-namespace {
-    struct TestArgsMultiMode {
-        int    argc;
-        const char* argv[4];
-        bool   expected;
-        SudokuSolverType solverType;
-        SudokuSolverCheck check;
-        SudokuSolverPrint print;
-    };
+struct SudokuTestArgsMultiMode {
+    int    argc;
+    const char* argv[5];
+    bool   expected;
+    SudokuSolverType solverType;
+    SudokuSolverCheck check;
+    SudokuSolverPrint print;
+    SudokuLoader::NumberOfCores numberOfThreads;
+};
 
-    constexpr TestArgsMultiMode testArgsMultiMode[] {
+namespace {
+    constexpr SudokuTestArgsMultiMode testArgsMultiMode[] {
         // 解を一つ求める
-        {1, {"sudoku", nullptr, nullptr, nullptr},
+        {1, {"sudoku", nullptr, nullptr, nullptr, nullptr},
                 true, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
-                    SudokuSolverPrint::DO_NOT_PRINT},
-        {2, {"sudoku", "../data/sudoku_example1.txt", nullptr, nullptr},
+                    SudokuSolverPrint::DO_NOT_PRINT, 1},
+        {2, {"sudoku", "../data/sudoku_example1.txt", nullptr, nullptr, nullptr},
                 false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
-                    SudokuSolverPrint::DO_NOT_PRINT},
-        {2, {"sudoku", "FileNotExists", nullptr, nullptr},
+                    SudokuSolverPrint::DO_NOT_PRINT, 1},
+        {2, {"sudoku", "FileNotExists", nullptr, nullptr, nullptr},
                 true, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
-                    SudokuSolverPrint::DO_NOT_PRINT},
-        {3, {"sudoku", "../data/sudoku_example1.txt", "0", nullptr},
+                    SudokuSolverPrint::DO_NOT_PRINT, 1},
+        {3, {"sudoku", "../data/sudoku_example1.txt", "INVALID", nullptr, nullptr},
                 false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
-                    SudokuSolverPrint::DO_NOT_PRINT},
-        {3, {"sudoku", "../data/sudoku_example1.txt", "1", nullptr},
+                    SudokuSolverPrint::DO_NOT_PRINT, 1},
+        {3, {"sudoku", "../data/sudoku_example1.txt", "0", nullptr, nullptr},
+                false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::DO_NOT_PRINT, 1},
+        {3, {"sudoku", "../data/sudoku_example1.txt", "1", nullptr, nullptr},
                 false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
-                    SudokuSolverPrint::DO_NOT_PRINT},
-        {4, {"sudoku", "../data/sudoku_example1.txt", "c++", "0"},
+                    SudokuSolverPrint::DO_NOT_PRINT, 1},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "c++", "0", nullptr},
                 false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
-                    SudokuSolverPrint::DO_NOT_PRINT},
-        {4, {"sudoku", "../data/sudoku_example1.txt", "c++", "1"},
+                    SudokuSolverPrint::DO_NOT_PRINT, 1},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "c++", "1", nullptr},
                 false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::DO_NOT_CHECK,
-                    SudokuSolverPrint::DO_NOT_PRINT},
-        {4, {"sudoku", "../data/sudoku_example1.txt", "sse", "0"},
+                    SudokuSolverPrint::DO_NOT_PRINT, 1},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "sse", "0", nullptr},
                 false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
-                    SudokuSolverPrint::DO_NOT_PRINT},
-        {4, {"sudoku", "../data/sudoku_example1.txt", "avx", "off"},
+                    SudokuSolverPrint::DO_NOT_PRINT, 1},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "avx", "off", nullptr},
                 false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::DO_NOT_CHECK,
-                    SudokuSolverPrint::DO_NOT_PRINT},
-        {4, {"sudoku", "../data/sudoku_example1.txt", "0", "2"},
+                    SudokuSolverPrint::DO_NOT_PRINT, 1},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "0", "2", nullptr},
                 false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
-                    SudokuSolverPrint::PRINT},
-        {4, {"sudoku", "../data/sudoku_example1.txt", "avx", "print"},
+                    SudokuSolverPrint::PRINT, 1},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "avx", "print", nullptr},
                 false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
-                    SudokuSolverPrint::PRINT},
+                    SudokuSolverPrint::PRINT, 1},
+        {3, {"sudoku", "../data/sudoku_example1.txt", "-N3", nullptr, nullptr},
+                false, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::DO_NOT_PRINT, 3},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "sse", "-N3", nullptr},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::DO_NOT_PRINT, 3},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "-N3", "sse", nullptr},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::DO_NOT_PRINT, 3},
+        {5, {"sudoku", "../data/sudoku_example1.txt", "avx", "print", "-N5"},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::PRINT, 5},
+        {5, {"sudoku", "../data/sudoku_example1.txt", "avx", "-N5", "print"},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::PRINT, 5},
+        {5, {"sudoku", "../data/sudoku_example1.txt", "-N5", "avx", "print"},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::PRINT, 5},
+        {5, {"sudoku", "../data/sudoku_example1.txt", "-N5", "-N3", "sse"},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::DO_NOT_PRINT, 3},
+        {5, {"sudoku", "../data/sudoku_example1.txt", "-N", "avx", "print"},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::PRINT, 0},
+        {5, {"sudoku", "../data/sudoku_example1.txt", "-Nx", "avx", "print"},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::PRINT, 0},
+        {5, {"sudoku", "../data/sudoku_example1.txt", "-N-1", "avx", "print"},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::PRINT, 0},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "sse", " -N3", nullptr},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::DO_NOT_PRINT, 1},
+        {4, {"sudoku", "../data/sudoku_example1.txt", "sse", "pre-N", nullptr},
+                false, SudokuSolverType::SOLVER_SSE_4_2, SudokuSolverCheck::CHECK,
+                    SudokuSolverPrint::DO_NOT_PRINT, 1},
     };
 }
 
@@ -892,6 +934,8 @@ void SudokuLoaderTest::test_setMultiMode() {
         SudokuLoader inst(test.argc, test.argv, nullptr, pSudokuOutStream_.get());
         CPPUNIT_ASSERT_EQUAL(test.expected, inst.multiLineFilename_.empty());
         CPPUNIT_ASSERT_EQUAL(static_cast<int>(test.solverType), static_cast<int>(inst.solverType_));
+        auto expected = (test.numberOfThreads == 0) ? inst.getNumberOfCores() : test.numberOfThreads;
+        CPPUNIT_ASSERT_EQUAL(expected, inst.numberOfThreads_);
     }
 
     for(const auto& test : testArgsMultiMode) {
@@ -899,10 +943,45 @@ void SudokuLoaderTest::test_setMultiMode() {
         SudokuLoader inst(0, nullptr, nullptr, nullptr);
         CPPUNIT_ASSERT_EQUAL(!test.expected, inst.setMultiMode(test.argc, test.argv));
         CPPUNIT_ASSERT_EQUAL(static_cast<int>(test.solverType), static_cast<int>(inst.solverType_));
+        auto expected = (test.numberOfThreads == 0) ? inst.getNumberOfCores() : test.numberOfThreads;
+        CPPUNIT_ASSERT_EQUAL(expected, inst.numberOfThreads_);
         if (!test.expected) {
             decltype(inst.multiLineFilename_) str = test.argv[1];
             CPPUNIT_ASSERT_EQUAL(str, inst.multiLineFilename_);
         }
+    }
+}
+
+void SudokuLoaderTest::test_setNumberOfThreads() {
+    struct Test {
+        int argc;
+        const char * const argv[3];
+        int argIndex;
+        bool expected;
+        SudokuLoader::NumberOfCores numberOfThreads;
+    };
+
+    constexpr Test testSet[] = {
+        {0, {nullptr, nullptr, nullptr},   0, false, 1},
+        {1, {nullptr, nullptr, nullptr},   0, false, 1},
+        {1, {"command", nullptr, nullptr}, 0, false, 1},
+        {1, {"command", nullptr, nullptr}, 1, false, 1},
+        {1, {"command", nullptr, nullptr}, 2, false, 1},
+        {2, {"......", "file-N", nullptr}, 1, false, 1},
+        {2, {".....", "file-N3", nullptr}, 1, false, 1},
+        {2, {"command", "-N1", nullptr},  1, true, 1},
+        {2, {"command", "-N2", nullptr},  1, true, 2},
+        {2, {"command", "-N32", nullptr}, 1, true, 32},
+        {2, {"command", "-N", nullptr},   1, true, 0},
+        {2, {"command", "-Nx", nullptr},  1, true, 0},
+        {2, {"command", "-N-1", nullptr}, 1, true, 0}
+    };
+
+    for(const auto& test : testSet) {
+        SudokuLoader inst(0, nullptr, nullptr, pSudokuOutStream_.get());
+        CPPUNIT_ASSERT_EQUAL(test.expected, inst.setNumberOfThreads(test.argc, test.argv, test.argIndex));
+        auto expected = (test.numberOfThreads == 0) ? inst.getNumberOfCores() : test.numberOfThreads;
+        CPPUNIT_ASSERT_EQUAL(expected, inst.numberOfThreads_);
     }
 }
 

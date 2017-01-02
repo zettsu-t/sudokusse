@@ -6,9 +6,6 @@ RUBY=ruby
 
 INCLUDES=-I. -I.. -Iunittest
 
-# Set -DSOLVE_PARALLEL to solve puzzles parallel
-CPPFLAGS_PARALLEL+=-DSOLVE_PARALLEL
-
 LIBPATH=
 LIBCFLAGS=
 LIBS=-lcppunit
@@ -23,15 +20,14 @@ else
 LDFLAGS=
 LIBS+=
 endif
-# Set -DSOLVE_PARALLEL to solve puzzles parallel
-CPPFLAGS_PARALLEL=-DSOLVE_PARALLEL
+CPPFLAGS_PARALLEL=
 
 else
 LDFLAGS=
 LIBS+=
 ifneq (,$(findstring cygwin,$(shell gcc -dumpmachine)))
 # MinGW does not support C++11 thread
-CPPFLAGS_PARALLEL=-DSOLVE_PARALLEL
+CPPFLAGS_PARALLEL=
 else
 CPPFLAGS_PARALLEL=-DNO_SOLVE_PARALLEL
 endif

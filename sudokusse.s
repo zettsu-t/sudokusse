@@ -1,5 +1,5 @@
 # Sudoku solver with SSE 4.2 / AVX
-# Copyright (C) 2012-2016 Zettsu Tatsuya
+# Copyright (C) 2012-2017 Zettsu Tatsuya
 
 .intel_syntax noprefix
 .file   "sudokusse.s"
@@ -27,8 +27,8 @@
         .global sudokuXmmRightBottomElement
         .global sudokuXmmRightBottomSolved
         .global sudokuXmmAllPatternCnt
-        .global sudokuXmmPrintFunc
         .global sudokuXmmReturnAddr
+        .global sudokuXmmPrintFunc
         .global sudokuXmmAssumeCellsPacked
         .global sudokuXmmUseAvx
         .global sudokuXmmDebug
@@ -64,17 +64,27 @@
 .data
 
 # Variables that this assembly and C++ code share
+# Solving puzzles can run on multiple threads so these global
+# variables must not used for multiple writes and readers.
+#
+# Counting solutions can run on a single thread only.
+# These variables are not thread-safe for multiple writes and readers.
+
 .set  sudokuMaxLoopcnt,         81         # The upper limit of number of iterations in filling cells
 sudokuXmmPrintAllCandidate:     .quad 0    # Non-zero if printing candidates of a puzzle
 sudokuXmmRightBottomElement:    .quad 0    # Initial candidates of the bottom-right cell in a puzzle
 sudokuXmmRightBottomSolved:     .quad 0    # Solved candidate of the bottom-right cell in a puzzle
 sudokuXmmAllPatternCnt:         .quad 0    # Number of solutions in a puzzle
-sudokuXmmPrintFunc:             .quad 0    # Address of a C++ function to print a puzzle
 sudokuXmmStackPointer:          .quad 0    # RSP register value before calling sudokuXmmPrintFunc
 sudokuXmmReturnAddr:            .quad 0    # Address to return after counting solutions
+
+# These variables are set by a thread before read by multiple threads
+sudokuXmmPrintFunc:             .quad 0    # Address of a C++ function to print a puzzle
 sudokuXmmAssumeCellsPacked:     .quad CellsPacked
 sudokuXmmUseAvx:                .quad EnableAvx
-sudokuXmmDebug:                 .quad 0    # Value for debugging assembly macros
+
+# Value for debugging assembly macros that run on a single thread
+sudokuXmmDebug:                 .quad 0
 
 # Candidates of 81 cells
 .set  arrayElementByteSize, 8
@@ -134,6 +144,9 @@ testFillNineUniqueCandidatesBoxX:             .quad 0, 0
 testFillNineUniqueCandidatesColumnX:          .quad 0, 0
 testCountRowCellCandidatesRowX:               .quad 0, 0
 
+# Align on a 4K page
+.align 4096
+sudokuXmmDummyToAlign:  .quad 0
 
 .text
 # Constants

@@ -59,12 +59,8 @@ _EnableAvx_ to 0 or an invalid opcode exception occurs.
 
 ### Solve parallel
 
-Add `-DSOLVE_PARALLEL` to _CPPFLAGS_SSE_AVX_ in _Makefile_vars_ and
-SudokuSSE solves sudoku puzzles in a file parallel. It is both
-effective on the C++ and SSE/AVX solver.
-
-Compiling sudoku.cpp with std::future fails on MinGW. It needs to
-add `-DNO_SOLVE_PARALLEL` to _CPPFLAGS_SSE_AVX_ in _Makefile_vars_.
+Compiling sudoku.cpp with std::future fails on MinGW. To avoid it, add
+`-DNO_SOLVE_PARALLEL` to _CPPFLAGS_PARALLEL_ in _Makefile_vars_.
 
 Checking sudoku solutions on Cygwin may be very slow. I applied these
 items below to improve this issue. I guess the false sharing issue
@@ -74,9 +70,6 @@ occur on Bash on Ubuntu on Windows.
 * Use std::array instead of std::vector if available
 * Call std::string::reserve(N) to separate string buffers on heap
   memory. N is larger than a size of a cache line in bytes.
-
-This feature is still experimental and will be changeable via command
-line options.
 
 ## Prepare sudoku puzzles
 
@@ -202,6 +195,18 @@ solutions are valid and prints the solutions.
 ```bash
 bin/sudokusse.exe filename sse off
 bin/sudokusse.exe filename sse print
+```
+
+When you place an argument "-Nnumber" or "-N" following a filename,
+SudokuSSE solves in sudoku puzzles of the file with _number_ of
+threads. If you omit the number, the number is set to the number of
+threads of a processor on which SudokuSSE runs (actually this is
+std::thread::hardware_concurrency()). My CPU (Intel Core i3 4160)
+has 4 threads (2 cores with hyper-threading).
+
+```bash
+bin/sudokusse.exe filename -N8 sse
+bin/sudokusse.exe filename -N sse
 ```
 
 ### Count how many solutions a sudoku puzzle has
@@ -596,6 +601,9 @@ is true.
 Note that rightmost and bottom cells always have only one candidate in
 backtracking and we can avoid setting candidates to them in the
 recursion.
+
+Counting solutions can run on a single thread only. To run on multiple
+threads, it needs to eliminate global variables.
 
 ### Make SudokuSSE faster
 

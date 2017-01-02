@@ -45,6 +45,7 @@ constexpr size_t arraySizeof(const T (&)[n]) {
 
 // コマンドライン引数
 namespace SudokuOption {
+    const char * const CommandLineArgParallel = "-N";
     const char * const CommandLineArgSseSolver[] = {"1", "sse", "avx"};
     const char * const CommandLineNoChecking[] = {"1", "off"};
     const char * const CommandLinePrint[] = {"2", "print"};
@@ -528,8 +529,9 @@ private:
 
 // 読み込みと実行時間測定
 class SudokuLoader {
-    // Unit test
+    // Unit tests
     friend class SudokuLoaderTest;
+    friend struct SudokuTestArgsMultiMode;
 
 public:
     SudokuLoader(int argc, const char * const argv[], std::istream* pSudokuInStream, std::ostream* pSudokuOutStream);
@@ -542,6 +544,7 @@ public:
     int Exec(void);
     static bool CanLaunch(int argc, const char * const argv[]);
 private:
+    using ExitStatusCode = int;
     using NumberOfCores = size_t;
     using DispatcherPtr = std::unique_ptr<SudokuMultiDispatcher>;
     using DispatcherPtrSet = std::vector<DispatcherPtr>;
@@ -549,20 +552,22 @@ private:
     static int getMeasureCount(const char *arg);
     void setSingleMode(int argc, const char * const argv[], std::istream* pSudokuInStream);
     bool setMultiMode(int argc, const char * const argv[]);
-    int execSingle(void);
-    int execMulti(void);
-    int execMulti(std::istream* pSudokuInStream);
+    bool setNumberOfThreads(int argc, const char * const argv[], int argIndex);
+    ExitStatusCode execSingle(void);
+    ExitStatusCode execMulti(void);
+    ExitStatusCode execMulti(std::istream* pSudokuInStream);
     void printHeader(SudokuSolverType solverType, std::ostream* pSudokuOutStream);
     NumberOfCores getNumberOfCores(void);
     SudokuPuzzleCount readLines(NumberOfCores numberOfCores, std::istream* pSudokuInStream, DispatcherPtrSet& dispatcherSet);
-    int execAll(NumberOfCores numberOfCores, DispatcherPtrSet& dispatcherSet);
+    ExitStatusCode execAll(NumberOfCores numberOfCores, DispatcherPtrSet& dispatcherSet);
     void writeMessage(NumberOfCores numberOfCores, SudokuPuzzleCount sizeOfPuzzle, DispatcherPtrSet& dispatcherSet, std::ostream* pSudokuOutStream);
     void measureTimeToSolve(SudokuSolverType solverType);
     SudokuTime solveSudoku(SudokuSolverType solverType, int count, bool warmup);
     SudokuTime enumerateSudoku(void);
     // メンバ
     std::string sudokuStr_; // 初期マップの文字列
-    std::string multiLineFilename_;  // 各行に数独パズルを書いたファイル名
+    std::string multiLineFilename_;     // 各行に数独パズルを書いたファイル名
+    NumberOfCores     numberOfThreads_; // 並列度
     SudokuSolverType  solverType_;   // 各行に数独パズルを書いたファイルを解く方法
     SudokuSolverCheck check_;        // 解いた結果を検査するかどうか
     SudokuSolverPrint print_;        // 複数の問題を解くときに、結果を表示するかどうか
@@ -571,8 +576,9 @@ private:
     int    measureCount_;   // 測定回数
     SudokuPatternCount printAllCandidate_;
     std::ostream* pSudokuOutStream_;  // 結果の出力先
-    static const int ExitStatusPassed;  // 正常終了
-    static const int ExitStatusFailed;  // 異常終了
+    static constexpr NumberOfCores DefaultNumberOfThreads = 1;  // デフォルトの並列度
+    static const ExitStatusCode ExitStatusPassed;  // 正常終了
+    static const ExitStatusCode ExitStatusFailed;  // 異常終了
 };
 
 extern "C" {
