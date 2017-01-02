@@ -60,15 +60,23 @@ _EnableAvx_ to 0 or an invalid opcode exception occurs.
 ### Solve parallel
 
 Add `-DSOLVE_PARALLEL` to _CPPFLAGS_SSE_AVX_ in _Makefile_vars_ and
-SudokuSSE solves sudoku puzzles in a file parallel. It is effective on
-the C++ solver.
+SudokuSSE solves sudoku puzzles in a file parallel. It is both
+effective on the C++ and SSE/AVX solver.
+
+Compiling sudoku.cpp with std::future fails on MinGW. It needs to
+add `-DNO_SOLVE_PARALLEL` to _CPPFLAGS_SSE_AVX_ in _Makefile_vars_.
+
+Checking sudoku solutions on Cygwin may be very slow. I applied these
+items below to improve this issue. I guess the false sharing issue
+occurs on heap memory holding string buffers. This issue does not
+occur on Bash on Ubuntu on Windows.
+
+* Use std::array instead of std::vector if available
+* Call std::string::reserve(N) to separate string buffers on heap
+  memory. N is larger than a size of a cache line in bytes.
 
 This feature is still experimental and will be changeable via command
 line options.
-
-Known issues are:
-* Compiling sudoku.cpp fails on MinGW
-* Checking solutions on Cygwin is very slow
 
 ## Prepare sudoku puzzles
 

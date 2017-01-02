@@ -1492,13 +1492,18 @@ bool SudokuChecker::Valid() const {
 
 bool SudokuChecker::parse(const std::string& puzzle, const std::string& solution,
                           SudokuSolverPrint printSolution, std::ostream* pSudokuOutStream) {
-    std::istringstream is(solution);
-    Grid grid(Sudoku::SizeOfGroupsPerMap, Group(Sudoku::SizeOfCellsPerGroup, 0));
+    Grid grid {0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,
+               0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,
+               0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0};
     bool valid = true;
     std::string solutionLine;
+    solutionLine.reserve(Sudoku::CacheGuardSize);
 
+    std::istringstream is(solution);
     for(SudokuIndex row = 0; valid && (row < Sudoku::SizeOfGroupsPerMap); ++row) {
         std::string rowLine;
+        rowLine.reserve(Sudoku::CacheGuardSize);
+
         getline(is, rowLine);
         if (rowLine.empty()) {
             valid = false;
@@ -1549,6 +1554,9 @@ bool SudokuChecker::parseRow(SudokuIndex row, const std::string& rowLine, Grid& 
         const char c = rowLine.at(column * 2);
         if (Sudoku::ConvertCharToSudokuCandidate(
                 Sudoku::MinCandidatesNumber, Sudoku::MaxCandidatesNumber, c, num)) {
+            if ((grid.size() <= row) || (grid.at(0).size() <= column)) {
+                return false;
+            }
             grid.at(row).at(column) = num;
             solutionLine += c;
         } else {
@@ -1615,9 +1623,12 @@ bool SudokuChecker::checkRowSet(const Grid& grid, std::ostream* pSudokuOutStream
 bool SudokuChecker::checkColumnSet(const Grid& grid, std::ostream* pSudokuOutStream) {
     // 各列のマスが一意
     for(SudokuIndex column = 0; column < Sudoku::SizeOfGroupsPerMap; ++column) {
-        Group group;
+        Group group {0,0,0,0,0,0,0,0,0};
         for(SudokuIndex row = 0; row < Sudoku::SizeOfCellsPerGroup; ++row) {
-            group.push_back(grid.at(row).at(column));
+            if (group.size() <= row) {
+                return false;
+            }
+            group.at(row) = grid.at(row).at(column);
         }
 
         auto valid = checkUnique(group);
@@ -1636,10 +1647,15 @@ bool SudokuChecker::checkBoxSet(const Grid& grid, std::ostream* pSudokuOutStream
     // 各3x3箱のマスが一意
     for(SudokuIndex column = 0; column < Sudoku::SizeOfGroupsPerMap; column += Sudoku::SizeOfBoxesOnEdge) {
         for(SudokuIndex row = 0; row < Sudoku::SizeOfCellsPerGroup; row += Sudoku::SizeOfBoxesOnEdge) {
-            Group group;
+            Group group {0,0,0,0,0,0,0,0,0};
+            Group::size_type index = 0;
             for(SudokuIndex x = 0; x < Sudoku::SizeOfCellsOnBoxEdge; ++x) {
                 for(SudokuIndex y = 0; y < Sudoku::SizeOfCellsOnBoxEdge; ++y) {
-                    group.push_back(grid.at(row + y).at(column + x));
+                    if (group.size() <= index) {
+                        return false;
+                    }
+                    group.at(index) = grid.at(row + y).at(column + x);
+                    ++index;
                 }
             }
 
@@ -1658,10 +1674,20 @@ bool SudokuChecker::checkBoxSet(const Grid& grid, std::ostream* pSudokuOutStream
 
 // 行、列、3x3箱のメンバが一意かどうか調べる
 bool SudokuChecker::checkUnique(const Group& line) {
-    Group row = line;
-    std::sort(row.begin(), row.end());
-    row.erase(std::unique(row.begin(), row.end()), row.end());
-    return (row.size() == Sudoku::SizeOfCellsPerGroup);
+    std::array<int, Sudoku::SizeOfCellsPerGroup + 1> cellMap {0,0,0,0,0,0,0,0,0,0};
+
+    for(const auto n : line) {
+        if ((n < Sudoku::MinCandidatesNumber) || (n > Sudoku::MaxCandidatesNumber)
+            || (cellMap.size() <= static_cast<decltype(cellMap.size())>(n))) {
+            return false;
+        }
+        if (cellMap.at(n)) {
+            return false;
+        }
+        cellMap.at(n) = 1;
+    }
+
+    return true;
 }
 
 const int SudokuLoader::ExitStatusPassed = 0;
@@ -1952,20 +1978,25 @@ SudokuPuzzleCount SudokuLoader::readLines(NumberOfCores numberOfCores, std::istr
 }
 
 int SudokuLoader::execAll(NumberOfCores numberOfCores, DispatcherPtrSet& dispatcherSet) {
-#ifdef SOLVE_PARALLEL
+#if !defined(NO_SOLVE_PARALLEL)
+#if defined(SOLVE_PARALLEL)
     constexpr bool noParallel = false;
 #else
     constexpr bool noParallel = true;
 #endif
+#endif
 
     int result = ExitStatusPassed;
 
+#if !defined(NO_SOLVE_PARALLEL)
     if (noParallel || (numberOfCores <= 1)) {
+#endif
         for(auto& dispatcher : dispatcherSet) {
             if (dispatcher->ExecAll()) {
                 result = ExitStatusFailed;
             }
         }
+#if !defined(NO_SOLVE_PARALLEL)
     } else {
         std::vector<std::future<bool>> futureSet;
         for(auto& dispatcher : dispatcherSet) {
@@ -1977,6 +2008,7 @@ int SudokuLoader::execAll(NumberOfCores numberOfCores, DispatcherPtrSet& dispatc
             }
         }
     }
+#endif
 
     return result;
 }

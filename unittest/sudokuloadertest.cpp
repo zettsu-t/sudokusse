@@ -14,6 +14,7 @@
 
 class SudokuCheckerTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST_SUITE(SudokuCheckerTest);
+    CPPUNIT_TEST(test_initializeGrid);
     CPPUNIT_TEST(test_parse);
     CPPUNIT_TEST(test_parseRow);
     CPPUNIT_TEST(test_compare);
@@ -27,6 +28,7 @@ public:
     void setUp() override;
     void tearDown() override;
 protected:
+    void test_initializeGrid();
     void test_parse();
     void test_parseRow();
     void test_compare();
@@ -73,6 +75,13 @@ void SudokuCheckerTest::setUp() {
 
 void SudokuCheckerTest::tearDown() {
     return;
+}
+
+void SudokuCheckerTest::test_initializeGrid() {
+    SudokuChecker::Group group {{0}};
+    for(auto e : group) {
+        CPPUNIT_ASSERT_EQUAL(static_cast<decltype(e)>(0), e);
+    }
 }
 
 void SudokuCheckerTest::test_parse() {
@@ -155,6 +164,7 @@ void SudokuCheckerTest::test_parseRow() {
 
         for(SudokuIndex column = 0; column < Sudoku::SizeOfCellsPerGroup; ++column) {
             SudokuNumber num = Sudoku::SizeOfCellsPerGroup - column;
+            CPPUNIT_ASSERT(grid.size() > row);
             CPPUNIT_ASSERT_EQUAL(num, grid.at(row).at(column));
         }
     }
@@ -243,6 +253,8 @@ void SudokuCheckerTest::test_checkRowSet() {
         for(SudokuIndex column = 0; column < Sudoku::SizeOfCellsPerGroup; ++column) {
             SudokuChecker::Grid grid = grid_;
             auto fromColumn = ((column + 1) == Sudoku::SizeOfCellsPerGroup) ? (column - 1) : (column + 1);
+            CPPUNIT_ASSERT(grid.size() > row);
+            CPPUNIT_ASSERT(grid.at(0).size() > column);
             grid.at(row).at(column) = grid.at(row).at(fromColumn);
 
             std::string expected = "Error in row ";
@@ -277,6 +289,8 @@ void SudokuCheckerTest::test_checkColumnSet() {
         for(SudokuIndex row = 0; row < Sudoku::SizeOfCellsPerGroup; ++row) {
             SudokuChecker::Grid grid = grid_;
             auto fromRow = ((row + 1) == Sudoku::SizeOfCellsPerGroup) ? (row - 1) : (row + 1);
+            CPPUNIT_ASSERT(grid.size() > row);
+            CPPUNIT_ASSERT(grid.at(0).size() > column);
             grid.at(row).at(column) = grid.at(fromRow).at(column);
             {
                 std::string expected = "Error in column ";
@@ -315,6 +329,9 @@ void SudokuCheckerTest::test_checkBoxSet() {
                 (column + Sudoku::SizeOfCellsOnBoxEdge - 1) : (column - 1);
             auto fromRow = ((row % Sudoku::SizeOfCellsOnBoxEdge) == 0) ?
                 (row + Sudoku::SizeOfCellsOnBoxEdge - 1) : (row - 1);
+
+            CPPUNIT_ASSERT(grid.size() > row);
+            CPPUNIT_ASSERT(grid.at(0).size() > column);
             grid.at(row).at(column) = grid.at(fromRow).at(fromColumn);
             {
                 std::string expected = "Error in a box with row ";

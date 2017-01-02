@@ -5,6 +5,7 @@
 #define SUDOKU_H_INCLUDED
 
 #include <stdint.h>
+#include <array>
 #include <string>
 #include <vector>
 #include <nmmintrin.h>
@@ -113,6 +114,8 @@ namespace Sudoku {
     constexpr SudokuSseElement AllThreeCandidates = 0x7ffffff;   // 3マスの全集合(bit8..0が1)
     constexpr short MinCandidatesNumber = 1;          // マスの初期設定の候補となる数字の最小値
     constexpr short MaxCandidatesNumber = 9;          // マスの初期設定の候補となる数字の最大値
+    // ヒープのfalse sharingを防ぐために、std::stringで確保する要素数 >= キャッシュラインサイズ
+    constexpr uint32_t CacheGuardSize = 128;
 }
 
 // 共通関数
@@ -459,8 +462,9 @@ public:
     SudokuChecker& operator =(const SudokuChecker&) = delete;
     bool Valid() const;  // 解が正しければtrue
 private:
-    using Group = std::vector<SudokuNumber>;
-    using Grid = std::vector<Group>;
+    // ヒープに確保すると、スレッド間でfalse shareingが発生するのでスタックに置く
+    using Group = std::array<SudokuNumber, Sudoku::SizeOfCellsPerGroup>;
+    using Grid = std::array<Group, Sudoku::SizeOfGroupsPerMap>;
     bool parse(const std::string& puzzle, const std::string& solution, SudokuSolverPrint printSolution, std::ostream* pSudokuOutStream);
     bool parseRow(SudokuIndex row, const std::string& rowLine, Grid& grid, std::string& solutionLine);
     bool compare(const std::string& puzzle, const std::string& solution, std::ostream* pSudokuOutStream);
