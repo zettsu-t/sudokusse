@@ -67,7 +67,6 @@ This feature is still experimental and will be changeable via command
 line options.
 
 Known issues are:
-* The SSE4.2 / AVX solver cannot run parallel because it is not thread-safe.
 * Compiling sudoku.cpp fails on MinGW
 * Checking solutions on Cygwin is very slow
 

@@ -856,20 +856,22 @@ void SudokuSseTest::test_CollectUniqueCandidatesInLine()
             *(reinterpret_cast<gRegister*>(&arg) + 1) = test.arghigh;
 
             gRegister sum = 0;
+            gRegister elementCount = 0;
             xmmRegister result;
             uint64_t  actual;
             gRegister resulthigh;
             gRegister resultlow;
+            constexpr gRegister expectedelementCount = 0;
 
             switch(e) {
             case Func::COLLECT:
                 asm volatile (
                     "movdqa  xmm1, xmmword ptr [%0]\n\t"
                     "call testCollectUniqueCandidatesInLine\n\t"
-                    :"=a"(sum):"r"(&arg):"rbx","rcx","r8","r9","r10","r11","r12","r13","r14","r15");
-                actual = sudokuXmmAborted;
+                    :"=a"(actual),"=b"(elementCount),"=d"(sum):"r"(&arg):"rsi","rdi","r8","r9","r10","r11","r12","r13","r15");
                 CPPUNIT_ASSERT_EQUAL(test.sum, sum);
                 CPPUNIT_ASSERT_EQUAL(test.aborted, actual);
+                CPPUNIT_ASSERT_EQUAL(expectedelementCount, elementCount);
                 break;
             case Func::FILTER:
                 asm volatile (
@@ -2208,34 +2210,24 @@ void SudokuSseTest::test_SearchNextCandidate() {
         }
 
         asm volatile (
-            "movdqa  xmm1,  xmmword ptr [rsi]\n\t"
-            "movdqa  xmm2,  xmmword ptr [rsi+16]\n\t"
-            "movdqa  xmm3,  xmmword ptr [rsi+32]\n\t"
-            "movdqa  xmm4,  xmmword ptr [rsi+48]\n\t"
-            "movdqa  xmm5,  xmmword ptr [rsi+64]\n\t"
-            "movdqa  xmm6,  xmmword ptr [rsi+80]\n\t"
-            "movdqa  xmm7,  xmmword ptr [rsi+96]\n\t"
-            "movdqa  xmm8,  xmmword ptr [rsi+112]\n\t"
-            "movdqa  xmm9,  xmmword ptr [rsi+128]\n\t"
-            "push rsi\n\t"
+            "movdqa  xmm1,  xmmword ptr [rax]\n\t"
+            "movdqa  xmm2,  xmmword ptr [rax+16]\n\t"
+            "movdqa  xmm3,  xmmword ptr [rax+32]\n\t"
+            "movdqa  xmm4,  xmmword ptr [rax+48]\n\t"
+            "movdqa  xmm5,  xmmword ptr [rax+64]\n\t"
+            "movdqa  xmm6,  xmmword ptr [rax+80]\n\t"
+            "movdqa  xmm7,  xmmword ptr [rax+96]\n\t"
+            "movdqa  xmm8,  xmmword ptr [rax+112]\n\t"
+            "movdqa  xmm9,  xmmword ptr [rax+128]\n\t"
+            "push rax\n\t"
             "call testSearchNextCandidate\n\t"
-            "pop  rsi\n\t"
-            :"=a"(outBoxShift),"=b"(inBoxShift),"=c"(rowNumber),"=d"(found):"S"(&xmmRegSet):"rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
+            "pop  rax\n\t"
+            :"=d"(outBoxShift),"=S"(inBoxShift),"=D"(rowNumber),"=c"(found):"a"(&xmmRegSet):"rbx", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
 
         CPPUNIT_ASSERT_EQUAL(test.found, found);
         CPPUNIT_ASSERT_EQUAL(test.outBoxShift, outBoxShift);
         CPPUNIT_ASSERT_EQUAL(test.inBoxShift, inBoxShift);
         CPPUNIT_ASSERT_EQUAL(test.rowNumber, rowNumber);
-
-        const auto actualFound = sudokuXmmNextCellFound;
-        const auto actualOutBoxShift = sudokuXmmNextOutBoxShift;
-        const auto actualInBoxShift = sudokuXmmNextInBoxShift;
-        const auto actualRowNumber = sudokuXmmNextRowNumber;
-
-        CPPUNIT_ASSERT_EQUAL(test.found, actualFound);
-        CPPUNIT_ASSERT_EQUAL(test.outBoxShift, actualOutBoxShift);
-        CPPUNIT_ASSERT_EQUAL(test.inBoxShift, actualInBoxShift);
-        CPPUNIT_ASSERT_EQUAL(test.rowNumber, actualRowNumber);
     }
 
     return;
@@ -2244,25 +2236,25 @@ void SudokuSseTest::test_SearchNextCandidate() {
 void SudokuSseTest::checkSearchNextCandidate(XmmRegisterSet& xmmRegSet,
                                              gRegister expectedFound, gRegister expectedOutBoxShift,
                                              gRegister expectedInBoxShift, gRegister expectedRowNumber) {
-    asm volatile (
-        "movdqa  xmm1,  xmmword ptr [rsi]\n\t"
-        "movdqa  xmm2,  xmmword ptr [rsi+16]\n\t"
-        "movdqa  xmm3,  xmmword ptr [rsi+32]\n\t"
-        "movdqa  xmm4,  xmmword ptr [rsi+48]\n\t"
-        "movdqa  xmm5,  xmmword ptr [rsi+64]\n\t"
-        "movdqa  xmm6,  xmmword ptr [rsi+80]\n\t"
-        "movdqa  xmm7,  xmmword ptr [rsi+96]\n\t"
-        "movdqa  xmm8,  xmmword ptr [rsi+112]\n\t"
-        "movdqa  xmm9,  xmmword ptr [rsi+128]\n\t"
-        "push rsi\n\t"
-        "call testSearchNextCandidate\n\t"
-        "pop  rsi\n\t"
-        ::"S"(&xmmRegSet):"rax", "rbx", "rcx", "rdx", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
+    gRegister actualFound = 0;
+    gRegister actualOutBoxShift = 0;
+    gRegister actualInBoxShift = 0;
+    gRegister actualRowNumber = 0;
 
-    const auto actualFound = sudokuXmmNextCellFound;
-    const auto actualOutBoxShift = sudokuXmmNextOutBoxShift;
-    const auto actualInBoxShift = sudokuXmmNextInBoxShift;
-    const auto actualRowNumber = sudokuXmmNextRowNumber;
+    asm volatile (
+        "movdqa  xmm1,  xmmword ptr [rax]\n\t"
+        "movdqa  xmm2,  xmmword ptr [rax+16]\n\t"
+        "movdqa  xmm3,  xmmword ptr [rax+32]\n\t"
+        "movdqa  xmm4,  xmmword ptr [rax+48]\n\t"
+        "movdqa  xmm5,  xmmword ptr [rax+64]\n\t"
+        "movdqa  xmm6,  xmmword ptr [rax+80]\n\t"
+        "movdqa  xmm7,  xmmword ptr [rax+96]\n\t"
+        "movdqa  xmm8,  xmmword ptr [rax+112]\n\t"
+        "movdqa  xmm9,  xmmword ptr [rax+128]\n\t"
+        "push rax\n\t"
+        "call testSearchNextCandidate\n\t"
+        "pop  rax\n\t"
+        :"=c"(actualFound),"=d"(actualOutBoxShift),"=S"(actualInBoxShift),"=D"(actualRowNumber):"a"(&xmmRegSet):"rbx", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
 
     CPPUNIT_ASSERT_EQUAL(expectedFound, actualFound);
     if (expectedFound) {

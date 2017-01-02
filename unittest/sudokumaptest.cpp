@@ -787,13 +787,16 @@ void SudokuSseMapTest::test_GetNextCell() {
     };
 
     for(const auto& test : testSet) {
-        sudokuXmmNextCellFound = (test.found) ?  1 : 0;
-        sudokuXmmNextOutBoxShift = test.outBoxIndex;
-        sudokuXmmNextInBoxShift = test.inBoxIndex;
-        sudokuXmmNextRowNumber = test.rowNumber;
+        SudokuSseMapResult result;
+        result.aborted = 0;
+        result.elementCnt = 0;
+        result.nextCellFound = (test.found) ?  1 : 0;
+        result.nextOutBoxIndex = test.outBoxIndex;
+        result.nextInBoxIndex = test.inBoxIndex;
+        result.nextRowNumber = test.rowNumber;
 
         SudokuSseCandidateCell cell = {0, 0, 0};
-        CPPUNIT_ASSERT_EQUAL(test.found, pInstance_->GetNextCell(cell));
+        CPPUNIT_ASSERT_EQUAL(test.found, pInstance_->GetNextCell(result, cell));
         if (test.found) {
             checkCandidateCell(cell, test.expectedRegIndex, test.expectedShift);
         }

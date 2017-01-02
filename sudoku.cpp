@@ -1289,13 +1289,13 @@ void SudokuSseMap::Preset(const std::string& presetStr) {
 }
 
 // 解く
-void SudokuSseMap::FillCrossing(bool loadXmm) {
+void SudokuSseMap::FillCrossing(bool loadXmm, SudokuSseMapResult& result) {
     Sudoku::LoadXmmRegistersFromMem(xmmRegSet_.regXmmVal_);
 
     // 使うレジスタはすべて記述する(Cygwinではレジスタが無いとエラーが出る)
     asm volatile (
         "call solveSudokuAsm\n\t"
-        :::"rax", "rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
+        :"=a"(result.aborted),"=b"(result.elementCnt),"=c"(result.nextCellFound),"=d"(result.nextOutBoxIndex),"=S"(result.nextInBoxIndex),"=D"(result.nextRowNumber)::"r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
 
     Sudoku::SaveXmmRegistersToMem(xmmRegSet_.regXmmVal_);
     return;
@@ -1333,15 +1333,12 @@ void SudokuSseMap::Print(std::ostream* pSudokuOutStream) const {
 }
 
 // C++版と同じ方法で次のバックトラッキング候補を見つける
-INLINE bool SudokuSseMap::GetNextCell(SudokuSseCandidateCell& cell) {
-    const bool found = (sudokuXmmNextCellFound != 0);
+INLINE bool SudokuSseMap::GetNextCell(const SudokuSseMapResult& result, SudokuSseCandidateCell& cell) {
+    const bool found = (result.nextCellFound != 0);
 
     if (found) {
-        const gRegister outBoxIndex = sudokuXmmNextOutBoxShift;
-        const gRegister inBoxIndex = sudokuXmmNextInBoxShift;
-        const gRegister rowNumber = sudokuXmmNextRowNumber;
-        cell.regIndex = (SudokuSseMap::InitialRegisterNum + rowNumber) * SudokuSse::RegisterWordCnt + outBoxIndex;
-        cell.shift = inBoxIndex * Sudoku::SizeOfCandidates;
+        cell.regIndex = (SudokuSseMap::InitialRegisterNum + result.nextRowNumber) * SudokuSse::RegisterWordCnt + result.nextOutBoxIndex;
+        cell.shift = result.nextInBoxIndex * Sudoku::SizeOfCandidates;
         cell.mask = Sudoku::AllCandidates << cell.shift;
     }
 
@@ -1417,20 +1414,21 @@ void SudokuSseSolver::PrintType(void) {
 bool SudokuSseSolver::solve(SudokuSseMap& map, bool topLevel, bool verbose) {
     for(;;) {
         // 解けるところまで解く
-        fillCells(map, topLevel, verbose);
+        SudokuSseMapResult result;
+        fillCells(map, topLevel, verbose, result);
         // バックトラッキング中に矛盾を発見したのでバックトラッキングをやり直す
-        if (sudokuXmmAborted) {
+        if (result.aborted) {
             return false;
         }
 
         // 全マス埋めた
-        if (sudokuXmmElementCnt == Sudoku::SizeOfAllCells) {
+        if (result.elementCnt == Sudoku::SizeOfAllCells) {
             return true;
         }
 
         // 減らないので候補を決め打ちしてバックトラッキングする
         SudokuSseCandidateCell cell;
-        auto found = map.GetNextCell(cell);
+        auto found = map.GetNextCell(result, cell);
         if (!found) {
             return false;
         }
@@ -1471,14 +1469,14 @@ bool SudokuSseSolver::solve(SudokuSseMap& map, bool topLevel, bool verbose) {
     return false;
 }
 
-bool SudokuSseSolver::fillCells(SudokuSseMap& map, bool topLevel, bool verbose) {
+bool SudokuSseSolver::fillCells(SudokuSseMap& map, bool topLevel, bool verbose, SudokuSseMapResult& result) {
     ++count_;
     if (verbose) {
         if (pSudokuOutStream_ != nullptr) {
             (*pSudokuOutStream_) << "Step " << count_ << "\n";
         }
     }
-    map.FillCrossing(topLevel);
+    map.FillCrossing(topLevel, result);
     return true;
 }
 
@@ -1747,6 +1745,7 @@ bool SudokuMultiDispatcher::ExecAll(void) {
     for(auto& dipatcher : dipatcherSet_) {
         failed |= dipatcher.Exec();
     }
+
     return failed;
 }
 
@@ -1920,9 +1919,6 @@ void SudokuLoader::printHeader(SudokuSolverType solverType, std::ostream* pSudok
 
 SudokuLoader::NumberOfCores SudokuLoader::getNumberOfCores(void) {
 #ifdef SOLVE_PARALLEL
-    if (solverType_ == SudokuSolverType::SOLVER_SSE_4_2) {
-        return 1;
-    }
     // unsigned int
     auto numberOfCores = std::thread::hardware_concurrency();
     static_assert(std::is_convertible<decltype(numberOfCores), NumberOfCores>::value == true, "Too narrow");

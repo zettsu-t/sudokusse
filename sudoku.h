@@ -336,22 +336,22 @@ private:
 
 // ASMで定義する
 extern "C" {
-    // パラメータ(説明はASMを参照)
-    extern volatile uint64_t sudokuXmmAborted;
-    extern volatile uint64_t sudokuXmmNextCellFound;
-    extern volatile uint64_t sudokuXmmNextOutBoxShift;
-    extern volatile uint64_t sudokuXmmNextInBoxShift;
-    extern volatile uint64_t sudokuXmmNextRowNumber;
-    extern volatile uint64_t sudokuXmmElementCnt;
+    // グローバル変数なので、このままではマルチスレッド化できない
+    // SudokuSseEnumeratorMapのメンバ関数
     extern volatile uint64_t sudokuXmmPrintAllCandidate;
     extern volatile uint64_t sudokuXmmRightBottomElement;
     extern volatile uint64_t sudokuXmmRightBottomSolved;
     extern volatile uint64_t sudokuXmmAllPatternCnt;
-    extern volatile uint64_t sudokuXmmPrintFunc;
-    extern volatile uint64_t sudokuXmmAssumeCellsPacked;
-    extern volatile uint64_t sudokuXmmUseAvx;
-    extern volatile uint64_t sudokuXmmDebug;
+    // PrintPattern() -> SudokuSseEnumeratorMap::PrintFromAsm
     extern XmmRegisterSet sudokuXmmToPrint;
+
+    // マルチスレッド実行する前に設定して、後は読み取るだけなので、グローバル変数でよい
+    extern volatile uint64_t sudokuXmmPrintFunc;  // main()
+    extern volatile uint64_t sudokuXmmAssumeCellsPacked; // SudokuLoader::CanLaunch()
+    extern volatile uint64_t sudokuXmmUseAvx;     // 未使用
+
+    // デバッグ専用なのでマルチスレッド化しない
+    extern volatile uint64_t sudokuXmmDebug;
 }
 
 // バックトラッキング候補
@@ -359,6 +359,16 @@ struct SudokuSseCandidateCell {
     size_t           regIndex;  // マスが入っている汎用レジスタの番号
     SudokuSseElement shift;     // マスが入っている汎用レジスタのビット位置
     SudokuSseElement mask;      // マスが入っている汎用レジスタのビットマスク
+};
+
+// sudokusse.sで解いた結果
+struct SudokuSseMapResult {
+    gRegister aborted;
+    gRegister elementCnt;
+    gRegister nextCellFound;
+    gRegister nextOutBoxIndex;
+    gRegister nextInBoxIndex;
+    gRegister nextRowNumber;
 };
 
 // 全マス(SSE4.2)
@@ -377,8 +387,8 @@ public:
     // 初期化と出力
     void Preset(const std::string& presetStr);
     void Print(std::ostream* pSudokuOutStream) const;
-    void FillCrossing(bool loadXmm);
-    INLINE bool GetNextCell(SudokuSseCandidateCell& cell);
+    void FillCrossing(bool loadXmm, SudokuSseMapResult& result);
+    INLINE bool GetNextCell(const SudokuSseMapResult& result, SudokuSseCandidateCell& cell);
     INLINE bool CanSetUniqueCell(const SudokuSseCandidateCell& cell, SudokuCellCandidates candidate) const;
     INLINE void SetUniqueCell(const SudokuSseCandidateCell& cell, SudokuCellCandidates candidate);
 };
@@ -430,7 +440,7 @@ public:
 private:
     void initialize(const std::string& presetStr, std::ostream* pSudokuOutStream);
     bool solve(SudokuSseMap& map, bool topLevel, bool verbose);
-    bool fillCells(SudokuSseMap& map, bool topLevel, bool verbose);
+    bool fillCells(SudokuSseMap& map, bool topLevel, bool verbose, SudokuSseMapResult& result);
     // メンバ
     SudokuSseMap map_;    // 数独
     SudokuSseEnumeratorMap enumeratorMap_;
@@ -486,7 +496,7 @@ private:
     SudokuSolverPrint  print_;        // 複数の問題を解くときに、結果を表示するかどうか
     SudokuPatternCount printAllCandidate_;
     SudokuPuzzleCount  puzzleNum_;
-    const std::string  puzzleLine_;
+    std::string puzzleLine_;
     std::string message_;  // 出力ストリームに書き込む文字列
 };
 

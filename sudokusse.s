@@ -23,12 +23,6 @@
         .set    UseReg64Most, 1
 
         # Variables that this assembly and C++ code share
-        .global sudokuXmmAborted
-        .global sudokuXmmNextCellFound
-        .global sudokuXmmNextOutBoxShift
-        .global sudokuXmmNextInBoxShift
-        .global sudokuXmmNextRowNumber
-        .global sudokuXmmElementCnt
         .global sudokuXmmPrintAllCandidate
         .global sudokuXmmRightBottomElement
         .global sudokuXmmRightBottomSolved
@@ -71,12 +65,6 @@
 
 # Variables that this assembly and C++ code share
 .set  sudokuMaxLoopcnt,         81         # The upper limit of number of iterations in filling cells
-sudokuXmmAborted:               .quad 0    # Non-zero if there is inconsistency of cells
-sudokuXmmNextCellFound:         .quad 0    # Non-zero if guessing a candidate in a cell for backtracking
-sudokuXmmNextOutBoxShift:       .quad 0    # Box number in a row of the cell in the guess (0..2)
-sudokuXmmNextInBoxShift:        .quad 0    # Horizontal cell number in the box in the guess (0..2)
-sudokuXmmNextRowNumber:         .quad 0    # Row number of the cell in the guess (0..8)
-sudokuXmmElementCnt:            .quad 0    # Number of the filled cells (cells with unique candidates) (0..81)
 sudokuXmmPrintAllCandidate:     .quad 0    # Non-zero if printing candidates of a puzzle
 sudokuXmmRightBottomElement:    .quad 0    # Initial candidates of the bottom-right cell in a puzzle
 sudokuXmmRightBottomSolved:     .quad 0    # Solved candidate of the bottom-right cell in a puzzle
@@ -671,8 +659,9 @@ testCollectUniqueCandidatesInRowPart:
 testCollectUniqueCandidatesInLine:
         InitMaskRegister
         xor     rax, rax
-        mov     qword ptr [rip + sudokuXmmAborted], 0
-        CollectUniqueCandidatesInLine eax, xRegRow1, ebx, ecx, r8d, r9d, r10d, r11d, r12d, r13d
+        xor     rbx, rbx
+        xor     rdx, rdx
+        CollectUniqueCandidatesInLine edx, xRegRow1, esi, edi, r8d, r9d, r10d, r11d, r12d, r13d
         ret
 
 # Leave unique candidates and clear others in consecutive nine cells.
@@ -700,7 +689,6 @@ testCollectUniqueCandidatesInLine:
         .global testFilterUniqueCandidatesInLine
 testFilterUniqueCandidatesInLine:
         InitMaskRegister
-        mov     qword ptr [rip + sudokuXmmAborted], 0
         FilterUniqueCandidatesInLine xRegWork2, xRegRow1, r8, r9, r10, r11, r12, r13, r14, r8d, xRegWork1
         ret
 
@@ -716,7 +704,6 @@ testFilterUniqueCandidatesInLine:
         .global testCollectUniqueCandidatesInThreeLine
 testCollectUniqueCandidatesInThreeLine:
         InitMaskRegister
-        mov     qword ptr [rip + sudokuXmmAborted], 0
         CollectUniqueCandidatesInThreeLine xRegRow1to3, xRegRow1, xRegRow2, xRegRow3, r8, r9, r10, r11, r12, r13, r14, r8d, xRegWork1, xRegWork2
         ret
 
@@ -1527,23 +1514,24 @@ testCountRowCellCandidates:
 302:
 .endm
 
-.macro SearchNextCandidate
-        CountRowSetCell xRegWork1, eax, ebx, ecx, edx, esi, edi, r8d, r9d, r10d, r11d, r12d, r13d, r14d
-        MacroPextrd  ecx, xRegWork1, 0
-        mov  r8, nextCellFound
-        xor  rdx, rdx
-        cmp  rcx, rowNumberInvalid
-        cmovnz  rdx, r8
-        mov  qword ptr [rip + sudokuXmmNextCellFound], rdx
-        mov  qword ptr [rip + sudokuXmmNextOutBoxShift], rax
-        mov  qword ptr [rip + sudokuXmmNextInBoxShift], rbx
-        mov  qword ptr [rip + sudokuXmmNextRowNumber], rcx
+.macro SearchNextCandidate xRegWork
+        .set    regSolverNextCellFoundD,   ecx
+        .set    regSolverNextOutBoxIndexD, edx
+        .set    regSolverNextInBoxIndexD,  esi
+        .set    regSolverNextRowNumberD,   edi
+
+        CountRowSetCell \xRegWork, regSolverNextOutBoxIndexD, regSolverNextInBoxIndexD, eax, ebx, ecx, edi, r8d, r9d, r10d, r11d, r12d, r13d, r14d
+        MacroPextrd  regSolverNextRowNumberD, \xRegWork, 0
+        mov  eax, nextCellFound
+        xor  regSolverNextCellFoundD, regSolverNextCellFoundD
+        cmp  regSolverNextRowNumberD, rowNumberInvalid
+        cmovnz  regSolverNextCellFoundD, eax
 .endm
 
         .global testSearchNextCandidate
 testSearchNextCandidate:
         InitMaskRegister
-        SearchNextCandidate
+        SearchNextCandidate xRegWork1
         ret
 
         .global testFoldRowParts
@@ -1667,7 +1655,7 @@ testCheckSetBox:
         CheckSetBox  eax, r8d, r9d, r10d, r11d, r12d, r13d
         ret
 
-.macro CheckConsistency regResultD, regInvalidD, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D, reg32Work1, reg32Work2, reg32Work3
+.macro CheckConsistency regResultD, regInvalidD, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D
         xor  \regResultD, \regResultD
         mov  \regInvalidD, 1
         CheckRowSet  \regResultD, \regInvalidD, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
@@ -1678,7 +1666,7 @@ testCheckSetBox:
         OrThreeXmmRegs  xRegRow4to6, xRegRow4, xRegRow5, xRegRow6
         OrThreeXmmRegs  xRegRow7to9, xRegRow7, xRegRow8, xRegRow9
         OrThreeXmmRegs  xRegRowAll, xRegRow1to3, xRegRow4to6, xRegRow7to9
-        CheckColumn  \regResultD, \regInvalidD, \reg32Work1, \reg32Work2, \reg32Work3
+        CheckColumn  \regResultD, \regInvalidD, \regWork1D, \regWork2D, \regWork3D
         CheckSetBox  \regResultD, \regInvalidD, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
 20001:
 .endm
@@ -1687,7 +1675,7 @@ testCheckConsistency:
         InitMaskRegister
         xor  rax, rax
         mov  r8, 1
-        CheckConsistency  eax, r8d, r9d, r10d, ebx, ecx, edx, ebx, ecx, edx
+        CheckConsistency  eax, r8d, r9d, r10d, ebx, ecx, edx
         ret
 
 # Assign code (text) in a consecutive memory area which its tests do not divide.
@@ -1696,7 +1684,6 @@ testCheckConsistency:
 solveSudokuAsm:
         mov    gRegBitMask, elementBitMask
         xorps  xLoopPopCnt, xLoopPopCnt
-        mov    qword ptr [rip + sudokuXmmNextCellFound], 0
 
         # Data structure holding sudoku cells
         # XMM registers = 1st .. 9th rows
@@ -1713,8 +1700,11 @@ loopFilling:
         OrThreeXmmRegs xRegRowAll, xRegRow1to3, xRegRow4to6, xRegRow7to9
 
         # Count how many cells are filled
-        .set    regCurrentPopcnt,  r8
-        .set    regCurrentPopcntD, r8d
+        .set    regSolverResult,         rax
+        .set    regSolverResultD,        eax
+        .set    regSolverElementCnt,     rbx
+        .set    regSolverElementCntD,    ebx
+        .set    regSolverNextCellFoundD, ecx
         .set    regPrevPopcnt,     r9
         .set    regPrevPopcntD,    r9d
         .set    regMaxPopcnt,      r10
@@ -1722,34 +1712,39 @@ loopFilling:
         .set    regLoopCnt,        r11
         .set    regLoopCntD,       r11d
 countFilledElementsLabel:
-        CountFilledElements regLoopCnt, regCurrentPopcnt, regPrevPopcnt, rcx
+        CountFilledElements regLoopCnt, regSolverElementCnt, regPrevPopcnt, rcx
         mov     regMaxPopcntD, maxElementNumber
 
         # ZF=0 if all cells are filled or no cell is filled in this iteration
         # ZF=1 otherwise
-        cmp     regCurrentPopcntD, regPrevPopcntD
+        cmp     regSolverElementCntD, regPrevPopcntD
         cmovz   regPrevPopcntD, regMaxPopcntD
         cmp     regPrevPopcntD, regMaxPopcntD
         jnz     keepFilling
 
 exitFilling:
-        .set    regResult,  r9
-        .set    regResultD, r9d
-        mov     qword ptr [rip + sudokuXmmElementCnt], regCurrentPopcnt
-        CheckConsistency regResultD, r10d, r11d, r12d, ebx, ecx, edx, ebx, ecx, edx
-        mov     qword ptr [rip + sudokuXmmAborted], regResult
-        cmp     regCurrentPopcntD, regMaxPopcntD
+        CheckConsistency regSolverResultD, r8d, r9d, r10d, r11d, r12d, r13d
+        xor     regSolverNextCellFoundD, regSolverNextCellFoundD
+        cmp     regSolverElementCntD, regMaxPopcntD
         jz      exitFillingCells
 
         # Find a cell to guess its candidate if not all cells are filled
 searchNextCandidateLabel:
-        SearchNextCandidate
+        # Set return value to rcx, rdx, rsi and rdi registers
+        MacroPinsrq xRegWork2, regSolverResult, 0
+        MacroPinsrq xRegWork2, regSolverElementCnt, 1
+
+        # set regSolverNextCellFoundD and other registers in SearchNextCandidate
+        SearchNextCandidate xRegWork1
+        MacroPextrq regSolverResult, xRegWork2, 0
+        MacroPextrq regSolverElementCnt, xRegWork2, 1
 exitFillingCells:
         ret
 
 abortFilling:
-        mov     qword ptr [rip + sudokuXmmAborted], 1
-        mov     qword ptr [rip + sudokuXmmElementCnt], 0
+        mov     regSolverResultD, 1
+        xor     regSolverElementCntD, regSolverElementCntD
+        xor     regSolverNextCellFoundD, regSolverNextCellFoundD
         ret
 
 keepFilling:
@@ -1757,7 +1752,7 @@ keepFilling:
         cmp     regLoopCntD, sudokuMaxLoopcnt
         JumpIfGreaterEqual exitFilling
         FastInc regLoopCntD
-        SaveLoopCnt regLoopCnt, regCurrentPopcnt
+        SaveLoopCnt regLoopCnt, regSolverElementCnt
 
         CollectUniqueCandidates r8d, r9d, r10d, r11d, r12d, r13d, r14d, eax, ebx, ecx, edx, xRegWork1, xRegWork2
 findCandidatesLabel:
