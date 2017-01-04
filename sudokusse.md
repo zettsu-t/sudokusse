@@ -60,12 +60,15 @@ _EnableAvx_ to 0 or an invalid opcode exception occurs.
 ### Solve parallel
 
 Compiling sudoku.cpp with std::future fails on MinGW. To avoid it, add
-`-DNO_SOLVE_PARALLEL` to _CPPFLAGS_PARALLEL_ in _Makefile_vars_.
+`-DNO_PARALLEL` to _CPPFLAGS_PARALLEL_ in _Makefile_vars_. If you can
+use boost::thread instead of it, set "yes" to _USE_BOOST_THREAD_
+environment variable so that the Makefile passes
+`-DSOLVE_PARALLEL_WITH_BOOST_THREAD` to C++ compilers.
 
 Checking sudoku solutions on Cygwin may be very slow. I applied these
-items below to improve this issue. I guess the false sharing issue
-occurs on heap memory holding string buffers. This issue does not
-occur on Bash on Ubuntu on Windows.
+items below to improve this issue. I guess the false sharing issue or
+other overhead occurs on heap memory holding string buffers. This
+issue does not occur on Bash on Ubuntu on Windows.
 
 * Use std::array instead of std::vector if available
 * Call std::string::reserve(N) to separate string buffers on heap
@@ -466,6 +469,16 @@ movdqa xmm0, xmmword ptr [rip + sudokuXmmToPrint]
 
 is right. MinGW-w64 may accept non-RIP-relative addressing but Cygwin
 causes link errors.
+
+g++ accepts assembly code in Intel syntax but it causes errors to mix
+up Intel and AT&T syntax. This occurs when you inline assembly code is
+in Intel syntax and inline assembly code in header files is in AT&T
+syntax. I found this issue in using boost::future and do not find in
+std::future.
+
+Its workarounds are:
+* Writing a compact file that contains inline assembly with fewer header files
+* Using the compile option -masm=intel if it is really required
 
 ### Footprints
 

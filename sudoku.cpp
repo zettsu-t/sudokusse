@@ -23,12 +23,10 @@
 
 #include <algorithm>
 #include <fstream>
-#include <future>
 #include <iomanip>
 #include <iostream>
 #include <limits>
 #include <sstream>
-#include <thread>
 #include <typeinfo>
 #include <type_traits>
 #include <cassert>
@@ -1763,10 +1761,13 @@ const std::string& SudokuMultiDispatcher::GetMessage(size_t index) const {
 const SudokuLoader::ExitStatusCode SudokuLoader::ExitStatusPassed = 0;
 const SudokuLoader::ExitStatusCode SudokuLoader::ExitStatusFailed = 1;
 
-SudokuLoader::SudokuLoader(int argc, const char * const argv[], std::istream* pSudokuInStream, std::ostream* pSudokuOutStream)
-    : numberOfThreads_(DefaultNumberOfThreads), solverType_(SudokuSolverType::SOLVER_GENERAL), check_(SudokuSolverCheck::CHECK),
+SudokuLoader::SudokuLoader(int argc, const char * const argv[], std::istream* pSudokuInStream,
+                           std::ostream* pSudokuOutStream)
+    : pParallelRunner_(Sudoku::CreateParallelRunner()), numberOfThreads_(DefaultNumberOfThreads),
+      solverType_(SudokuSolverType::SOLVER_GENERAL), check_(SudokuSolverCheck::CHECK),
       print_(SudokuSolverPrint::DO_NOT_PRINT),
       isBenchmark_(false), verbose_(true), measureCount_(1), printAllCandidate_(0), pSudokuOutStream_(nullptr) {
+    static_assert(std::is_convertible<NumberOfCores, size_t>::value == true, "Too narrow");
 
     if (pSudokuOutStream == nullptr) {
         return;
@@ -1917,7 +1918,7 @@ bool SudokuLoader::setNumberOfThreads(int argc, const char * const argv[], int a
 
     const char* pStr = arg.c_str() + header.size();
     int num = ::atoi(pStr);
-    numberOfThreads_ = (num >= 1) ? num : getNumberOfCores();
+    numberOfThreads_ = (num >= 1) ? num : pParallelRunner_->GetHardwareConcurrency();
     return true;
 }
 
@@ -1982,17 +1983,6 @@ void SudokuLoader::printHeader(SudokuSolverType solverType, std::ostream* pSudok
     return;
 }
 
-SudokuLoader::NumberOfCores SudokuLoader::getNumberOfCores(void) {
-#ifdef NO_SOLVE_PARALLEL
-    return 1;
-#else
-    // unsigned int
-    auto numberOfCores = std::thread::hardware_concurrency();
-    static_assert(std::is_convertible<decltype(numberOfCores), NumberOfCores>::value == true, "Too narrow");
-    return std::max(numberOfCores, static_cast<decltype(numberOfCores)>(1));
-#endif
-}
-
 SudokuPuzzleCount SudokuLoader::readLines(NumberOfCores numberOfCores, std::istream* pSudokuInStream,
                                           DispatcherPtrSet& dispatcherSet) {
     SudokuPuzzleCount sizeOfPuzzle = 0;
@@ -2017,31 +2007,12 @@ SudokuPuzzleCount SudokuLoader::readLines(NumberOfCores numberOfCores, std::istr
 }
 
 SudokuLoader::ExitStatusCode SudokuLoader::execAll(NumberOfCores numberOfCores, DispatcherPtrSet& dispatcherSet) {
-    auto result = ExitStatusPassed;
-
-#ifndef NO_SOLVE_PARALLEL
-    if (numberOfCores <= 1) {
-#endif
-        for(auto& dispatcher : dispatcherSet) {
-            if (dispatcher->ExecAll()) {
-                result = ExitStatusFailed;
-            }
-        }
-#ifndef NO_SOLVE_PARALLEL
-    } else {
-        std::vector<std::future<bool>> futureSet;
-        for(auto& dispatcher : dispatcherSet) {
-            futureSet.push_back(std::async(std::launch::async, [&dispatcher] { return dispatcher->ExecAll(); }));
-        }
-        for (auto& f : futureSet) {
-            if (f.get()) {
-                result = ExitStatusFailed;
-            }
-        }
+    for(auto& dispatcher : dispatcherSet) {
+        Sudoku::BaseParallelRunner::Evaluator evaluator = [&dispatcher] { return dispatcher->ExecAll(); };
+        pParallelRunner_->Add(evaluator);
     }
-#endif
 
-    return result;
+    return pParallelRunner_->Run(numberOfCores) ? ExitStatusFailed : ExitStatusPassed;
 }
 
 void SudokuLoader::writeMessage(NumberOfCores numberOfCores, SudokuPuzzleCount sizeOfPuzzle,

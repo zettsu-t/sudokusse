@@ -712,7 +712,6 @@ class SudokuLoaderTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST(test_execMultiPassedSse);
     CPPUNIT_TEST(test_execMultiFailed);
     CPPUNIT_TEST(test_printHeader);
-    CPPUNIT_TEST(test_getNumberOfCores);
     CPPUNIT_TEST(test_readLines);
     CPPUNIT_TEST(test_execAll);
     CPPUNIT_TEST(test_writeMessage);
@@ -735,7 +734,6 @@ protected:
     void test_execMultiPassedSse();
     void test_execMultiFailed();
     void test_printHeader();
-    void test_getNumberOfCores();
     void test_readLines();
     void test_execAll();
     void test_writeMessage();
@@ -934,7 +932,9 @@ void SudokuLoaderTest::test_setMultiMode() {
         SudokuLoader inst(test.argc, test.argv, nullptr, pSudokuOutStream_.get());
         CPPUNIT_ASSERT_EQUAL(test.expected, inst.multiLineFilename_.empty());
         CPPUNIT_ASSERT_EQUAL(static_cast<int>(test.solverType), static_cast<int>(inst.solverType_));
-        auto expected = (test.numberOfThreads == 0) ? inst.getNumberOfCores() : test.numberOfThreads;
+
+        auto numberOfCores = Sudoku::CreateParallelRunner()->GetHardwareConcurrency();
+        auto expected = (test.numberOfThreads == 0) ? numberOfCores : test.numberOfThreads;
         CPPUNIT_ASSERT_EQUAL(expected, inst.numberOfThreads_);
     }
 
@@ -943,7 +943,9 @@ void SudokuLoaderTest::test_setMultiMode() {
         SudokuLoader inst(0, nullptr, nullptr, nullptr);
         CPPUNIT_ASSERT_EQUAL(!test.expected, inst.setMultiMode(test.argc, test.argv));
         CPPUNIT_ASSERT_EQUAL(static_cast<int>(test.solverType), static_cast<int>(inst.solverType_));
-        auto expected = (test.numberOfThreads == 0) ? inst.getNumberOfCores() : test.numberOfThreads;
+
+        auto numberOfCores = Sudoku::CreateParallelRunner()->GetHardwareConcurrency();
+        auto expected = (test.numberOfThreads == 0) ? numberOfCores : test.numberOfThreads;
         CPPUNIT_ASSERT_EQUAL(expected, inst.numberOfThreads_);
         if (!test.expected) {
             decltype(inst.multiLineFilename_) str = test.argv[1];
@@ -980,7 +982,9 @@ void SudokuLoaderTest::test_setNumberOfThreads() {
     for(const auto& test : testSet) {
         SudokuLoader inst(0, nullptr, nullptr, pSudokuOutStream_.get());
         CPPUNIT_ASSERT_EQUAL(test.expected, inst.setNumberOfThreads(test.argc, test.argv, test.argIndex));
-        auto expected = (test.numberOfThreads == 0) ? inst.getNumberOfCores() : test.numberOfThreads;
+
+        auto numberOfCores = Sudoku::CreateParallelRunner()->GetHardwareConcurrency();
+        auto expected = (test.numberOfThreads == 0) ? numberOfCores : test.numberOfThreads;
         CPPUNIT_ASSERT_EQUAL(expected, inst.numberOfThreads_);
     }
 }
@@ -1097,11 +1101,6 @@ void SudokuLoaderTest::test_printHeader() {
     }
 
     return;
-}
-
-void SudokuLoaderTest::test_getNumberOfCores() {
-    SudokuLoader inst(0, nullptr, nullptr, pSudokuOutStream_.get());
-    CPPUNIT_ASSERT(inst.getNumberOfCores() > 0);
 }
 
 void SudokuLoaderTest::test_readLines() {

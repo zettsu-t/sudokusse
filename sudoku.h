@@ -30,7 +30,7 @@
   #define ALLOW_VIRTUAL virtual
 #endif
 
-// WindowsとLinuxで異なる実装を行うが、I/Fは共通にする
+// WindowsとLinux、C++11とBoost C++ Librariesで異なる実装を行うが、I/Fは共通にする
 #include "sudoku_os_dependent.h"
 
 /* 配列のサイズを求める
@@ -545,7 +545,7 @@ public:
     static bool CanLaunch(int argc, const char * const argv[]);
 private:
     using ExitStatusCode = int;
-    using NumberOfCores = size_t;
+    using NumberOfCores = Sudoku::BaseParallelRunner::NumberOfCores;
     using DispatcherPtr = std::unique_ptr<SudokuMultiDispatcher>;
     using DispatcherPtrSet = std::vector<DispatcherPtr>;
 
@@ -557,7 +557,6 @@ private:
     ExitStatusCode execMulti(void);
     ExitStatusCode execMulti(std::istream* pSudokuInStream);
     void printHeader(SudokuSolverType solverType, std::ostream* pSudokuOutStream);
-    NumberOfCores getNumberOfCores(void);
     SudokuPuzzleCount readLines(NumberOfCores numberOfCores, std::istream* pSudokuInStream, DispatcherPtrSet& dispatcherSet);
     ExitStatusCode execAll(NumberOfCores numberOfCores, DispatcherPtrSet& dispatcherSet);
     void writeMessage(NumberOfCores numberOfCores, SudokuPuzzleCount sizeOfPuzzle, DispatcherPtrSet& dispatcherSet, std::ostream* pSudokuOutStream);
@@ -567,6 +566,7 @@ private:
     // メンバ
     std::string sudokuStr_; // 初期マップの文字列
     std::string multiLineFilename_;     // 各行に数独パズルを書いたファイル名
+    std::unique_ptr<Sudoku::BaseParallelRunner> pParallelRunner_;  // 並列実行
     NumberOfCores     numberOfThreads_; // 並列度
     SudokuSolverType  solverType_;   // 各行に数独パズルを書いたファイルを解く方法
     SudokuSolverCheck check_;        // 解いた結果を検査するかどうか

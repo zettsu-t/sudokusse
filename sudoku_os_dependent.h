@@ -1,23 +1,28 @@
 // Sudoku solver with SSE 4.2 / AVX
 // Copyright (C) 2012-2017 Zettsu Tatsuya
-// WindowsとLinuxの違いを吸収する
+// WindowsとLinux、C++11とBoost C++ Librariesの違いを吸収する
 
 #ifndef SUDOKU_OS_DEPENDENT_H_INCLUDED
 #define SUDOKU_OS_DEPENDENT_H_INCLUDED
 
+#include <algorithm>
 #include <iostream>
 #include <iomanip>
+#include <functional>
 #include <memory>
+#include <vector>
 
 using SudokuTime = unsigned long long;   // 時刻と時間
 static_assert(sizeof(SudokuTime) == 8, "Unexpected SudokuTime size");
 
-// unit test
+// unit tests
 class SudokuTimerTest;
 class SudokuWindowsTimerTest;
 class SudokuLinuxTimerTest;
 class SudokuWindowsProcessorBinderTest;
 class SudokuLinuxProcessorBinderTest;
+class SudokuBaseParallelRunnerTest;
+class SudokuParallelRunnerTest;
 
 // 読み込みと実行時間測定
 namespace Sudoku {
@@ -174,9 +179,76 @@ namespace Sudoku {
         bool failed_ {false};  // 設定に失敗した
     };
 
+    // bool f(void)群を非同期実行して、結果のORを取るクラス
+    class BaseParallelRunner {
+        // unit test
+        friend class ::SudokuBaseParallelRunnerTest;
+        friend class ::SudokuParallelRunnerTest;
+    public:
+        using ResultType = bool;
+        using Evaluator = std::function<ResultType(void)>;
+        using NumberOfCores = unsigned int;
+        BaseParallelRunner(void) = default;
+        virtual ~BaseParallelRunner(void) = default;
+        BaseParallelRunner(const BaseParallelRunner&) = delete;
+        BaseParallelRunner& operator =(const BaseParallelRunner&) = delete;
+
+        NumberOfCores GetHardwareConcurrency(void) {
+#ifdef NO_PARALLEL
+            return 1;
+#else
+            auto numberOfCores = getHardwareConcurrency();
+            return std::max(numberOfCores, static_cast<decltype(numberOfCores)>(1));
+#endif
+        }
+
+        void Add(Evaluator& evaluator) {
+            evaluatorSet_.push_back(evaluator);
+            return;
+        }
+
+        ResultType Run(NumberOfCores numberOfCores) {
+#ifdef NO_PARALLEL
+            ResultType result = runSequential();
+#else
+            ResultType result = (numberOfCores <= 1) ? runSequential() : runParallel(evaluatorSet_);
+#endif
+            // この関数から返った後に、関数オブジェクトが指すものが破棄されることに備える
+            evaluatorSet_.clear();
+            return result;
+        }
+
+    protected:
+        using EvaluatorSet = std::vector<Evaluator>;
+        virtual NumberOfCores getHardwareConcurrency(void) = 0;
+        virtual ResultType runParallel(EvaluatorSet& evaluatorSet) = 0;
+
+        template<typename FutureSet> ResultType runParallelImpl(FutureSet& futureSet) {
+            ResultType result = false;
+            for (auto& f : futureSet) {
+                result |= f.get();
+            }
+            return result;
+        }
+
+    private:
+        ResultType runSequential(void) {
+            ResultType result = false;
+            for(auto& evaluator : evaluatorSet_) {
+                result |= evaluator();
+            }
+            return result;
+        }
+
+        EvaluatorSet evaluatorSet_;
+    };
+
     // WindowsとLinuxに応じたインスタンスを取得する
     extern std::unique_ptr<ITimer> CreateTimerInstance(void);
     extern std::unique_ptr<IProcessorBinder> CreateProcessorBinder(void);
+
+    // C++11とBoost C++ Librariesに応じたインスタンスを取得する
+    extern std::unique_ptr<BaseParallelRunner> CreateParallelRunner(void);
 }
 
 #endif // SUDOKU_OS_DEPENDENT_H_INCLUDED

@@ -13,7 +13,12 @@ $(CELLS_UNPACKED_TARGET): $(CELLS_UNPACKED_OBJS)
 $(CELLS_PACKED_TARGET): $(CELLS_PACKED_OBJS)
 	$(LD) -o $@ $(LDFLAGS) $^ $(LIBS)
 
+# Using Intel syntax assembly
 %.o: %.cpp $(HEADERS) $(GENERATED_CODE)
+	$(CXX) -c $(CPPFLAGS) $(CPPFLAGS_INTEL_SYNTAX) $< -o $@
+
+# Do not set -masm=intel for sources which include boost::thread
+sudoku_boost.o: sudoku_boost.cpp $(HEADERS) $(GENERATED_CODE)
 	$(CXX) -c $(CPPFLAGS) $< -o $@
 
 sudokusse_cells_unpacked.o : sudokusse.s
