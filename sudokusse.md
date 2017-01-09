@@ -11,10 +11,10 @@ shown below are required.
 
 |Tool|Cygwin 64bit|Bash on Ubuntu on Windows|MinGW-w64|
 |:------|:------|:------|:------|
-|GCC (g++)|5.4.0|4.8.4|6.1.0|
-|GNU assembler (as)|2.25.2|2.24|2.26|
-|GNU Make|4.2.1|3.81|4.2|
-|Ruby|2.2.5p319|1.9.3p484|ActiveScriptRuby 2.3.1p112|
+|GCC (g++)|5.4.0|4.8.4|6.3.0|
+|GNU assembler (as)|2.25.2|2.24|2.27|
+|GNU Make|4.2.1|3.81|4.2.1|
+|Ruby|2.2.5p319|1.9.3p484|ActiveScriptRuby 2.4.0p0|
 |Perl|5.22.2|5.18.2|Cygwin perl|
 |CppUnit|1.12.1|1.13.0|-|
 
@@ -245,6 +245,17 @@ lines from its top to bottom ordered by
 1. blank nine cells (0 or more lines)
 
 ### Helper scripts
+
+#### Measure time to solve puzzle
+
+1. Download [sudoku17](http://staffhome.ecm.uwa.edu.au/~00013890/sudoku17) on data/ directory.
+1. Execute `make time` to measure how long it takes to solve _sudoku17_. `make check` solves sudoku puzzle examples in data/ before solves _sudoku17_.
+
+To solve other sudoku puzzle files instead of _sudoku17_, launch the ruby script directly.
+
+```bash
+ruby sudoku_check.rb sudoku_puzzle_filename
+```
 
 #### Measure time to count solutions
 
