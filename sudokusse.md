@@ -246,9 +246,9 @@ lines from its top to bottom ordered by
 
 ### Helper scripts
 
-#### Measure time to solve puzzle
+#### Measure time to solve puzzles
 
-1. Download [sudoku17](http://staffhome.ecm.uwa.edu.au/~00013890/sudoku17) on data/ directory.
+1. Download [sudoku17](http://staffhome.ecm.uwa.edu.au/~00013890/sudoku17) into data/ directory.
 1. Execute `make time` to measure how long it takes to solve _sudoku17_. `make check` solves sudoku puzzle examples in data/ before solves _sudoku17_.
 
 To solve other sudoku puzzle files instead of _sudoku17_, launch the ruby script directly.
@@ -482,7 +482,7 @@ is right. MinGW-w64 may accept non-RIP-relative addressing but Cygwin
 causes link errors.
 
 g++ accepts assembly code in Intel syntax but it causes errors to mix
-up Intel and AT&T syntax. This occurs when you inline assembly code is
+up Intel and AT&T syntax. This occurs when your inline assembly code is
 in Intel syntax and inline assembly code in header files is in AT&T
 syntax. I found this issue in using boost::future and do not find in
 std::future.
