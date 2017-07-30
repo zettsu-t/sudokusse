@@ -34,8 +34,10 @@ LIBS+=
 endif
 endif
 
+# -Wconversion causes warnings that are ignorable.
+CPPFLAGS_WALL=-Wall -W -Wformat=2 -Wcast-qual -Wcast-align -Wwrite-strings -Wfloat-equal -Wpointer-arith -Wno-unused-parameter
 CPPFLAGS_INTEL_SYNTAX=-masm=intel
-CPPFLAGS_COMMON=-std=c++11 -O0 -g -Wall -m64 -DUNITTEST $(INCLUDES) $(LIBCFLAGS)
+CPPFLAGS_COMMON=-std=c++11 -O0 -g $(CPPFLAGS_WALL) -m64 -DUNITTEST $(INCLUDES) $(LIBCFLAGS)
 CPPFLAGS_SSE=$(CPPFLAGS_COMMON) -msse4.2 -DSUDOKU_USE_AVX=0
 CPPFLAGS_AVX=$(CPPFLAGS_COMMON) -mavx2 -DSUDOKU_USE_AVX=1
 CPPFLAGS_NO_PARALLEL=$(CPPFLAGS_COMMON) -msse4.2 -DSUDOKU_USE_AVX=0 -DNO_PARALLEL

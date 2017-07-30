@@ -8,7 +8,7 @@ MAKEFILE_PARALLEL=-j 5
 
 ALL_UPDATED_VARIABLES+= THIS_DIR MAKEFILE_SUB_COMPILE MAKEFILE_PARALLEL
 
-.PHONY: all clean check time show FORCE
+.PHONY: all clean rebuild check time show FORCE
 
 all: $(TARGETS)
 
@@ -18,6 +18,8 @@ $(TARGETS): FORCE
 
 clean:
 	$(MAKE) -f $(MAKEFILE_SUB_COMPILE) clean
+
+rebuild: clean all
 
 check: $(TARGETS)
 	perl sudoku_solve_all.pl

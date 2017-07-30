@@ -57,7 +57,9 @@ endif
 
 # -O2 optimization is better than -O3 in this program
 # Do not set -masm=intel for sources which include boost::thread
-CPPFLAGS=-std=c++11 -O2 -Wall -m64 $(CPPFLAGS_SSE_AVX) $(CPPFLAGS_PARALLEL)
+# -Wconversion causes warnings that are ignorable.
+CPPFLAGS_WALL=-Wall -W -Wformat=2 -Wcast-qual -Wcast-align -Wwrite-strings -Wfloat-equal -Wpointer-arith -Wno-unused-parameter
+CPPFLAGS=-std=c++11 -O2 $(CPPFLAGS_WALL) -m64 $(CPPFLAGS_SSE_AVX) $(CPPFLAGS_PARALLEL)
 
 CELLS_UNPACKED_TARGET=bin/sudokusse
 CELLS_PACKED_TARGET=bin/sudokusse_cells_packed

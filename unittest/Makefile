@@ -14,7 +14,7 @@ bash ./launchtest.sh $(1)
 
 endef
 
-.PHONY: all check clean show FORCE
+.PHONY: all check clean rebuild show FORCE
 
 all: $(TARGETS) check
 
@@ -27,6 +27,8 @@ check:
 
 clean:
 	$(MAKE) -f $(MAKEFILE_SUB_COMPILE) clean
+
+rebuild: clean all
 
 show:
 	$(foreach v, $(ALL_UPDATED_VARIABLES), $(info $(v) = $($(v))))
