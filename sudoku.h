@@ -191,7 +191,10 @@ class SudokuCell {
 public:
     SudokuCell(void);
 #ifndef NO_DESTRUCTOR
-    ALLOW_VIRTUAL ~SudokuCell();
+    // If destructors do nothing but compiler-generated code,
+    // it is a good practice to define them with =default or not to define them.
+    // Giving implementations to destructors may disturb move constructors.
+    ALLOW_VIRTUAL ~SudokuCell() = default;
 #endif
     // Initializing and output a cell
     void Preset(char c);
@@ -244,7 +247,7 @@ class SudokuMap {
 public:
     SudokuMap(void);
 #ifndef NO_DESTRUCTOR
-    ALLOW_VIRTUAL ~SudokuMap();
+    ALLOW_VIRTUAL ~SudokuMap() = default;
 #endif
     // Initializing and output
     void Preset(const std::string& presetStr, SudokuIndex seed);
@@ -306,7 +309,7 @@ class SudokuSolver : public SudokuBaseSolver {
 public:
     SudokuSolver(const std::string& presetStr, SudokuIndex seed, std::ostream* pSudokuOutStream);
     SudokuSolver(const std::string& presetStr, SudokuIndex seed, std::ostream* pSudokuOutStream, SudokuPatternCount printAllCandidate);
-    virtual ~SudokuSolver();
+    virtual ~SudokuSolver() = default;
     virtual bool Exec(bool silent, bool verbose) override;
     virtual void PrintType(void) override;
 private:
@@ -326,7 +329,7 @@ class SudokuSseCell {
 public:
     SudokuSseCell(void);
 #ifndef NO_DESTRUCTOR
-    ALLOW_VIRTUAL ~SudokuSseCell();
+    ALLOW_VIRTUAL ~SudokuSseCell() = default;
 #endif
     void Preset(char c);
     void Print(std::ostream* pSudokuOutStream) const;
@@ -390,7 +393,7 @@ private:
 public:
     SudokuSseMap(void);
 #ifndef NO_DESTRUCTOR
-    ALLOW_VIRTUAL ~SudokuSseMap();
+    ALLOW_VIRTUAL ~SudokuSseMap() = default;
 #endif
     void Preset(const std::string& presetStr);
     void Print(std::ostream* pSudokuOutStream) const;
@@ -440,7 +443,7 @@ class SudokuSseSolver : public SudokuBaseSolver {
 public:
     SudokuSseSolver(const std::string& presetStr, std::ostream* pSudokuOutStream, SudokuPatternCount printAllCandidate);
     SudokuSseSolver(const std::string& presetStr, SudokuIndex seed, std::ostream* pSudokuOutStream, SudokuPatternCount printAllCandidate);
-    virtual ~SudokuSseSolver();
+    virtual ~SudokuSseSolver() = default;
     virtual bool Exec(bool silent, bool verbose) override;
     virtual void Enumerate(void);
     virtual void PrintType(void) override;
@@ -540,7 +543,7 @@ public:
     SudokuLoader(int argc, const char * const argv[], std::istream* pSudokuInStream, std::ostream* pSudokuOutStream);
 
 #ifndef NO_DESTRUCTOR
-    ALLOW_VIRTUAL ~SudokuLoader();
+    ALLOW_VIRTUAL ~SudokuLoader() = default;
 #endif
     SudokuLoader(const SudokuLoader&) = delete;
     SudokuLoader& operator =(const SudokuLoader&) = delete;
