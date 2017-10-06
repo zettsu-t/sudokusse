@@ -1,6 +1,6 @@
 // solver with SSE 4.2 / AVX
 // Copyright (C) 2012-2016 Zettsu Tatsuya
-// C++11標準ライブラリ依存部
+// C++11 standard libraries dependent implementation
 
 #include "sudoku_os_dependent.h"
 
