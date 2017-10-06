@@ -1,19 +1,23 @@
 #!/bin/perl
-# sudoku_solve_all.pl が出力したログから最短時間を抽出する
-# 基準となる実行ファイルを指定すると、そこからどれだけ短縮できたか計算する
+# This script extracts shortest elapsed time from a log which
+# sudoku_solve_all.pl wrote.
 #
-# 起動方法 : Cygwinのシェルから起動する
-#   sudoku_search_timelog.pl sudoku_solve_all.plが出力したログファイル名
-# 例 perl sudoku_search_timelog.pl SudokuTime_2013_09_27_21_34_56.log
+# Usage: Launch this script from Cygwin terminal.
+#   $ perl sudoku_search_timelog.pl filename
+# The filename indicates a file which sudoku_solve_all.pl wrote.
+#   $ perl sudoku_search_timelog.pl SudokuTime_2013_09_27_21_34_56.log
 #
-# Copyright (C) 2013 Zettsu Tatsuya
+# Set an executable filename to $EXE_SUDOKU_BASE and this script
+# prints how much bin/sudokusse* are faster than it.
+#
+# Copyright (C) 2013-2017 Zettsu Tatsuya
 
 use strict;
 
-# 拡張子を付けないと起動できないことがある
+# It may be required to launch executables with ".exe" suffix on Windows.
 my $exepostfix = ($^O eq "cygwin") ? ".exe" : "";
 
-# sudoku_solve_all.pl と同様
+# Like sudoku_solve_all.pl does
 my $EXE_SUDOKU_NOT_PACKED = "bin/sudokusse$exepostfix";
 my $EXE_SUDOKU_PACKED = "bin/sudokusse_cells_packed$exepostfix";
 my $EXE_SUDOKU_BASE = "ToBeReplaced$exepostfix";
@@ -52,7 +56,7 @@ sub ParseLogLine {
 }
 
 sub ParseBaseLogLine {
-    # $EXE_SUDOKU_BASEの出力を解析する処理を、ここに追加する
+    # Handle output of $EXE_SUDOKU_BASE if required.
     0;
 }
 

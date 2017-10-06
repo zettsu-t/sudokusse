@@ -385,7 +385,7 @@ class SudokuSseMap {
     friend class SudokuSseMapTest;
     template <class TestedT, class CandidatesT> friend class SudokuSolverCommonTest;
 private:
-    static constexpr size_t InitialRegisterNum = 1;  // The number of an XMM register which holds the top row.
+    static constexpr size_t InitialRegisterNum = 1;  // The number of an XMM register which holds the top row
     XmmRegisterSet xmmRegSet_;
 public:
     SudokuSseMap(void);

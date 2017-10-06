@@ -1,15 +1,16 @@
 #!/bin/perl
-# 数独を解く(解けるかどうかのテストと自動計測)
-# data/以下にある*.txtをすべて解く
+# This script solves all sudoku puzzles in data/* files,
+# checks whether they are correctly solved, and measures
+# how long time does it takes.
 #
-# Cygwinのシェルから、引数なしで起動する
-#   perl sudoku_solve_all.pl
+# Usage: Launch this script from Cygwin terminal without arguments.
+#   $ perl sudoku_solve_all.pl
 #
-# Copyright (C) 2012-2013 Zettsu Tatsuya
+# Copyright (C) 2012-2017 Zettsu Tatsuya
 
 use strict;
 
-# 拡張子を付けないと起動できないことがある
+# It may be required to launch executables with ".exe" suffix on Windows.
 my $exepostfix = ($^O eq "cygwin") ? ".exe" : "";
 
 my $EXE_FILENANE = "bin/sudokusse$exepostfix";
@@ -32,7 +33,7 @@ sub checkAnswer {
         @numarray[$i] = "";
     }
 
-    # 関連するマスを全部集める
+    # Collect cells
     for($i=0; $i<81; $i+=1) {
         my $rowbase = int($i / 9) * 9;
         my $columnbase = $i % 9;
@@ -52,7 +53,7 @@ sub checkAnswer {
         }
     }
 
-    # 1..9が3つずつあるはず
+    # Expect each row, column and box have three 1 to 9.
     for($i=0; $i<81; $i+=1) {
         my $actual = join("",sort(split(//,@numarray[$i])));
         ($actual eq "111222333444555666777888999") || die "not filled entry $actual : $i";
@@ -77,7 +78,7 @@ sub checkResult {
     my $outstrline;
     foreach $outstrline (@outstr) {
         my $line = trimCrLF($outstrline);
-        # 答えの始まり
+        # Beginning of solutions
         if ($line =~ /^\d*:\d*:\d*:\d*:\d*:\d*:\d*:\d*:\d*:\s*$/) {
             if ($state == $OUT_OF_STEP) {
                 $state = $IN_STEP;
@@ -92,7 +93,7 @@ sub checkResult {
                 $foundEmpty = 1;
             }
 
-            # 数える
+            # Counts cells
             $line =~ s/\D//g;
             $currentNumStr .= $line;
             my $count = length($line);
@@ -110,7 +111,7 @@ sub checkResult {
             $solver = $1;
         }
 
-        # 最後の出力を調べる
+        # Checks a footer of output lines
         if ($line =~ /^Total/) {
             $answercnt += 1;
             print "-------- $filename result ($answercnt, solver = $solver) --------\n";
@@ -126,19 +127,19 @@ sub checkResult {
 sub solve {
     my ($count) = @_;
 
-    # 入力ファイルを集める
+    # Collects input files
     my @outstr = `find data -name "*.txt"`;
     my @files;
 
     my $outstrline;
-    # 正しく解けるかどうか試す
+    # Check whether the solver solves correctly
     foreach $outstrline (@outstr) {
         my $filename = trimCrLF($outstrline);
         push(@files, $filename);
         checkResult($filename);
     }
 
-    # 時間を測る
+    # Measures elapsed time
     my $filename;
     foreach $filename (@files) {
         print "\n-------- $filename time begin --------\n";
