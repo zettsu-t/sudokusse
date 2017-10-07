@@ -1,12 +1,14 @@
-// C++11とBoost C++ Librariesによる並列実行をテストする
+// Testing parallel execution by C++11 and Boost C++ Libraries
 // Copyright (C) 2012-2017 Zettsu Tatsuya
 //
-// クラス定義は下記から流用
+// I use CppUnit code on the website.
 // http://www.atmarkit.co.jp/fdotnet/cpptest/cpptest02/cpptest02_03.html
 
 #include <cassert>
 #include "sudokutest_os_dependent.h"
 
+// C++11 and Boost C++ Libraries have very common interface
+// for threading and we switch them by macros.
 #ifdef SOLVE_PARALLEL_WITH_BOOST_THREAD
 #include <boost/atomic.hpp>
 #include <boost/thread/future.hpp>

@@ -1,7 +1,7 @@
-// SudokuSolverクラスをテストする
-// Copyright (C) 2012-2015 Zettsu Tatsuya
+// Testing class SudokuSolver
+// Copyright (C) 2012-2017 Zettsu Tatsuya
 //
-// クラス定義は下記から流用
+// I use CppUnit code on the website.
 // http://www.atmarkit.co.jp/fdotnet/cpptest/cpptest02/cpptest02_02.html
 
 #include <cppunit/extensions/HelperMacros.h>
@@ -52,8 +52,8 @@ protected:
 private:
     void verifyTestVector(void);
 
-    std::unique_ptr<SudokuOutStream> pSudokuOutStream_;  // 結果出力先
-    std::shared_ptr<SudokuSolver>    pInstance_;         // インスタンス
+    std::unique_ptr<SudokuOutStream> pSudokuOutStream_;  // destination to write strings
+    std::shared_ptr<SudokuSolver>    pInstance_;         // tested object
     std::unique_ptr<SudokuSolverCommonTest<SudokuSolver, SudokuCellCandidates>> pCommonTester_;
 };
 
@@ -82,14 +82,14 @@ protected:
     void test_fillCells();
 
 private:
-    std::unique_ptr<SudokuOutStream> pSudokuOutStream_;  // 結果出力先
-    std::shared_ptr<SudokuSseSolver> pInstance_;         // インスタンス
+    std::unique_ptr<SudokuOutStream> pSudokuOutStream_;  // destination to write strings
+    std::shared_ptr<SudokuSseSolver> pInstance_;         // tested object
     std::unique_ptr<SudokuSolverCommonTest<SudokuSseSolver, SudokuSseElement>> pCommonTester_;
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(SudokuSseSolverTest);
 
-// テスト用の値が正しいかどうか検算する
+// Confirms that constants for testing are correct
 void SudokuSolverTest::verifyTestVector(void) {
     assert(SudokuTestPattern::NoBacktrackString.length() >= Sudoku::SizeOfAllCells);
     assert(SudokuTestPattern::BacktrackString.length() >= Sudoku::SizeOfAllCells);
@@ -104,7 +104,7 @@ void SudokuSolverTest::verifyTestVector(void) {
     return;
 }
 
-// マスの候補が正しく設定されたかどうか調べる
+// Confirms candidates of cells are set collect
 template <>
 void SudokuSolverCommonTest<SudokuSolver, SudokuCellCandidates>::checkCells(SudokuSolver *pInst, const SudokuIndex* expectedIndexes) {
     for(size_t i=0;i<arraySizeof(pInst->map_.cells_);++i) {
@@ -153,14 +153,13 @@ void SudokuSolverCommonTest<SudokuSseSolver, SudokuSseElement>::checkCells(Sudok
     return;
 }
 
-// マスの候補が正しく設定されたかどうか調べる
 template <>
 void SudokuSolverCommonTest<SudokuSolver, SudokuCellCandidates>::CheckCells(SudokuSolver *pInst, const SudokuIndex* expectedIndexes) {
     checkCells(pInst, expectedIndexes);
     return;
 }
 
-// 各テスト・ケースの実行直前に呼ばれる
+// Call before run a test
 void SudokuSolverTest::setUp() {
     pSudokuOutStream_ = decltype(pSudokuOutStream_)(new SudokuOutStream());
     pInstance_ = decltype(pInstance_)(new SudokuSolver(SudokuTestPattern::NoBacktrackString, 0, pSudokuOutStream_.get()));
@@ -171,7 +170,7 @@ void SudokuSolverTest::setUp() {
     return;
 }
 
-// 各テスト・ケースの実行直後に呼ばれる
+// Call after run a test
 void SudokuSolverTest::tearDown() {
     assert(pCommonTester_);
     assert(pInstance_);
@@ -185,7 +184,7 @@ void SudokuSolverTest::tearDown() {
     return;
 }
 
-// これ以降はテスト・ケースの実装内容
+// Test cases
 template <class TestedT, class CandidatesT>
 SudokuSolverCommonTest<TestedT, CandidatesT>::SudokuSolverCommonTest(std::shared_ptr<TestedT>& pInst)
     : pInstance_(pInst) {
@@ -200,7 +199,8 @@ SudokuSolverCommonTest<TestedT, CandidatesT>::~SudokuSolverCommonTest() {
 template <class TestedT, class CandidatesT>
 void SudokuSolverCommonTest<TestedT, CandidatesT>::test_Exec() {
     for(const auto& test : SudokuTestPattern::testSet) {
-        SudokuOutStream sudokuOutStream;  // SudokuSolverインスタンスの解体後に解体する
+        // Destroy after destructing an instance which uses 'sudokuOutStream'
+        SudokuOutStream sudokuOutStream;
         {
             TestedT inst(test.presetStr, 0, &sudokuOutStream, 0);
             CPPUNIT_ASSERT_EQUAL(test.result, inst.Exec(true, false));
@@ -216,7 +216,7 @@ template <class TestedT, class CandidatesT>
 void SudokuSolverCommonTest<TestedT, CandidatesT>::test_PrintType(const char *pExpectedStr) {
     pInstance_->PrintType();
 
-    // SetUpで設定したのだから成功するはず
+    // This cast will never fail when SetUp() selected the right class.
     SudokuOutStream* pOstream = dynamic_cast<SudokuOutStream*>(pInstance_->pSudokuOutStream_);
     assert(pOstream != nullptr);
     const std::string actualstr = pOstream->str();
@@ -228,7 +228,8 @@ void SudokuSolverCommonTest<TestedT, CandidatesT>::test_PrintType(const char *pE
 template <class TestedT, class CandidatesT>
 void SudokuSolverCommonTest<TestedT, CandidatesT>::test_solve() {
     for(const auto& test : SudokuTestPattern::testSet) {
-        SudokuOutStream sudokuOutStream;  // SudokuSolverインスタンスの解体後に解体する
+        // Destroy after destructing an instance which uses 'sudokuOutStream'
+        SudokuOutStream sudokuOutStream;
         {
             TestedT inst(test.presetStr, 0, &sudokuOutStream, 0);
             CPPUNIT_ASSERT_EQUAL(test.result, inst.solve(inst.map_, true, false));
@@ -245,7 +246,7 @@ bool SudokuSolverCommonTest<SudokuSolver, SudokuCellCandidates>::filterRetvalFil
 
 template <>
 bool SudokuSolverCommonTest<SudokuSseSolver, SudokuSseElement>::filterRetvalFillCells(bool original) {
-    // 常に同じ値
+    // Always returns true
     return true;
 }
 
@@ -264,7 +265,8 @@ bool SudokuSolverCommonTest<TestedT, CandidatesT>::call_fillCells(SudokuSseSolve
 template <class TestedT, class CandidatesT>
 void SudokuSolverCommonTest<TestedT, CandidatesT>::test_fillCells() {
     for(const auto& test : SudokuTestPattern::testSet) {
-        SudokuOutStream sudokuOutStream;  // SudokuSolverインスタンスの解体後に解体する
+        // Destroy after destructing an instance which uses 'sudokuOutStream'
+        SudokuOutStream sudokuOutStream;
         {
             TestedT inst(test.presetStr, 0, &sudokuOutStream, 0);
             CPPUNIT_ASSERT_EQUAL(filterRetvalFillCells(test.result), call_fillCells(inst));
@@ -278,9 +280,10 @@ void SudokuSolverCommonTest<TestedT, CandidatesT>::test_fillCells() {
 void SudokuSolverTest::test_Constructor() {
     verifyTestVector();
     for(size_t i=0; i<arraySizeof(SudokuTestPattern::testSet); ++i) {
-        SudokuOutStream sudokuOutStream;  // SudokuSolverインスタンスの解体後に解体する
+        // Destroy after destructing an instance which uses 'sudokuOutStream'
+        SudokuOutStream sudokuOutStream;
         {
-            // キャストする前に確認する
+            // Confirm before cast
             assert(arraySizeof(SudokuTestPattern::testSet) < std::numeric_limits<SudokuIndex>::max());
             SudokuSolver inst(SudokuTestPattern::testSet[i].presetStr, static_cast<SudokuIndex>(i), &sudokuOutStream);
             pCommonTester_->CheckCells(&inst, SudokuTestPattern::testSet[i].presetNum);
@@ -314,7 +317,7 @@ void SudokuSolverTest::test_fillCells() {
     return;
 }
 
-// 各テスト・ケースの実行直前に呼ばれる
+// Call before run a test
 void SudokuSseSolverTest::setUp() {
     pSudokuOutStream_ = decltype(pSudokuOutStream_)(new SudokuOutStream());
     pInstance_ = decltype(pInstance_)(new SudokuSseSolver(SudokuTestPattern::NoBacktrackString, pSudokuOutStream_.get(), 0));
@@ -325,7 +328,7 @@ void SudokuSseSolverTest::setUp() {
     return;
 }
 
-// 各テスト・ケースの実行直後に呼ばれる
+// Call after run a test
 void SudokuSseSolverTest::tearDown() {
     assert(pCommonTester_);
     assert(pInstance_);
@@ -340,7 +343,7 @@ void SudokuSseSolverTest::tearDown() {
 }
 
 void SudokuSseSolverTest::test_Constructor() {
-    // SudokuSseMapのテストをもって替える
+    // If all test for SudokuSseMap succeed, the constructor of SudokuSseSolver works well.
     return;
 }
 

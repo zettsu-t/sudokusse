@@ -1,9 +1,8 @@
-// SudokuCellクラスをテストする
-// Copyright (C) 2012-2015 Zettsu Tatsuya
+// Testing class SudokuCell
+// Copyright (C) 2012-2017 Zettsu Tatsuya
 //
-// クラス定義は下記から流用
+// I use CppUnit code on the website.
 // http://www.atmarkit.co.jp/fdotnet/cpptest/cpptest02/cpptest02_02.html
-//
 
 #include <cppunit/extensions/HelperMacros.h>
 #include <cassert>
@@ -85,7 +84,7 @@ private:
     static bool hasMultipleCandidates(SudokuCellCandidates candidates);
     static SudokuIndex countCandidates(SudokuCellCandidates candidates);
 
-    std::shared_ptr<SudokuCell> pInstance_;   // インスタンス
+    std::shared_ptr<SudokuCell> pInstance_;   // tested object
     std::unique_ptr<SudokuCellCommonTest<SudokuCell, SudokuCellCandidates>> pCommonTester_;
 };
 
@@ -110,13 +109,13 @@ protected:
 private:
     void checkConstructor(void);
 
-    std::shared_ptr<SudokuSseCell> pInstance_;   // インスタンス
+    std::shared_ptr<SudokuSseCell> pInstance_;   // tested object
     std::unique_ptr<SudokuCellCommonTest<SudokuSseCell, SudokuSseElement>> pCommonTester_;
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(SudokuSseCellTest);
 
-// テスト用の値が正しいかどうか検算する
+// Confirms that constants for testing are correct
 void SudokuCellTest::verifyTestVector(void) {
     assert(isUniqueCandidates(SudokuTestCandidates::Empty) == false);
     assert(hasMultipleCandidates(SudokuTestCandidates::Empty) == false);
@@ -152,14 +151,14 @@ void SudokuCellTest::verifyTestVector(void) {
     return;
 }
 
-// コンストラクタを調べる
+// Checks whether an instance of SudokuCell is constructed well
 void SudokuCellTest::checkConstructor(void) {
     CPPUNIT_ASSERT(pInstance_->indexNumber_ == 0);
     CPPUNIT_ASSERT(pInstance_->candidates_ == SudokuCell::SudokuAllCandidates);
     return;
 }
 
-// 1になっているbitが1つのみか、それ以外かを検算する
+// Returns true if only 1 bit is set (equal to 1), or false otherwise.
 bool SudokuCellTest::isUniqueCandidates(SudokuCellCandidates candidates) {
     auto result = false;
     auto restCandidates = candidates;
@@ -167,10 +166,10 @@ bool SudokuCellTest::isUniqueCandidates(SudokuCellCandidates candidates) {
     for(size_t i=0; i < bitsOf(restCandidates); ++i) {
         if ((restCandidates & 1) == 1) {
             if (result != false) {
-                // 2bit以上1がある
+                // 2 bits are equal to 1
                 return false;
             } else {
-                // 1のbitがみつかった
+                // a bit that equals to 1 is found
                 result = true;
             }
         }
@@ -179,7 +178,7 @@ bool SudokuCellTest::isUniqueCandidates(SudokuCellCandidates candidates) {
     return result;
 }
 
-// 1になっているbitが2つ以上か、それ以外かを検算する
+// Returns true if two or more bits are set (equal to 1), or false otherwise.
 bool SudokuCellTest::hasMultipleCandidates(SudokuCellCandidates candidates) {
     auto found = false;
     auto restCandidates = candidates;
@@ -187,10 +186,10 @@ bool SudokuCellTest::hasMultipleCandidates(SudokuCellCandidates candidates) {
     for(size_t i=0; i < bitsOf(restCandidates); ++i) {
         if ((restCandidates & 1) == 1) {
             if (found != false) {
-                // 2bit以上1がある
+                // 2 bits are equal to 1
                 return true;
             } else {
-                // 1のbitがみつかった
+                // a bit that equals to 1 is found
                 found = true;
             }
         }
@@ -199,7 +198,9 @@ bool SudokuCellTest::hasMultipleCandidates(SudokuCellCandidates candidates) {
     return false;
 }
 
-// 候補の数を数える
+// It is better to use a population count instruction or combination
+// of bit manipulation to calculate faster. I write this in a simple way
+// to avoid test testing itself.
 SudokuIndex SudokuCellTest::countCandidates(SudokuCellCandidates candidates) {
     SudokuIndex result = 0;
     auto restCandidates = candidates;
@@ -213,7 +214,7 @@ SudokuIndex SudokuCellTest::countCandidates(SudokuCellCandidates candidates) {
     return result;
 }
 
-// 各テスト・ケースの実行直前に呼ばれる
+// Call before run a test
 void SudokuCellTest::setUp() {
     pInstance_ = decltype(pInstance_)(new SudokuCell());
     pCommonTester_ = decltype(pCommonTester_)(new SudokuCellCommonTest<SudokuCell, SudokuCellCandidates>(pInstance_));
@@ -222,7 +223,7 @@ void SudokuCellTest::setUp() {
     return;
 }
 
-// 各テスト・ケースの実行直後に呼ばれる
+// Call after run a test
 void SudokuCellTest::tearDown() {
     assert(pCommonTester_);
     assert(pInstance_);
@@ -233,7 +234,7 @@ void SudokuCellTest::tearDown() {
     return;
 }
 
-// これ以降はテスト・ケースの実装内容
+// Test cases
 template <class TestedT, class CandidatesT>
 SudokuCellCommonTest<TestedT, CandidatesT>::SudokuCellCommonTest(std::shared_ptr<TestedT>& pInst)
     : pInstance_(pInst) {
@@ -247,21 +248,21 @@ SudokuCellCommonTest<TestedT, CandidatesT>::~SudokuCellCommonTest() {
 
 template <class TestedT, class CandidatesT>
 void SudokuCellCommonTest<TestedT, CandidatesT>::test_Preset() {
-    constexpr CandidatesT dirty = 0xe6;          // 未設定の時の値
-    constexpr char invalidCharSet[] {"0Ab. "};   // 無効な文字の集合
+    constexpr CandidatesT dirty = 0xe6;          // candidates when this cell in not set
+    constexpr char invalidCharSet[] {"0Ab. "};   // invalid characters for preset
 
-    // 数字でないものは設定しないし何も変更しない
+    // If non-digit char and 0 are given, candidates of cells are not changed.
     pInstance_->candidates_ = dirty;
     for(const auto& test : invalidCharSet) {
         pInstance_->Preset(test);
         CPPUNIT_ASSERT_EQUAL(dirty, pInstance_->candidates_);
     }
 
-    // nul文字も然り
+    // 'nul' is invalid
     pInstance_->Preset('\0');
     CPPUNIT_ASSERT_EQUAL(dirty, pInstance_->candidates_);
 
-    // 各数字を設定する
+    // 1..9 are valid
     for(char ofs = 1; ofs <= 9; ++ofs) {
         pInstance_->Preset('0'+ofs);
         auto expected = SudokuTestCommon::ConvertToCandidate(ofs);
@@ -278,17 +279,16 @@ void SudokuCellCommonTest<TestedT, CandidatesT>::test_Print() {
         pInstance_->_candidates = candidates;
         pInstance_->Print(&sudokuOutStream);
         auto expected = SudokuCell::CellLookUp_[candidates].NumberOfCandidates;
-        // 候補の数だけあるはず
+        // Expect the length is equal to number of candidates
         CPPUNIT_ASSERT_EQUAL(expected, sudokuOutStream.str().length());
     }
 
-    // 引数がnull
+    // Do not crash when the argument is null
     pInstance_->_candidates = SudokuTestCandidates::CenterLine;
-    pInstance_->Print(0);
+    pInstance_->Print(nullptr);
     return;
 }
 
-// これ以降はテスト・ケースの実装内容
 void SudokuCellTest::test_Preset() {
     pCommonTester_->test_Preset();
     return;
@@ -309,7 +309,7 @@ void SudokuCellTest::test_Print() {
 }
 
 void SudokuCellTest::test_GetIndex() {
-    // ありえない値
+    // First initialize with one-of-range value
     pInstance_->indexNumber_ = Sudoku::SizeOfAllCells + 1;
 
     for(SudokuIndex i=0;i<Sudoku::SizeOfAllCells;++i) {
@@ -413,14 +413,14 @@ void SudokuCellTest::test_SetCandidates() {
     };
 
     constexpr TestSet testSet[] {
-        // 減らす
+        // These decrease candidates
         {SudokuTestCandidates::All, SudokuTestCandidates::OneOnly, SudokuTestCandidates::OneOnly},
         {SudokuTestCandidates::All, SudokuTestCandidates::ExceptTwo, SudokuTestCandidates::ExceptTwo},
         {SudokuTestCandidates::ExceptCenter, SudokuTestCandidates::CenterLine, SudokuTestCandidates::FourAndSix},
-        // 同じ
+        // These do not change candidates
         {SudokuTestCandidates::OneOnly, SudokuTestCandidates::OneOnly, SudokuTestCandidates::OneOnly},
         {SudokuTestCandidates::ExceptTwo, SudokuTestCandidates::ExceptTwo, SudokuTestCandidates::ExceptTwo},
-        // 何も残らない
+        // This clear all candidates
         {SudokuTestCandidates::Odds, SudokuTestCandidates::Evens, SudokuTestCandidates::Empty}
     };
 
@@ -486,12 +486,12 @@ void SudokuCellTest::test_CountCandidatesIfMultiple() {
 }
 
 void SudokuCellTest::test_MaskCandidatesUnlessMultiple() {
-    // 2から9
+    // 2 to 9
     for(SudokuIndex i=Sudoku::SizeOfUniqueCandidate+1;i<Sudoku::SizeOfCandidates;++i) {
         CPPUNIT_ASSERT_EQUAL(i, pInstance_->MaskCandidatesUnlessMultiple(i));
     }
 
-    // それ以外
+    // otherwise
     CPPUNIT_ASSERT_EQUAL(static_cast<SudokuIndex>(0),
                          pInstance_->MaskCandidatesUnlessMultiple(Sudoku::OutOfRangeCandidates));
     return;
@@ -526,7 +526,6 @@ void SudokuCellTest::test_FlipCandidates() {
     };
 
     constexpr TestSet testSet[] {
-        // 減らす
         {SudokuTestCandidates::All, SudokuTestCandidates::Empty},
         {SudokuTestCandidates::Empty, SudokuTestCandidates::All},
         {SudokuTestCandidates::OneOnly, SudokuTestCandidates::TwoToNine},
@@ -550,13 +549,13 @@ void SudokuCellTest::test_MergeCandidates() {
     };
 
     constexpr TestSet testSet[] {
-        // 増える
+        // These add candidates
         {SudokuTestCandidates::OneOnly, SudokuTestCandidates::TwoToNine, SudokuTestCandidates::All},
         {SudokuTestCandidates::ExceptTwo, SudokuTestCandidates::TwoOnly, SudokuTestCandidates::All},
         {SudokuTestCandidates::Odds, SudokuTestCandidates::Evens, SudokuTestCandidates::All},
         {SudokuTestCandidates::Evens, SudokuTestCandidates::Odds, SudokuTestCandidates::All},
         {SudokuTestCandidates::CenterOnly, SudokuTestCandidates::FourAndSix, SudokuTestCandidates::CenterLine},
-        // 同じ
+        // These do not change candidates
         {SudokuTestCandidates::OneOnly, SudokuTestCandidates::OneOnly, SudokuTestCandidates::OneOnly},
         {SudokuTestCandidates::ExceptTwo, SudokuTestCandidates::ExceptTwo, SudokuTestCandidates::ExceptTwo},
         {SudokuTestCandidates::All, SudokuTestCandidates::All, SudokuTestCandidates::All},
@@ -583,7 +582,7 @@ void SudokuCellTest::test_GetInitialCandidate() {
 void SudokuCellTest::test_GetNextCandidate() {
     SudokuCellCandidates candidates = SudokuTestCandidates::OneOnly;
 
-    // 余分に取得する
+    // Call too many times and confirm it gets 'Empty'
     for(SudokuIndex i=0;i<=(Sudoku::SizeOfCandidates+3);++i) {
         SudokuCellCandidates expected = ((i+1) >= Sudoku::SizeOfCandidates) ?
             SudokuTestCandidates::Empty : (candidates << 1);
@@ -595,18 +594,17 @@ void SudokuCellTest::test_GetNextCandidate() {
 }
 
 void SudokuCellTest::test_updateState() {
-    // 単に呼び出しから返ってくるかどうかだけ調べる
+    // Confirm this returns
     pInstance_->updateState();
     return;
 }
 
-// コンストラクタを調べる
 void SudokuSseCellTest::checkConstructor(void) {
     CPPUNIT_ASSERT(pInstance_->candidates_ == SudokuSseCell::AllCandidates);
     return;
 }
 
-// 各テスト・ケースの実行直前に呼ばれる
+// Call before run a test
 void SudokuSseCellTest::setUp() {
     pInstance_ = decltype(pInstance_)(new SudokuSseCell());
     pCommonTester_ = decltype(pCommonTester_)(new SudokuCellCommonTest<SudokuSseCell, SudokuSseElement>(pInstance_));
@@ -614,7 +612,7 @@ void SudokuSseCellTest::setUp() {
     return;
 }
 
-// 各テスト・ケースの実行直後に呼ばれる
+// Call after run a test
 void SudokuSseCellTest::tearDown() {
     assert(pCommonTester_);
     assert(pInstance_);

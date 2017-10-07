@@ -1,7 +1,7 @@
-// Linux依存部をテストする
-// Copyright (C) 2012-2016 Zettsu Tatsuya
+// Testing Linux dependent implementation
+// Copyright (C) 2012-2017 Zettsu Tatsuya
 //
-// クラス定義は下記から流用
+// I use CppUnit code on the website.
 // http://www.atmarkit.co.jp/fdotnet/cpptest/cpptest02/cpptest02_03.html
 
 #include <cassert>
@@ -42,17 +42,17 @@ protected:
     void test_PrintTime();
     void test_convertTimeToNum();
 
-    // 派生クラスのメンバを参照できるようにする
+    // Access to members of derived classes of ITimer
     std::shared_ptr<TestedTimer> createTimerInstance(void) {
         std::shared_ptr<Sudoku::ITimer> pTimer = std::move(Sudoku::CreateTimerInstance());
         std::shared_ptr<TestedTimer> pBaseTimer = std::dynamic_pointer_cast<TestedTimer>(pTimer);
         return pBaseTimer;
     }
 
-    // 指定ミリ秒待つ
+    // Waits specified time 'timeInMsec'
     MilliSleepFunc createMilliSleepFunc(int timeInMsec) {
         auto funcLambda = [=](decltype(timeInMsec) argTimeInMsec) {
-            // 1秒以上は対応しない
+            // Do not consider 1 second and over
             timespec req {0, argTimeInMsec * 1000000};
             timespec rem {0, 0};
             while(::nanosleep(&req, &rem) == EINTR) {
@@ -81,17 +81,17 @@ protected:
 CPPUNIT_TEST_SUITE_REGISTRATION(SudokuLinuxTimerTest);
 CPPUNIT_TEST_SUITE_REGISTRATION(SudokuLinuxProcessorBinderTest);
 
-// 各テスト・ケースの実行直前に呼ばれる
+// Call before run a test
 void SudokuLinuxTimerTest::setUp() {
     return;
 }
 
-// 各テスト・ケースの実行直後に呼ばれる
+// Call after run a test
 void SudokuLinuxTimerTest::tearDown() {
     return;
 }
 
-// これ以降はテスト・ケースの実装内容
+// Test cases
 void SudokuLinuxTimerTest::test_Constructor() {
     auto pTimer = createTimerInstance();
     checkConstructor(pTimer.get());
@@ -137,7 +137,7 @@ void SudokuLinuxTimerTest::test_StopClock() {
 void SudokuLinuxTimerTest::test_GetElapsedTime() {
     auto pTimer = createTimerInstance();
     constexpr int msecTime = 50;
-    // msec/usec * 100nsec解像度
+    // resolution in msec/usec * 100 nsec
     constexpr SudokuTime timeInUnit = msecTime * 1000 * Sudoku::BaseTimer::SudokuTimeUnitInUsec;
     MilliSleepFunc func = createMilliSleepFunc(msecTime);
     checkGetElapsedTime(pTimer.get(), func, timeInUnit);
@@ -146,7 +146,7 @@ void SudokuLinuxTimerTest::test_GetElapsedTime() {
 void SudokuLinuxTimerTest::test_GetClockInterval() {
     auto pTimer = createTimerInstance();
     constexpr int msecTime = 1;
-    // 1GHzなら、1clock = 1nsec : 最低0.2GHzで動作すると仮定する
+    // clock = 1nsec at 1GHz. We expect x64 CPUs run at 0.2GHz or over.
     constexpr SudokuTime clockCount = msecTime * 200000;
     MilliSleepFunc func = createMilliSleepFunc(msecTime);
     checkGetClockInterval(pTimer.get(), func, clockCount);
@@ -172,8 +172,8 @@ void SudokuLinuxTimerTest::test_PrintTime() {
     }
 
     {
-        constexpr timespec startTimestamp { 1000000,   0};  //  1000000'0000000 (0が13個) * 100nsec
-        constexpr timespec stopTimestamp  {11000000, 300};  // 11000000'0000003 (0が間に12個) * 100nsec
+        constexpr timespec startTimestamp { 1000000,   0};  //  1000000'0000000 (13 zeros) * 100 nsec
+        constexpr timespec stopTimestamp  {11000000, 300};  // 11000000'0000003 (12 zeros) * 100 nsec
         pTimer->startTimestamp_ = startTimestamp;
         pTimer->stopTimestamp_ = stopTimestamp;
         setUpAndCheckPrintTime(pTimer.get(), pOutStream.get());
@@ -204,17 +204,17 @@ void SudokuLinuxTimerTest::test_convertTimeToNum() {
     return;
 }
 
-// 各テスト・ケースの実行直前に呼ばれる
+// Call before run a test
 void SudokuLinuxProcessorBinderTest::setUp() {
     return;
 }
 
-// 各テスト・ケースの実行直後に呼ばれる
+// Call after run a test
 void SudokuLinuxProcessorBinderTest::tearDown() {
     return;
 }
 
-// これ以降はテスト・ケースの実装内容
+// Test cases
 void SudokuLinuxProcessorBinderTest::test_Constructor() {
     auto pBinder = Sudoku::CreateProcessorBinder();
     ProcessorBinder* pConcreteBinder = dynamic_cast<decltype(pConcreteBinder)>(pBinder.get());

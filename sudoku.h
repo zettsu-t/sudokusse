@@ -579,7 +579,7 @@ private:
     SudokuSolverPrint print_;       // Whether or not printing results
     bool   isBenchmark_;    // true when it runs for benchmarking
     bool   verbose_;        // true if printing steps to solving a puzzle
-    int    measureCount_;   // means how many times it solves a puzzle
+    int    measureCount_;   // how many times it solves a puzzle
     SudokuPatternCount printAllCandidate_;
     std::ostream* pSudokuOutStream_;  // receives strings to write
     static constexpr NumberOfCores DefaultNumberOfThreads = 1;  // the default number of threads

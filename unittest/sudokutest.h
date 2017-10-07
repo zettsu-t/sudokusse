@@ -1,19 +1,20 @@
-// 数独を解くプログラムをテストする
+// Testing Sudoku solver with SSE 4.2 / AVX
+// Copyright (C) 2012-2017 Zettsu Tatsuya
 
 #include <stdint.h>
 #include <cstdlib>
 #include <string>
 
-// arraySizeofの定義
+// Define arraySizeof()
 #include "sudoku.h"
 
-// 変数のビット数を求める
+// Returns number of bits of T
 template<typename T>
 constexpr size_t bitsOf(T) {
     return sizeof(T) * 8;
 }
 
-// ASMで定義する
+// Declare conditions for testing here and define them in assembly
 extern "C" {
     extern volatile uint64_t testSearchRowPartElementsPreUniqueCandidate;
     extern volatile uint64_t testSearchRowPartElementsPreRowPart;
@@ -43,7 +44,7 @@ extern "C" {
 }
 
 namespace SudokuTestCandidates {
-    constexpr SudokuCellCandidates Empty = 0;              // [空]
+    constexpr SudokuCellCandidates Empty = 0;              // []
     constexpr SudokuCellCandidates UniqueBase = 1;         // [1]
     constexpr SudokuCellCandidates OneOnly = 1;            // [1]
     constexpr SudokuCellCandidates TwoOnly = 1 << 1;       // [2]
@@ -64,7 +65,7 @@ namespace SudokuTestCandidates {
     constexpr size_t candidateSetSize = arraySizeof(CandidateSetOne);
 }
 
-// テスト用の候補を設定するマスの番号
+// Index of cells for testing
 // *........
 // ...*.....
 // ......*..
@@ -75,20 +76,20 @@ namespace SudokuTestCandidates {
 // .....*.b.
 // ........*
 namespace SudokuTestPosition {
-    constexpr SudokuIndex Head = 0;          // 先頭
-    constexpr SudokuIndex HeadNext = 1;      // 先頭の次
-    constexpr SudokuIndex Center = 40;       // 中心
-    constexpr SudokuIndex Centerorigin = 30; // 中心3*3の左上
-    constexpr SudokuIndex Conflict = 62;     // 上記の!の位置
-    constexpr SudokuIndex Backtracked = 70;  // 上記のbの位置(バックトラック候補)
-    constexpr SudokuIndex Last = Sudoku::SizeOfAllCells - 1;  // 最後
+    constexpr SudokuIndex Head = 0;          // top-left corner
+    constexpr SudokuIndex HeadNext = 1;      // top and next-to-left
+    constexpr SudokuIndex Center = 40;       // center
+    constexpr SudokuIndex Centerorigin = 30; // top-left corner of the center box
+    constexpr SudokuIndex Conflict = 62;     // the cell marked ! above
+    constexpr SudokuIndex Backtracked = 70;  // the cell marked b above (selected for backtracking)
+    constexpr SudokuIndex Last = Sudoku::SizeOfAllCells - 1;  // last and bottom-righr corner
 };
 
-// 以下は「プログラマのための論理パズル」から引用したものを基に作成
-// "プログラマのための論理パズル 難題を突破する論理思考トレーニング", Dennis E. Shasha (著), 吉平 健治 (翻訳), 2009/3, オーム社
-
+// These cases are based on the book;
+// Dennis E. Shasha (May 2007), "Puzzles for Programmers and Pros", Wrox
+// (I read its Japanese translation published by Ohmsha).
 namespace SudokuTestPattern {
-    constexpr SudokuIndex ConflictedCell = 0xfe;  // 矛盾したので何が書かれるか不定
+    constexpr SudokuIndex ConflictedCell = 0xfe;  // unspecified value for an inconsistent cell
     const std::string NoBacktrackString = "........77.4...893..68.2.....75286...8...67.19.34...8....7.49..6...9....459...1.8";
     const std::string NoBacktrackStringSolution = "815349267724651893396872415147528639582936741963417582231784956678195324459263178";
     const std::string BacktrackString =   ".3.....4..1..97.5...25.86....3...8..9....43....76....4..98.54...7.....2..5..71.8.";
@@ -119,32 +120,32 @@ namespace SudokuTestPattern {
     struct TestArgs {
         int    argc;
         const char* argv[4];
-        bool   isBenchmark;   // ベンチマークかどうか
-        bool   verbose;       // 解く過程を示すかどうか
-        int    measureCount;  // 測定回数
-        SudokuPatternCount printAllCandidate;  // 候補の数
+        bool   isBenchmark;   // true when it runs for benchmarking
+        bool   verbose;       // true if printing steps to solving a puzzle
+        int    measureCount;  // how many times it solves a puzzle
+        SudokuPatternCount printAllCandidate;  // number of candicates
     };
 
     constexpr TestArgs testArgs[] {
-        // 解を一つ求める
-        {1, {"sudoku", 0,      0, 0}, false, true,  1,   0},  // 回数未指定
-        {2, {"sudoku", "1",    0, 0}, true,  false, 1,   0},  // 1回
-        {2, {"sudoku", "100",  0, 0}, true,  false, 100, 0},  // 100回
-        {2, {"sudoku", "-1",   0, 0}, false, true,  1,   0},  // 1回
-        {2, {"sudoku", "-200", 0, 0}, false, true,  200, 0},  // 1回
-        // 解を数える
-        {2, {"sudoku", "0", 0,    0}, false, true, 0, 0},  // 0個
-        {3, {"sudoku", "0", "",   0}, false, true, 0, 0},  // 0個
-        {3, {"sudoku", "0", "0",  0}, false, true, 0, 0},  // 0個
-        {3, {"sudoku", "0", "2",  0}, false, true, 0, 2},  // 2個
-        {3, {"sudoku", "0", "-1", 0}, false, true, 0, 0},  // 0個
+        // Solving a solution. Specify how many times test cases solve.
+        {1, {"sudoku", 0,      0, 0}, false, true,  1,   0},  // not specified
+        {2, {"sudoku", "1",    0, 0}, true,  false, 1,   0},  // solve once
+        {2, {"sudoku", "100",  0, 0}, true,  false, 100, 0},  // 100 times
+        {2, {"sudoku", "-1",   0, 0}, false, true,  1,   0},  // once
+        {2, {"sudoku", "-200", 0, 0}, false, true,  200, 0},  // once
+        // Counting solutions
+        {2, {"sudoku", "0", 0,    0}, false, true, 0, 0},  // none of solutions
+        {3, {"sudoku", "0", "",   0}, false, true, 0, 0},  // none
+        {3, {"sudoku", "0", "0",  0}, false, true, 0, 0},  // none
+        {3, {"sudoku", "0", "2",  0}, false, true, 0, 2},  // 2
+        {3, {"sudoku", "0", "-1", 0}, false, true, 0, 0},  // none
     };
 }
 
 using SudokuInStream = std::istringstream;
 using SudokuOutStream = std::ostringstream;
 
-// 共通部分
+// Utilities for testing
 class SudokuTestCommon {
 public:
     static SudokuCellCandidates ConvertToCandidate(char index);
