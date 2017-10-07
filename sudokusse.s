@@ -8,7 +8,7 @@
         # .set    EnableAvx, 1
 
         # Set CellsPacked to 1 to assume that initial cells in a
-        # sudoku puzzle are packed in its top-left.
+        # sudoku puzzle is packed in its top-left.
         # .set    CellsPacked, 0
 
         # Set LastCellsToFilled to 10 to assume each cell in the
@@ -65,7 +65,7 @@
 
 # Variables that this assembly and C++ code share
 # Solving puzzles can run on multiple threads so these global
-# variables must not used for multiple writes and readers.
+# variables must not be used for multiple writes and readers.
 #
 # Counting solutions can run on a single thread only.
 # These variables are not thread-safe for multiple writes and readers.
@@ -78,7 +78,7 @@ sudokuXmmAllPatternCnt:         .quad 0    # Number of solutions in a puzzle
 sudokuXmmStackPointer:          .quad 0    # RSP register value before calling sudokuXmmPrintFunc
 sudokuXmmReturnAddr:            .quad 0    # Address to return after counting solutions
 
-# These variables are set by a thread before read by multiple threads
+# These variables are set by a thread before multiple threads read
 sudokuXmmPrintFunc:             .quad 0    # Address of a C++ function to print a puzzle
 sudokuXmmAssumeCellsPacked:     .quad CellsPacked
 sudokuXmmUseAvx:                .quad EnableAvx
@@ -165,7 +165,7 @@ sudokuXmmDummyToAlign:  .quad 0
 .set    outBoxIndexInvalid, (rowPartNum + 1)           # Indicating an out-of-bounds index of boxes
 .set    rowNumberInvalid,   (numberOfRows + 1)         # Indicating an out-of-bounds index of rows
 .set    nextCellFound,            1  # Indicating it found a cell and guess a its candidate for backtracking
-.set    minCandidatesNumToSearch, 2  # Minimum number of cadidates to guess a candidate in a cell
+.set    minCandidatesNumToSearch, 2  # Minimum number of candidates to guess a candidate in a cell
 
 .set    elementBitMask, 0x1ff      # Bit mask for candidates of a cell
 .set    rowPartBitMask, 0x7ffffff  # Bit mask for candidates of three cells in a row of a box
@@ -199,7 +199,7 @@ sudokuXmmDummyToAlign:  .quad 0
 .set    gRegBitMask,  r15
 .set    gRegBitMaskD, r15d
 
-# NOTICE : every unit test must begin with InitMaskRegister. Almost macros need it.
+# NOTICE: every unit test must begin with InitMaskRegister. Almost macros need it.
 # Labels in general macros must have number 3000 or later
 
 .macro InitMaskRegister
@@ -800,7 +800,7 @@ testSelectElementInRowParts2:
         mov    regShiftedBitmaskD, gRegBitMaskD
         ShlNonZero  regShiftedBitmaskD, (candidatesNum * \inBoxShift)
 
-        # Collect candidates in a row, column and box
+        # Collect candidates in a row, column, and box
 .if (EnableAvx != 0)
         andn   regCandidateD, \regCandidateSetD, regBitmaskD
 .else
@@ -894,7 +894,7 @@ testFillOneUniqueCandidates2:
         pcmpeqw  \regWork1X, \regWork1X
 .endif
 
-        # Bit masks
+        # Bitmasks
         mov    regBitmaskD, rowPartBitMask
         MacroMovd regBitmaskX, regBitmaskD
         PslldqNonZero regBitmaskX, (boxRowByteSize * \outBoxShift)
@@ -973,7 +973,7 @@ testMaskElementCandidates2:
 
 # Merge candidates in two cells (overwriting regSum)
 .macro MergeTwoElementsImpl regSumD, shiftLeft1, shiftLeft2, inBoxShift, regWorkD
-        # Parrnell for each bit mask
+        # Parallel for each bitmask
         .if (\inBoxShift == 0)
         mov    \regWorkD, \regSumD
         ShrNonZero  \regSumD,  (candidatesNum * 1)
@@ -1302,7 +1302,7 @@ testFindNineCandidates:
         Find27UniqueCandidates xRegRow7, xRegRow8, xRegRow9, xRegRow7to9, xRegRow1to3, xRegRow4to6, xRegRowAll, \regWork1, \regWork2, \regWork3, \regWork4, \regWork1D \regWork2D, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D, \regWork11D, \regWork12D, \regWork13D, \regWork1X, \regWork2X
 .endm
 
-# Count how many cells are filled after moving previous count to regPrevPopcnt
+# Count how many cells are filled after moving the previous count to regPrevPopcnt
 .macro CountFilledElements reg64LoopCnt, reg64CurrentPopcnt, reg64PrevPopcnt, regWork
         MacroPextrq  \reg64PrevPopcnt, xLoopPopCnt, 0
         MacroPextrq  \reg64LoopCnt,    xLoopPopCnt, 1
@@ -1705,7 +1705,7 @@ solveSudokuAsm:
         # c_n: 1 if n is a candidate of the cell c, 0 otherwise
 
 loopFilling:
-        # Find cadidates per 3 rows
+        # Find candidates per 3 rows
         CollectUniqueCandidatesInThreeLine xRegRow1to3, xRegRow1, xRegRow2, xRegRow3, rax, rbx, rcx, rdx, r8, r9, r10, eax, xRegWork1, xRegWork2
         CollectUniqueCandidatesInThreeLine xRegRow4to6, xRegRow4, xRegRow5, xRegRow6, rax, rbx, rcx, rdx, r8, r9, r10, eax, xRegWork1, xRegWork2
         CollectUniqueCandidatesInThreeLine xRegRow7to9, xRegRow7, xRegRow8, xRegRow9, rax, rbx, rcx, rdx, r8, r9, r10, eax, xRegWork1, xRegWork2
@@ -1812,10 +1812,8 @@ saveXmmRegisters:
         MacroMovdqa (xmmword ptr [rdi+240]), xmm15
         ret
 
-# 64bitレジスタではなく、32bitでレジスタ計算できるところはそうする、という変更はここまで
-
-# 数独の個数を数える
-        # 固定でレジスタを割り当てる(rcxはシフト用)
+# Counts solutions of a sudoku puzzle
+        # Assign registers to variables (RCX is exclusive for a shift counter)
         .set    xRightestColumn, xmm10
         .set    xRegWork3,       xmm11
 
@@ -2093,7 +2091,6 @@ testFastCollectCandidatesAtBox788:
           .endif
          .endif
 
-        # xRegWork1も反映させる
         MacroOrps xRegWork1, xRegWork2
         MacroOrps xRegWork1, xRegWork3
         MacroPextrw \regSum, xRegWork1, \columnNumber
@@ -2158,7 +2155,7 @@ testFastCollectCandidatesAtColumn88:
         cmp     \regWork2, candidatesNum
         JumpIfGreaterEqual 10012f
 
-        # ここで打ち切っても速くならない
+        # If we abort here, the whole process does not get faster
         .if ((CellsPacked == 0) || ((\rowNumber % 3) != 0))
         FastCollectCandidatesAtBox \regWork1, \xRegSrcOther1, \regWork2, \otherColumnNumber1, \otherColumnNumber2, \rowNumber
         or  \regSum, \regWork1
@@ -2329,14 +2326,17 @@ testFastSetUniqueCandidatesAtCellSub88:
         push    rbp
         mov     qword ptr [rip + sudokuXmmStackPointer], rsp
 
-        # x64のABIは、呼び出し先関数の領域を32 byte分だけ、呼び出し側で確保する
+        # In the x64 ABI, callers have responsibility to allocate 32 bytes on stack
         .set    MinStackSize, 32
         sub     rsp, MinStackSize
 
-        # x64のABIは、rsp を 16 byte境界にアラインメントしないと動作しない
-        # 戻りアドレスを積む前の時点で16 byte境界なので、積んだ後は8 mod 16byteである
-        # そのため下位ビットを切り捨てて、下位アドレスの16 byte境界にそろえる
-        # これをしないと、std::cout << の実行中にC++ライブラリの中で異常終了することになる
+        # In the x64 ABI, RSP must be aligned on 16 bytes boundary.
+        # If we violate this rule, standard C++ libraries will crash abruptly
+        # when this code calls std::iostram.
+
+        # RSP is aligned on 16 bytes boundary when a C/C++ function calls here
+        # and RSP is not aligned on 16 bytes boundary after push RBP.
+        # Flooring RSP to 16*N bytes is required.
         and     rsp, ~0xf
         call    [rip + sudokuXmmPrintFunc]
         mov     rsp, qword ptr [rip + sudokuXmmStackPointer]
@@ -2364,7 +2364,7 @@ testFastSetUniqueCandidatesAtCellSub88:
         xor     gRegSum64, gRegSum64
         xor     gRegTarget64, gRegTarget64
 
-        # 候補が一つしかないときはここではなく、呼び出し先でretする
+        # If there is only one candidate, we use tail call and it returns in the called function.
         pop     gRegReturn
         FastCollectUniqueCandidatesAtCell gRegSum, gRegTarget, gRegWork2, gRegShift, \cellCount
 
@@ -2376,8 +2376,8 @@ testFastSetUniqueCandidatesAtCellSub88:
         xor     gRegWork2, gRegWork2
         cmp     gRegWork1, candidatesNum
 
-        # 候補があれば1
-        # 次の分岐とまとめる
+        # 1 when there is at least one candidate
+        # Merge to the next branch
         adc     gRegWork2Byte, 0
 10011:
         .if (TrimRedundancy == 0)
@@ -2388,9 +2388,9 @@ testFastSetUniqueCandidatesAtCellSub88:
         setnz   gRegWork1Byte
         add     gRegWork2Byte, gRegWork1Byte
 
-        # 遠くに飛ぶと遅くなるのでできるだけ近くにする
+        # Branch near to jump fast
         .if ((LastCellsToFilled != 0) && (\cellCount + LastCellsToFilled) >= maxElementNumber)
-        # 前方には分岐しないのがデフォルトの分岐予測
+        # Default branch prediction does not expect jump forward
         jz      10012f
         jmp     10013f
         .else
@@ -2401,11 +2401,11 @@ testFastSetUniqueCandidatesAtCellSub88:
 
 10013:
         .if ((\cellCount + 1) >= maxElementNumber)
-        # すべてのマスが埋まった
+        # All cells are filled
         add     gRegCount, gRegOne64
 
         cmp     qword ptr [rip + sudokuXmmPrintAllCandidate], 0
-        # 候補を表示しないに分岐しないようにして速くする
+        # Jump to 'no print candidates' and make this branch fast
         jnz     10021f
         jmp     gRegReturn
 
@@ -2431,39 +2431,39 @@ testFastSetUniqueCandidatesAtCellSub88:
 
 10032:
         mov     gRegNewCandidate, gRegOne
-        # 他の候補に使われていないものが1
+        # Bit 1 for candidates that are not used for other cells
         not     gRegSum
         and     gRegSum, gRegFastBitMask
 
 10033:
-        # CountUniqueCandidatesAtNextCellを使って展開すると却って遅くなる
+        # Expand with CountUniqueCandidatesAtNextCell gets slower
         mov     gRegNewCandidate64, gRegOne64
         bsf     gRegShift, gRegSum
         shl     gRegNewCandidate, cl
         xor     gRegSum, gRegNewCandidate
 
-        # push-popの方が固定アドレスより速い
+        # push-pop is faster than load and save
         push    gRegSum64
         FastSetUniqueCandidatesAtCell gRegNewCandidate, \cellCount
         CallCountUniqueCandidatesAtCell (\cellCount + 1)
         pop     gRegSum64
 
-        # 最右列と最下行は候補があったとしても高々一つ
+        # We found only one candidate in cells at the bottom row and the right-most column
          .if (LastCellsToFilled == 0) || (((\cellCount % numberOfColumns) + 1) != numberOfColumns) || ((\cellCount + LastCellsToFilled) < maxElementNumber)
         and     gRegSum, gRegSum
         jnz     10033b
          .endif
 10034:
-        # 0に書き戻す
+        # Reverts to 0
         pop     gRegReturn
         xor     gRegWork1, gRegWork1
         FastSetUniqueCandidatesAtCell gRegWork1, \cellCount
-        # retにするとかなり遅くなる
-        # latencyはpop reg64=1, jmp reg=1, ret=8なので、pop+jmpの方が速い
+        # ret is slower than tail call with jmp
+        # latency: pop reg64=1, jmp reg=1, ret=8
         jmp     gRegReturn
 
 10035:
-        # 候補があればその値(ジャンプ先でret)
+        # Branch by candidates and use tail call
         JmpCountUniqueCandidatesAtCell (\cellCount + 1)
         .endif
 .endm
@@ -2682,7 +2682,7 @@ countAt78:
 countAt79:
         CountUniqueCandidatesAtCell 79
 
-# 80=最後のマス以降は同じマクロ
+# Same as for 80+
 countAt80:
 countAt81:
         CountUniqueCandidatesAtCell 80
