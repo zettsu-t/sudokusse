@@ -1,7 +1,7 @@
-// Sudokumapクラスをテストする
-// Copyright (C) 2012-2015 Zettsu Tatsuya
+// Testing class Sudokumap
+// Copyright (C) 2012-2017 Zettsu Tatsuya
 //
-// クラス定義は下記から流用
+// I use CppUnit code on the website.
 // http://www.atmarkit.co.jp/fdotnet/cpptest/cpptest02/cpptest02_02.html
 
 #include <cppunit/extensions/HelperMacros.h>
@@ -80,7 +80,7 @@ private:
                                     SudokuIndex inboxOfsX, SudokuIndex inboxOfsY);
     void testFillCrossingBox(SudokuIndex boxX, SudokuIndex boxY,
                              SudokuIndex inboxOfsX, SudokuIndex inboxOfsY);
-    std::unique_ptr<SudokuMap> pInstance_;   // インスタンス
+    std::unique_ptr<SudokuMap> pInstance_;   // tested object
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(SudokuMapTest);
@@ -113,18 +113,17 @@ private:
     void setAllCellsFullCandidates(void);
     void checkCandidateCell(const SudokuSseCandidateCell& expected, decltype(SudokuSseCandidateCell::regIndex) regIndex,
                             decltype(SudokuSseCandidateCell::shift) inBoxShift);
-    std::unique_ptr<SudokuSseMap> pInstance_;   // インスタンス
+    std::unique_ptr<SudokuSseMap> pInstance_;  // tested object
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(SudokuSseMapTest);
 
-// コンストラクタを調べる
 void SudokuMapTest::checkConstructor(void) {
     checkCellIndexes();
     return;
 }
 
-// インデックスが正しいかどうか検査する
+// Checks all index of cells are right
 void SudokuMapTest::checkCellIndexes(void) {
     decltype(SudokuCell::indexNumber_) i = 0;
 
@@ -135,7 +134,7 @@ void SudokuMapTest::checkCellIndexes(void) {
     return;
 }
 
-// 設定する数字を候補に変換する
+// Converts a digit of candidate 1..9 to a bitboard representation
 SudokuCellCandidates SudokuMapTest::indexToCandidate(SudokuIndex index) {
     if ((index < 1) || (index > 9)) {
         return SudokuCell::SudokuAllCandidates;
@@ -144,7 +143,7 @@ SudokuCellCandidates SudokuMapTest::indexToCandidate(SudokuIndex index) {
     return SudokuTestCommon::ConvertToCandidate(index);
 }
 
-// 全マス埋める
+// Set a unique candidate to cells
 void SudokuMapTest::setAllCellsFilled(void) {
     for(SudokuIndex i=0;i<Sudoku::SizeOfAllCells;++i) {
         pInstance_->cells_[i].candidates_ = SudokuTestCandidates::OneOnly;
@@ -152,7 +151,7 @@ void SudokuMapTest::setAllCellsFilled(void) {
     return;
 }
 
-// 全マス複数候補にする
+// Set multiple and part of 1..9 candidate to cells
 void SudokuMapTest::setAllCellsMultiCandidates(void) {
     for(SudokuIndex i=0;i<Sudoku::SizeOfAllCells;++i) {
         pInstance_->cells_[i].candidates_ = SudokuTestCandidates::TwoToNine;
@@ -161,7 +160,7 @@ void SudokuMapTest::setAllCellsMultiCandidates(void) {
     return;
 }
 
-// 全マス全候補にする
+// Set all 1..9 candidate to cells
 void SudokuMapTest::setAllCellsFullCandidates(void) {
     for(SudokuIndex i=0;i<Sudoku::SizeOfAllCells;++i) {
         pInstance_->cells_[i].candidates_ = SudokuTestCandidates::All;
@@ -170,9 +169,8 @@ void SudokuMapTest::setAllCellsFullCandidates(void) {
     return;
 }
 
-// 候補を全3*3マスに設定する
 void SudokuMapTest::setConsistentCells(SudokuCellCandidates candidates) {
-    // 3*3マスを埋める
+    // Set a candidate to boxes as below
     // *........
     // ...*.....
     // ......*..
@@ -188,7 +186,7 @@ void SudokuMapTest::setConsistentCells(SudokuCellCandidates candidates) {
     }
 }
 
-// 最上行を右端以外設定める
+// Set a candidate to cells in the top row except its rightmost
 void SudokuMapTest::setTopLineExceptRightest(void) {
     for(SudokuIndex i=0;i<Sudoku::SizeOfCellsPerGroup - 1;++i) {
         pInstance_->cells_[i].candidates_ = indexToCandidate(i+1);
@@ -197,19 +195,19 @@ void SudokuMapTest::setTopLineExceptRightest(void) {
     return;
 }
 
-// 各テスト・ケースの実行直前に呼ばれる
+// Call before running a test
 void SudokuMapTest::setUp() {
     pInstance_ = decltype(pInstance_)(new SudokuMap());
     checkConstructor();
     return;
 }
 
-// 各テスト・ケースの実行直後に呼ばれる
+// Call after running a test
 void SudokuMapTest::tearDown() {
     return;
 }
 
-// これ以降はテスト・ケースの実装内容
+// Test cases
 void SudokuMapTest::test_Preset() {
     const std::string presetStr = "1234567890\a\b\n\r\f\t\v0987654321 !\"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~.abcdefxyzABCDEFXYZ..";
 //                                 12345678912 3 4 5 6 7 8 9123456789123 45678 91234567891234567 89123456789123456789123456789
@@ -233,7 +231,7 @@ void SudokuMapTest::test_Preset() {
         CPPUNIT_ASSERT(pInstance_->backtrackedGroup_ < Sudoku::SizeOfGroupsPerCell);
     }
 
-    // 短すぎる場合
+    // An input string is too short but it does not cause a crash.
     pInstance_->Preset(ShortStr, 0);
     return;
 }
@@ -241,39 +239,39 @@ void SudokuMapTest::test_Preset() {
 void SudokuMapTest::test_Print() {
     SudokuCellCandidates candidates = 0;
     SudokuIndex index = 0;
-    size_t expected = 0;  // 予想文字列長
+    size_t expected = 0;  // expected length of output strings
 
     for(SudokuIndex y=0; y < Sudoku::SizeOfCellsPerGroup; ++y) {
         for(SudokuIndex x=0; x < Sudoku::SizeOfCellsPerGroup; ++x) {
             pInstance_->cells_[index++].candidates_ = candidates;
-            expected += y+1; // 区切り文字分
+            expected += y+1;  // Count a delimiter
         }
         candidates = (candidates << 1) | SudokuTestCandidates::UniqueBase;
-        ++expected; // 改行分
+        ++expected;  // Count a linefeed
     }
 
-    // 最後の要素を8要素から全部にする
+    // Set all candidates 1..9 to the last cell
     pInstance_->cells_[Sudoku::SizeOfAllCells - 1].candidates_ = SudokuTestCandidates::All;
     ++expected;
-    // 最後の改行
+    // Count the last linefeed
     ++expected;
 
     SudokuOutStream sudokuOutStream;
     pInstance_->Print(&sudokuOutStream);
     CPPUNIT_ASSERT_EQUAL(expected, sudokuOutStream.str().length());
 
-    // 引数がnull
+    // Missing output stream
     pInstance_->cells_[0].candidates_ = SudokuTestCandidates::CenterLine;
-    pInstance_->Print(0);
+    pInstance_->Print(nullptr);
     return;
 }
 
 void SudokuMapTest::test_IsFilled() {
-    // 全マス埋まっている
+    // All cells are filled at first
     setAllCellsFilled();
     CPPUNIT_ASSERT_EQUAL(true, pInstance_->IsFilled());
 
-    // 一つずつ解除
+    // Make each cell not filled one by one
     SudokuIndex i = Sudoku::SizeOfAllCells;
     do {
         --i;
@@ -311,12 +309,12 @@ void SudokuMapTest::testFillCrossingBox(SudokuIndex boxX, SudokuIndex boxY,
     // ..2......
     // .........
     // .........
-    // ?=1, *=[4,6], !=2, ^=9が埋まる
-    // @を4にすると矛盾が生じる
-    // これらを置換して全マスを検査する
-    // 3*3マス内の縦横の列を入れ替える
-    // 3*3マスの縦横を入れ替える
-    // つまり上表のx,yを、試験対象のx,yに入れ替える
+    // ?=1, *=[4,6], !=2, ^=9 are filled in this order.
+    // Setting 4 to @ makes this map inconsistent.
+
+    // This test fills these cells in the map and checks the map after calling FillCrossing().
+    // We can swap rows, columns, and boxes according to the arguments and
+    // we get same results before and after swapping.
 
     struct TestSet{
         SudokuIndex cellIndex;
@@ -341,7 +339,7 @@ void SudokuMapTest::testFillCrossingBox(SudokuIndex boxX, SudokuIndex boxY,
     };
 
     setAllCellsFullCandidates();
-    // マスを入れ替えて設定する
+    // Swaps rows, columns, and boxes according to the arguments
     for(const auto& test : testSet) {
         const auto target = convertCellPosition(test.cellIndex, boxX, boxY, inboxOfsX, inboxOfsY);
         pInstance_->cells_[target].candidates_ = indexToCandidate(test.candidatesIndex);
@@ -349,13 +347,13 @@ void SudokuMapTest::testFillCrossingBox(SudokuIndex boxX, SudokuIndex boxY,
 
     CPPUNIT_ASSERT_EQUAL(false, pInstance_->SudokuMap::FillCrossing());
 
-    // 検査する
+    // Confirms cells are updated correctly
     for(const auto& result : resultSet) {
         const auto target = convertCellPosition(result.cellIndex, boxX, boxY, inboxOfsX, inboxOfsY);
         CPPUNIT_ASSERT_EQUAL(result.candidates, pInstance_->cells_[target].candidates_);
     }
 
-    // 矛盾させる
+    // Intentionally makes the map inconsistent
     for(const auto& conflict : conflictSet) {
         const auto target = convertCellPosition(conflict.cellIndex, boxX, boxY, inboxOfsX, inboxOfsY);
         pInstance_->cells_[target].candidates_ = indexToCandidate(conflict.candidatesIndex);
@@ -366,10 +364,10 @@ void SudokuMapTest::testFillCrossingBox(SudokuIndex boxX, SudokuIndex boxY,
 }
 
 void SudokuMapTest::test_FillCrossing() {
-    // 3*3マス
+    // Boxes
     for(SudokuIndex boxX = 0; boxX < Sudoku::SizeOfBoxesOnEdge; ++boxX) {
         for(SudokuIndex boxY = 0; boxY < Sudoku::SizeOfBoxesOnEdge; ++boxY) {
-            // 3*3マスの中
+            // In a box
             for(SudokuIndex ofsX = 0; ofsX < Sudoku::SizeOfCellsOnBoxEdge; ++ofsX) {
                 for(SudokuIndex ofsY = 0; ofsY < Sudoku::SizeOfCellsOnBoxEdge; ++ofsY) {
                     testFillCrossingBox(boxX, boxY, ofsX, ofsY);
@@ -418,7 +416,7 @@ void SudokuMapTest::test_SetUniqueCell() {
         assert(index < arraySizeof(testSet));
 
         const auto expected = testSet[index].filled;
-        // 9,8,7,6,5,4,3,2,1の順
+        // 9,8,7,6,5,4,3,2,1
         auto candidate = indexToCandidate(9 - index);
         pInstance_->cells_[i].candidates_ = testSet[index].candidates;
         CPPUNIT_ASSERT_EQUAL(expected, pInstance_->CanSetUniqueCell(i, candidate));
@@ -427,7 +425,7 @@ void SudokuMapTest::test_SetUniqueCell() {
         SudokuCellCandidates expectedValue = (expected) ? candidate : 0;
         CPPUNIT_ASSERT_EQUAL(expectedValue, pInstance_->cells_[i].candidates_);
 
-        // 1..9の順
+        // 1..9
         candidate = indexToCandidate(index + 1);
         pInstance_->cells_[i].candidates_ = testSet[index].candidates;
         CPPUNIT_ASSERT_EQUAL(expected, pInstance_->CanSetUniqueCell(i, candidate));
@@ -441,11 +439,11 @@ void SudokuMapTest::test_SetUniqueCell() {
 }
 
 void SudokuMapTest::test_CountFilledCells() {
-    // 全マス未定
+    // All cells have no unique candidate
     setAllCellsMultiCandidates();
     CPPUNIT_ASSERT_EQUAL(static_cast<SudokuIndex>(0), pInstance_->CountFilledCells());
 
-    // 一つずつ解除
+    // Sets a unique candidate to each cell one by one
     SudokuIndex expected = 0;
     for(SudokuIndex i=0;i<Sudoku::SizeOfAllCells;++i) {
         ++expected;
@@ -453,11 +451,11 @@ void SudokuMapTest::test_CountFilledCells() {
         CPPUNIT_ASSERT_EQUAL(expected, pInstance_->CountFilledCells());
     }
 
-    // 全マス埋まっている
+    // All cells have each unique candidate
     setAllCellsFilled();
     CPPUNIT_ASSERT_EQUAL(Sudoku::SizeOfAllCells, pInstance_->CountFilledCells());
 
-    // 一つずつ未定にする
+    // Sets multiple candidates to each cell one by one
     SudokuIndex i = Sudoku::SizeOfAllCells;
     do {
         --i;
@@ -469,54 +467,54 @@ void SudokuMapTest::test_CountFilledCells() {
 }
 
 void SudokuMapTest::test_SelectBacktrackedCellIndex() {
-    // まず矛盾のない場合
-    // 全マス全候補
+    // First, all cells have all 1..9 candidates and are consistent.
     setAllCellsFullCandidates();
+    // The first (top-left) cell is selected.
     auto expected = SudokuTestPosition::Head;
     CPPUNIT_ASSERT_EQUAL(expected, pInstance_->SelectBacktrackedCellIndex());
 
-    // 最後に8候補
+    // Decrement a candidate from the last (bottom-right) cell.
     expected = SudokuTestPosition::Last;
+    // The last cell is selected because it has least candidates.
     pInstance_->cells_[expected].candidates_ = SudokuTestCandidates::ExceptCenter;
     CPPUNIT_ASSERT_EQUAL(expected, pInstance_->SelectBacktrackedCellIndex());
 
-    // 二番目にも8候補
+    // Decrement a candidate from the second cell.
     expected = SudokuTestPosition::HeadNext;
     pInstance_->cells_[expected].candidates_ = SudokuTestCandidates::TwoToNine;
+    // The second cell is selected because it has a smaller index than the last cell.
     CPPUNIT_ASSERT_EQUAL(expected, pInstance_->SelectBacktrackedCellIndex());
 
-    // 右下に2候補のマスが二つある。3*3マスの総候補が少ないので選ばれる。
+    // Set two candidates to a cell. The cell is selected because it has least candidates.
     expected = SudokuTestPosition::Backtracked;
     pInstance_->cells_[expected].candidates_ = SudokuTestCandidates::FourAndSix;
     CPPUNIT_ASSERT_EQUAL(expected, pInstance_->SelectBacktrackedCellIndex());
 
-    // 真ん中に候補のないマスがあるがこれは関係ない
+    // Cells which have no candidates are not selected.
     pInstance_->cells_[SudokuTestPosition::Center].candidates_ = SudokuTestCandidates::Empty;
     CPPUNIT_ASSERT_EQUAL(expected, pInstance_->SelectBacktrackedCellIndex());
 
-    // 真ん中に確定したマスがあるがこれは関係ない
+    // Cells which have only one candidate are not selected.
     pInstance_->cells_[SudokuTestPosition::Center].candidates_ = SudokuTestCandidates::CenterOnly;
     CPPUNIT_ASSERT_EQUAL(expected, pInstance_->SelectBacktrackedCellIndex());
 
     return;
 }
 
-// 要見直し
 void SudokuMapTest::test_IsConsistent() {
-    // まず矛盾のない場合
-    // 全マス全候補
+    // First, all cells have all 1..9 candidates and are consistent.
     setAllCellsFullCandidates();
     CPPUNIT_ASSERT_EQUAL(true, pInstance_->IsConsistent());
 
-    // 1をすべての3*3マスに設定する
+    // Set a candidate 1 to cells in each box.
     setConsistentCells(SudokuTestCandidates::OneOnly);
     CPPUNIT_ASSERT_EQUAL(true, pInstance_->IsConsistent());
 
-    // 空白にする
+    // Clear candidates in a cell.
     pInstance_->cells_[SudokuTestPosition::Last].candidates_ = SudokuTestCandidates::Empty;
     CPPUNIT_ASSERT_EQUAL(false, pInstance_->IsConsistent());
 
-    // 矛盾がある
+    // Set a candidate 1 to cells and it makes the map inconsistent.
     setConsistentCells(SudokuTestCandidates::OneOnly);
     pInstance_->cells_[SudokuTestPosition::Conflict].candidates_ = SudokuTestCandidates::OneOnly;
     CPPUNIT_ASSERT_EQUAL(false, pInstance_->IsConsistent());
@@ -524,9 +522,8 @@ void SudokuMapTest::test_IsConsistent() {
     return;
 }
 
-// 式を共通化できない?
 void SudokuMapTest::test_findUnusedCandidate() {
-    // 横一列
+    // a row
     setAllCellsFullCandidates();
     setTopLineExceptRightest();
     auto target = Sudoku::SizeOfCellsPerGroup - 1;
@@ -534,7 +531,7 @@ void SudokuMapTest::test_findUnusedCandidate() {
     auto expected = indexToCandidate(target+1);
     CPPUNIT_ASSERT_EQUAL(expected, pInstance_->cells_[target].candidates_);
 
-    // 矛盾
+    // inconsistent
     setAllCellsFullCandidates();
     setTopLineExceptRightest();
     pInstance_->cells_[Sudoku::SizeOfAllCells - 1].candidates_ = indexToCandidate(Sudoku::SizeOfCellsPerGroup);
@@ -542,7 +539,7 @@ void SudokuMapTest::test_findUnusedCandidate() {
     expected = SudokuTestCandidates::Empty;
     CPPUNIT_ASSERT_EQUAL(expected, pInstance_->cells_[target].candidates_);
 
-    // 縦一列
+    // a column
     setAllCellsFullCandidates();
     for(SudokuIndex i=0;i<Sudoku::SizeOfCellsPerGroup - 1;++i) {
         pInstance_->cells_[Sudoku::SizeOfCellsPerGroup - 1 + Sudoku::SizeOfCellsPerGroup * i].
@@ -553,7 +550,7 @@ void SudokuMapTest::test_findUnusedCandidate() {
     expected = indexToCandidate(Sudoku::SizeOfCellsPerGroup);
     CPPUNIT_ASSERT_EQUAL(expected, pInstance_->cells_[target].candidates_);
 
-    // 3*3
+    // box (3*3)
     setAllCellsFullCandidates();
     for(SudokuIndex y=0;y<3;++y) {
         for(SudokuIndex x=0;x<3;++x) {
@@ -568,7 +565,7 @@ void SudokuMapTest::test_findUnusedCandidate() {
     expected = SudokuTestCandidates::CenterOnly;
     CPPUNIT_ASSERT_EQUAL(expected, pInstance_->cells_[target].candidates_);
 
-    // 合成
+    // complex cases
     struct TestSet {
         SudokuIndex cellPosition;
         SudokuIndex candidateIndex;
@@ -605,7 +602,7 @@ void SudokuMapTest::test_findUnusedCandidate() {
 }
 
 void SudokuMapTest::test_findUniqueCandidate() {
-    // 横一列
+    // a row
     setAllCellsFullCandidates();
     auto target = Sudoku::SizeOfCellsPerGroup - 1;
     for(SudokuIndex i=0;i<target;++i) {
@@ -615,7 +612,7 @@ void SudokuMapTest::test_findUniqueCandidate() {
     auto expected = SudokuTestCandidates::OneOnly;
     CPPUNIT_ASSERT_EQUAL(expected, pInstance_->cells_[target].candidates_);
 
-    // これは候補を絞らない
+    // This does not decrease candidates.
     setAllCellsFullCandidates();
     target = Sudoku::SizeOfCellsPerGroup - 1;
     pInstance_->cells_[SudokuTestPosition::Head].candidates_ = SudokuTestCandidates::OneOnly;
@@ -624,7 +621,7 @@ void SudokuMapTest::test_findUniqueCandidate() {
     expected = SudokuTestCandidates::All;
     CPPUNIT_ASSERT_EQUAL(expected, pInstance_->cells_[target].candidates_);
 
-    // 縦一列
+    // column
     setAllCellsFullCandidates();
     for(SudokuIndex i=0;i<Sudoku::SizeOfCellsPerGroup - 1;++i) {
         pInstance_->cells_[Sudoku::SizeOfCellsPerGroup - 1 + Sudoku::SizeOfCellsPerGroup * i].
@@ -635,7 +632,7 @@ void SudokuMapTest::test_findUniqueCandidate() {
     expected = SudokuTestCandidates::TwoOnly;
     CPPUNIT_ASSERT_EQUAL(expected, pInstance_->cells_[target].candidates_);
 
-    // 3*3
+    // box (3*3)
     setAllCellsFullCandidates();
     for(SudokuIndex y=0;y<3;++y) {
         for(SudokuIndex x=0;x<3;++x) {
@@ -650,7 +647,7 @@ void SudokuMapTest::test_findUniqueCandidate() {
     expected = SudokuTestCandidates::CenterOnly;
     CPPUNIT_ASSERT_EQUAL(expected, pInstance_->cells_[target].candidates_);
 
-    // 矛盾
+    // inconsistent
     setAllCellsFullCandidates();
     target = Sudoku::SizeOfCellsPerGroup - 1;
     for(SudokuIndex i=0;i<target;++i) {
@@ -663,19 +660,18 @@ void SudokuMapTest::test_findUniqueCandidate() {
     return;
 }
 
-// 各テスト・ケースの実行直前に呼ばれる
+// Call before running a test
 void SudokuSseMapTest::setUp() {
     pInstance_ = decltype(pInstance_)(new SudokuSseMap());
     checkConstructor();
     return;
 }
 
-// 各テスト・ケースの実行直後に呼ばれる
+// Call after running a test
 void SudokuSseMapTest::tearDown() {
     return;
 }
 
-// コンストラクタを調べる
 void SudokuSseMapTest::checkConstructor(void) {
     static_assert(SudokuSse::RegisterCnt == 16, "Unexpected SudokuSse::RegisterCnt value");
     static_assert(SudokuSse::RegisterWordCnt == 4, "Unexpected SudokuSse::RegisterWordCnt value");
@@ -739,29 +735,29 @@ void SudokuSseMapTest::test_Preset() {
 void SudokuSseMapTest::test_Print() {
     SudokuCellCandidates candidates = 0x40201;
     size_t regIndex = pInstance_->InitialRegisterNum * SudokuSse::RegisterWordCnt;
-    size_t expected = 0;  // 予想文字列長
+    size_t expected = 0;  // expected length of output strings
 
     for(SudokuIndex y=0; y < Sudoku::SizeOfCellsPerGroup; ++y) {
         for(SudokuIndex x=0; x < Sudoku::SizeOfBoxesOnEdge; ++x) {
-            // 3マスまとめて設定する
+            // Sets three cells at once
             pInstance_->xmmRegSet_.regVal_[regIndex++] = candidates;
             expected += 3 * (y + 1);
         }
         ++regIndex;
-        candidates = (candidates << 1) | candidates;  // 候補を1マス1個ずつ増やす
-        expected += Sudoku::SizeOfCellsPerGroup;    // 区切り文字分
-        ++expected; // 改行分
+        candidates = (candidates << 1) | candidates;  // Sets a unique candidate one by one
+        expected += Sudoku::SizeOfCellsPerGroup;      // Count delimiters
+        ++expected;  // Count a linefeed
     }
 
-    // 最後の改行
+    // Count the last linefeed
     ++expected;
 
     SudokuOutStream sudokuOutStream;
     pInstance_->Print(&sudokuOutStream);
     CPPUNIT_ASSERT_EQUAL(expected, sudokuOutStream.str().length());
 
-    // 引数がnull
-    pInstance_->Print(0);
+    // Missing output stream
+    pInstance_->Print(nullptr);
     return;
 }
 

@@ -55,9 +55,9 @@ protected:
         pTimer->SetStartTime();
         milliSleep();
         pTimer->SetStopTime();
-        // Duration for 'sleep' is not exact as specified time. It may get longer.
+        // Sleep() does not sleep exact specified time. It may get longer.
         CPPUNIT_ASSERT(pTimer->GetElapsedTime() >= leastSleepTime);
-        // We treat sleeping too longer as a failure of testing.
+        // We assume this test is failed if it sleeps too long time.
         CPPUNIT_ASSERT(pTimer->GetElapsedTime() < (leastSleepTime * 10));
     }
 

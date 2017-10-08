@@ -1,7 +1,7 @@
-// SSE 4.2 ASM部テスト
-// Copyright (C) 2012-2015 Zettsu Tatsuya
+// Testing assmebly code
+// Copyright (C) 2012-2017 Zettsu Tatsuya
 //
-// クラス定義は下記から流用
+// I use CppUnit code on the website.
 // http://www.atmarkit.co.jp/fdotnet/cpptest/cpptest02/cpptest02_03.html
 
 #include <cppunit/extensions/HelperMacros.h>
@@ -278,8 +278,8 @@ constexpr EnumeratorTestCase EnumeratorTestCaseSet[] {
                 0, 0, 0, 0,  0, 0, 0, 0},
      "0:0:0:0:0:0:0:0:0\n0:0:0:0:0:0:0:0:0\n0:0:0:0:0:0:0:0:0\n0:0:0:0:0:0:0:0:0\n0:0:0:0:0:0:0:0:0\n0:0:0:0:0:0:0:0:0\n0:0:0:0:0:0:0:0:0\n0:0:0:0:0:0:0:0:0\n0:0:0:0:0:0:0:0:9\n",
     },
-    /* 問題2の解答
-       |        |        |        |        |        |        |        |        | */
+    // The solution of quiz
+    //         |        |        |        |        |        |        |        |
     {"835126749416397258792548631643912875981754362527683194269835417178469523354271986",
      81, 0x20, {0x0040080, 0x0010010, 0x0200002, 0x0080040,
                 0x0010008, 0x0040020, 0x0400100, 0x0100002,
@@ -427,19 +427,19 @@ void SudokuSseEnumeratorMapTest::test_powerOfTwoPlusOne() {
     }
 }
 
-// 各テスト・ケースの実行直前に呼ばれる
+// Call before running a test
 void SudokuSseTest::setUp()
 {
     return;
 }
 
-// 各テスト・ケースの実行直後に呼ばれる
+// Call after running a test
 void SudokuSseTest::tearDown()
 {
     return;
 }
 
-// これ以降はテスト・ケースの実装内容
+// Test cases
 enum class Shiftpos {
     SHIFT_POSMIN,
     SHIFT_POS0 = SHIFT_POSMIN,
@@ -591,7 +591,7 @@ void SudokuSseTest::test_PowerOf2()
     callPowerOf2orAll1_32(arg, result);
     CPPUNIT_ASSERT_EQUAL(expectedAll1_32, result);
 
-    // 2のべき乗
+    // power of 2
     arg = 1;
     for(size_t i=0; i < 64; ++i) {
         callIsPowerOf2ToFlags(arg, result);
@@ -616,7 +616,7 @@ void SudokuSseTest::test_PowerOf2()
         arg <<= 1;
     }
 
-    // それ以外
+    // others
     arg = 3;
     for(size_t i=0; i < 64; ++i) {
         callIsPowerOf2ToFlags(arg, result);
@@ -1527,7 +1527,7 @@ void SudokuSseTest::test_FillThreePartsUniqueCandidates()
 
     enum class Func {
         FUNCMIN,
-        PART2 = FUNCMIN, // 左、右、中の順
+        PART2 = FUNCMIN, // left, right, center
         PART0,
         PART1,
         ROW2,
@@ -1539,31 +1539,31 @@ void SudokuSseTest::test_FillThreePartsUniqueCandidates()
     };
 
     constexpr TestSet testSet[] {
-        /* 1行目 : *,  *, 3,   4,5,6, 7,8,9,
-           2行目 : 4,  5, 6,   0,0,0, 0,0,0,
-           3行目 : 7,  8, 9,   0,0,0, 0,0,0,
-           列    : 2-9,58,369, 4,5,6, 7,8,9, (find nine以外)
-           列    : 47, 58,369, 4,5,6, 7,8,9, (find nine)
-           結果  : 1,  2, ...  */
+        // 1st row : *,  *, 3,   4,5,6, 7,8,9,
+        // 2nd row : 4,  5, 6,   0,0,0, 0,0,0,
+        // 3rd row : 7,  8, 9,   0,0,0, 0,0,0,
+        // colunm  : 2-9,58,369, 4,5,6, 7,8,9, (except find nine)
+        // colunm  : 47, 58,369, 4,5,6, 7,8,9, (find nine)
+        // result  : 1,  2, ...
         {{{{0x20202001010100, 0x7fc0604}, {0x7ffffff07ffffff, 0x202020},  {0x7ffffff07ffffff, 0x1010100},
            {0x20202001010100, 0x1212124}, {0x20202001010100,  0x7f92124},
            {0x20202001010100, 0x40404},   {0x20202001010100,  0x1252524}, {0x20202001010100,  0x7fd2524},
            {0x20202001010100, 0x40404},   {0x20202001010100,  0x1252524}, {0x20202001010100,  0x7fd2524},
            {0x20202001010100, 0x7fc0604}, {0x7ffffff07ffffff, 0x1212120}, {0x7ffffff07ffffff, 0x1212120},
            0x1fc}}},
-        /* 1行目 : *,  *, 3,   4,5,6, 0,0,0,
-           2行目 : 4,  5, 6,   0,0,0, 0,0,0,
-           3行目 : 7,  8, 9,   0,0,0, 0,0,0,
-           列    : 2-9,58,369, 4,5,6, 7,8,9, (find nine以外)
-           列    : 47, 58,369, 4,5,6, 0,0,0, (find nine)
-            結果  : 1,  2, ...  */
+        // 1st row : *,  *, 3,   4,5,6, 0,0,0,
+        // 2nd row : 4,  5, 6,   0,0,0, 0,0,0,
+        // 3rd row : 7,  8, 9,   0,0,0, 0,0,0,
+        // column  : 2-9,58,369, 4,5,6, 7,8,9, (except find nine)
+        // column  : 47, 58,369, 4,5,6, 0,0,0, (find nine)
+        // result  : 1,  2, ...
         {{{{0x20202007ffffff, 0x7fc0c04}, {0x7ffffff07ffffff, 0x202020},  {0x7ffffff07ffffff, 0x1010100},
            {0x20202000000000, 0x1212124}, {0x20202000000000,  0x7f92124},
            {0x20202007ffffff, 0x40404},   {0x20202000000000,  0x1252524}, {0x20202000000000,  0x7fd2524},
            {0x202020070381c0, 0x40404},   {0x20202000000000,  0x1252524}, {0x20202000000000,  0x7fd2524},
            {0x20202007ffffff, 0x40404},   {0x7ffffff07ffffff, 0x1212120}, {0x7ffffff07ffffff, 0x1212120},
            0x3c}}},
-        /* 1行目がすべて埋まっている */
+        // Top row is filled
         {{{{0x20202001010100, 0x40404}, {0x7ffffff07ffffff, 0x7ffffff}, {0x7ffffff07ffffff, 0x7ffffff},
            {0x20202001010100, 0x40404}, {0x20202001010100,  0x40404},
            {0x20202001010100, 0x40404}, {0x20202001010100,  0x40404},   {0x20202001010100,  0x40404},
@@ -1575,7 +1575,7 @@ void SudokuSseTest::test_FillThreePartsUniqueCandidates()
     for(const auto& testOriginal : testSet) {
         auto test = testOriginal;
         for(Func e=Func::FUNCMIN; e<Func::FUNCCNT; e=static_cast<Func>(static_cast<int>(e)+1)) {
-            // memsetはvolatile*を受け付けない
+            // memset() does not accept volatile*
             memset(const_cast<void*>(static_cast<volatile void*>(&testFillNineUniqueCandidatesRowX)),
                    0, sizeof(testFillNineUniqueCandidatesRowX));
             memset(const_cast<void*>(static_cast<volatile void*>(&testFillNineUniqueCandidatesBoxX)),
@@ -1741,11 +1741,11 @@ void SudokuSseTest::test_FindRowPartCandidates()
     constexpr TestSet testSet[] {
         {{{{0,0},{0,0},{0,0},{0,0}, 0x7ffffff, 0, 0,
            0, 0, 0, 0,  0x7ffffff, 0, 0}}},
-        {{{{0,0},{0,0},{0,0},{0,0}, 0x1c0401, 0, 0,          // 行で絞る
+        {{{{0,0},{0,0},{0,0},{0,0}, 0x1c0401, 0, 0,          // Decrease candidates by rows
            0x4010040, 0x3, 0x1c0, 0x38, 0x100401, 0x1f8, 0}}},
-        {{{{0,0},{0x7eff7fe,0},{0,0},{0,0}, 0x7ffffff, 0, 0, // 列
+        {{{{0,0},{0x7eff7fe,0},{0,0},{0,0}, 0x7ffffff, 0, 0, // by columns
            0, 0, 0, 0,  0x100801, 0, 0}}},
-        {{{{0x7000e18,0},{0,0},{0,0},{0,0}, 0x4000238, 0, 0, // 箱
+        {{{{0x7000e18,0},{0,0},{0,0},{0,0}, 0x4000238, 0, 0, // by boxes
            0, 0, 0, 0,  0x4000220, 0, 0x1df}}},
     };
 
@@ -2269,48 +2269,49 @@ void SudokuSseTest::checkSearchNextCandidate(XmmRegisterSet& xmmRegSet,
 void SudokuSseTest::test_SearchNextCandidateParam() {
     XmmRegisterSet xmmRegSet;
 
-    // 全マス空
+    // All cells have no candidates.
     ::memset(&xmmRegSet, 0, sizeof(xmmRegSet));
     checkSearchNextCandidate(xmmRegSet, false, 0, 0, 0);
 
-    // 全マス一候補
+    // All cells have one candidate.
     SudokuTest::SetAllCellsFilled(0, xmmRegSet);
     checkSearchNextCandidate(xmmRegSet, false, 0, 0, 0);
 
-    // 全マス全候補
+    // All cells have all 1..9 candidates.
     SudokuTest::SetAllCellsFullCandidates(0, xmmRegSet);
     checkSearchNextCandidate(xmmRegSet, true, 2, 2, 0);
 
-    // 最後の列の最後の箱に8候補
+    // A cell in the right box and the bottom row have 8 candidates.
     size_t rowNumber = Sudoku::SizeOfGroupsPerMap - 1;
     size_t regIndex = rowNumber * SudokuSse::RegisterWordCnt + 2;
     xmmRegSet.regVal_[regIndex] = Sudoku::AllThreeCandidates ^ 1;
     checkSearchNextCandidate(xmmRegSet, true, 2, 0, rowNumber);
 
-    // 四番目にも8候補
+    // The 4th cell in the top row also has 8 candidates.
     rowNumber = 0;
     regIndex = 1;
     xmmRegSet.regVal_[regIndex] = Sudoku::AllThreeCandidates ^ (1 << (Sudoku::SizeOfCandidates * 2));
     checkSearchNextCandidate(xmmRegSet, true, 1, 2, rowNumber);
 
-    // 二番目にも8候補
+    // The 2nd cell in the top row also has 8 candidates.
     rowNumber = 0;
     regIndex = 2;
     xmmRegSet.regVal_[regIndex] = Sudoku::AllThreeCandidates ^ (1 << Sudoku::SizeOfCandidates);
     checkSearchNextCandidate(xmmRegSet, true, 2, 1, rowNumber);
 
-    // 右下に2候補のマスが二つある。3*3マスの総候補が少ないので選ばれる。
+    // The bottom-right box has two cells which have two candidates.
+    // One of the cells is selected because the box has least candidates.
     rowNumber = 7;
     regIndex = rowNumber * SudokuSse::RegisterWordCnt;
     xmmRegSet.regVal_[regIndex] = Sudoku::AllThreeCandidates ^ (0x1d7 << Sudoku::SizeOfCandidates);
     checkSearchNextCandidate(xmmRegSet, true, 0, 1, rowNumber);
 
-    // 真ん中に候補のないマスがあるがこれは関係ない
+    // Cells which have no candidates are not selected.
     regIndex = 4 * SudokuSse::RegisterWordCnt + 1;
     xmmRegSet.regVal_[regIndex] = Sudoku::AllThreeCandidates ^ (Sudoku::AllCandidates << Sudoku::SizeOfCandidates);
     checkSearchNextCandidate(xmmRegSet, true, 0, 1, rowNumber);
 
-    // 真ん中に確定したマスがあるがこれは関係ない
+    // Cells which have only one candidate are not selected.
     xmmRegSet.regVal_[regIndex] = Sudoku::AllThreeCandidates ^ (0x100 << Sudoku::SizeOfCandidates);
     checkSearchNextCandidate(xmmRegSet, true, 0, 1, rowNumber);
 
@@ -2319,7 +2320,7 @@ void SudokuSseTest::test_SearchNextCandidateParam() {
 
 void SudokuSseTest::test_FoldRowParts() {
     struct TestSet {
-        // XMMレジスタのアラインメントが必要
+        // Requires alignment for XMM registers
         union {
             gRegister arg[2];
             xmmRegister xmmReg;
@@ -2356,7 +2357,7 @@ void SudokuSseTest::test_FoldRowParts() {
 
 void SudokuSseTest::test_CheckRow() {
     struct TestSet {
-        // XMMレジスタのアラインメントが必要
+        // Requires alignment for XMM registers
         union {
             gRegister arg[2];
             xmmRegister xmmReg;
@@ -2421,7 +2422,7 @@ void SudokuSseTest::test_CheckRowSet() {
 
 void SudokuSseTest::test_CheckColumn() {
     struct TestSet {
-        // XMMレジスタのアラインメントが必要
+        // Requires alignment for XMM registers
         union {
             gRegister arg[2];
             xmmRegister xmmReg;
@@ -2452,7 +2453,7 @@ void SudokuSseTest::test_CheckColumn() {
 
 void SudokuSseTest::test_CheckBox() {
     struct TestSet {
-        // XMMレジスタのアラインメントが必要
+        // Requires alignment for XMM registers
         union {
             gRegister arg[2];
             xmmRegister xmmReg;

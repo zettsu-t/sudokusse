@@ -69,12 +69,12 @@ protected:
 CPPUNIT_TEST_SUITE_REGISTRATION(SudokuWindowsTimerTest);
 CPPUNIT_TEST_SUITE_REGISTRATION(SudokuWindowsProcessorBinderTest);
 
-// Call before run a test
+// Call before running a test
 void SudokuWindowsTimerTest::setUp() {
     return;
 }
 
-// Call after run a test
+// Call after running a test
 void SudokuWindowsTimerTest::tearDown() {
     return;
 }
@@ -192,12 +192,12 @@ void SudokuWindowsTimerTest::test_convertTimeToNum() {
     return;
 }
 
-// Call before run a test
+// Call before running a test
 void SudokuWindowsProcessorBinderTest::setUp() {
     return;
 }
 
-// Call after run a test
+// Call after running a test
 void SudokuWindowsProcessorBinderTest::tearDown() {
     return;
 }

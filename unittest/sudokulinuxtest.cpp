@@ -81,12 +81,12 @@ protected:
 CPPUNIT_TEST_SUITE_REGISTRATION(SudokuLinuxTimerTest);
 CPPUNIT_TEST_SUITE_REGISTRATION(SudokuLinuxProcessorBinderTest);
 
-// Call before run a test
+// Call before running a test
 void SudokuLinuxTimerTest::setUp() {
     return;
 }
 
-// Call after run a test
+// Call after running a test
 void SudokuLinuxTimerTest::tearDown() {
     return;
 }
@@ -204,12 +204,12 @@ void SudokuLinuxTimerTest::test_convertTimeToNum() {
     return;
 }
 
-// Call before run a test
+// Call before running a test
 void SudokuLinuxProcessorBinderTest::setUp() {
     return;
 }
 
-// Call after run a test
+// Call after running a test
 void SudokuLinuxProcessorBinderTest::tearDown() {
     return;
 }

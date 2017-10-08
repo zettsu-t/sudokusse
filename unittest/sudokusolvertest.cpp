@@ -159,7 +159,7 @@ void SudokuSolverCommonTest<SudokuSolver, SudokuCellCandidates>::CheckCells(Sudo
     return;
 }
 
-// Call before run a test
+// Call before running a test
 void SudokuSolverTest::setUp() {
     pSudokuOutStream_ = decltype(pSudokuOutStream_)(new SudokuOutStream());
     pInstance_ = decltype(pInstance_)(new SudokuSolver(SudokuTestPattern::NoBacktrackString, 0, pSudokuOutStream_.get()));
@@ -170,7 +170,7 @@ void SudokuSolverTest::setUp() {
     return;
 }
 
-// Call after run a test
+// Call after running a test
 void SudokuSolverTest::tearDown() {
     assert(pCommonTester_);
     assert(pInstance_);
@@ -317,7 +317,7 @@ void SudokuSolverTest::test_fillCells() {
     return;
 }
 
-// Call before run a test
+// Call before running a test
 void SudokuSseSolverTest::setUp() {
     pSudokuOutStream_ = decltype(pSudokuOutStream_)(new SudokuOutStream());
     pInstance_ = decltype(pInstance_)(new SudokuSseSolver(SudokuTestPattern::NoBacktrackString, pSudokuOutStream_.get(), 0));
@@ -328,7 +328,7 @@ void SudokuSseSolverTest::setUp() {
     return;
 }
 
-// Call after run a test
+// Call after running a test
 void SudokuSseSolverTest::tearDown() {
     assert(pCommonTester_);
     assert(pInstance_);

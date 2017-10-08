@@ -214,7 +214,7 @@ SudokuIndex SudokuCellTest::countCandidates(SudokuCellCandidates candidates) {
     return result;
 }
 
-// Call before run a test
+// Call before running a test
 void SudokuCellTest::setUp() {
     pInstance_ = decltype(pInstance_)(new SudokuCell());
     pCommonTester_ = decltype(pCommonTester_)(new SudokuCellCommonTest<SudokuCell, SudokuCellCandidates>(pInstance_));
@@ -223,7 +223,7 @@ void SudokuCellTest::setUp() {
     return;
 }
 
-// Call after run a test
+// Call after running a test
 void SudokuCellTest::tearDown() {
     assert(pCommonTester_);
     assert(pInstance_);
@@ -248,7 +248,7 @@ SudokuCellCommonTest<TestedT, CandidatesT>::~SudokuCellCommonTest() {
 
 template <class TestedT, class CandidatesT>
 void SudokuCellCommonTest<TestedT, CandidatesT>::test_Preset() {
-    constexpr CandidatesT dirty = 0xe6;          // candidates when this cell in not set
+    constexpr CandidatesT dirty = 0xe6;          // when this cell in not set
     constexpr char invalidCharSet[] {"0Ab. "};   // invalid characters for preset
 
     // If non-digit char and 0 are given, candidates of cells are not changed.
@@ -309,7 +309,7 @@ void SudokuCellTest::test_Print() {
 }
 
 void SudokuCellTest::test_GetIndex() {
-    // First initialize with one-of-range value
+    // First, initialize with one-of-range value.
     pInstance_->indexNumber_ = Sudoku::SizeOfAllCells + 1;
 
     for(SudokuIndex i=0;i<Sudoku::SizeOfAllCells;++i) {
@@ -604,7 +604,7 @@ void SudokuSseCellTest::checkConstructor(void) {
     return;
 }
 
-// Call before run a test
+// Call before running a test
 void SudokuSseCellTest::setUp() {
     pInstance_ = decltype(pInstance_)(new SudokuSseCell());
     pCommonTester_ = decltype(pCommonTester_)(new SudokuCellCommonTest<SudokuSseCell, SudokuSseElement>(pInstance_));
@@ -612,7 +612,7 @@ void SudokuSseCellTest::setUp() {
     return;
 }
 
-// Call after run a test
+// Call after running a test
 void SudokuSseCellTest::tearDown() {
     assert(pCommonTester_);
     assert(pInstance_);
