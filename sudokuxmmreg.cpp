@@ -4,7 +4,7 @@
 #include "sudoku.h"
 
 namespace Sudoku {
-    // メモリからXMMレジスタにロードする
+    // Loads XMM registers from main memory
     void LoadXmmRegistersFromMem(const xmmRegister *pData) {
         asm volatile (
             "call loadXmmRegisters\n\t"
@@ -12,7 +12,7 @@ namespace Sudoku {
         return;
     }
 
-    // XMMレジスタの内容をメモリにセーブする
+    // Saves XMM registers to main memory
     void SaveXmmRegistersToMem(xmmRegister *pData) {
         asm volatile (
             "call saveXmmRegisters\n\t"

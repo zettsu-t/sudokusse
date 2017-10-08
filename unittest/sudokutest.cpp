@@ -1,5 +1,8 @@
-// 共通関数
-// Copyright (C) 2012-2015 Zettsu Tatsuya
+// Testing common functions
+// Copyright (C) 2012-2017 Zettsu Tatsuya
+//
+// I use CppUnit code on the website.
+// http://www.atmarkit.co.jp/fdotnet/cpptest/cpptest02/cpptest02_03.html
 
 #include <cppunit/extensions/HelperMacros.h>
 #include <cassert>

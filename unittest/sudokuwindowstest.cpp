@@ -1,7 +1,7 @@
-// Windows依存部をテストする
-// Copyright (C) 2012-2016 Zettsu Tatsuya
+// Testing Windows dependent implementation
+// Copyright (C) 2012-2017 Zettsu Tatsuya
 //
-// クラス定義は下記から流用
+// I use CppUnit code on the website.
 // http://www.atmarkit.co.jp/fdotnet/cpptest/cpptest02/cpptest02_03.html
 
 #include <cassert>
@@ -41,14 +41,14 @@ protected:
     void test_PrintTime();
     void test_convertTimeToNum();
 
-    // 派生クラスのメンバを参照できるようにする
+    // Access to members of derived classes of ITimer
     std::shared_ptr<TestedTimer> createTimerInstance(void) {
         std::shared_ptr<Sudoku::ITimer> pTimer = std::move(Sudoku::CreateTimerInstance());
         std::shared_ptr<TestedTimer> pBaseTimer = std::dynamic_pointer_cast<TestedTimer>(pTimer);
         return pBaseTimer;
     }
 
-    // 指定ミリ秒待つ
+    // Waits specified time 'timeInMsec'
     MilliSleepFunc createMilliSleepFunc(int timeInMsec) {
         MilliSleepFunc func(std::bind(::Sleep, timeInMsec));
         return func;
@@ -69,17 +69,17 @@ protected:
 CPPUNIT_TEST_SUITE_REGISTRATION(SudokuWindowsTimerTest);
 CPPUNIT_TEST_SUITE_REGISTRATION(SudokuWindowsProcessorBinderTest);
 
-// 各テスト・ケースの実行直前に呼ばれる
+// Call before running a test
 void SudokuWindowsTimerTest::setUp() {
     return;
 }
 
-// 各テスト・ケースの実行直後に呼ばれる
+// Call after running a test
 void SudokuWindowsTimerTest::tearDown() {
     return;
 }
 
-// これ以降はテスト・ケースの実装内容
+// Test cases
 void SudokuWindowsTimerTest::test_Constructor() {
     auto pTimer = createTimerInstance();
     checkConstructor(pTimer.get());
@@ -125,7 +125,7 @@ void SudokuWindowsTimerTest::test_StopClock() {
 void SudokuWindowsTimerTest::test_GetElapsedTime() {
     auto pTimer = createTimerInstance();
     constexpr SudokuTime msecTime = 50;
-    // msec/usec * 100nsec解像度
+    // resolution in msec/usec * 100 nsec
     constexpr SudokuTime timeInUnit = msecTime * 1000 * Sudoku::BaseTimer::SudokuTimeUnitInUsec;
     MilliSleepFunc func = createMilliSleepFunc(msecTime);
     checkGetElapsedTime(pTimer.get(), func, timeInUnit);
@@ -134,7 +134,7 @@ void SudokuWindowsTimerTest::test_GetElapsedTime() {
 void SudokuWindowsTimerTest::test_GetClockInterval() {
     auto pTimer = createTimerInstance();
     constexpr SudokuTime msecTime = 1;
-    // 1GHzなら、1clock = 1nsec : 最低0.2GHzで動作すると仮定する
+    // 1 clock = 1nsec at 1GHz. We expect x64 CPUs run at 0.2GHz or over.
     constexpr SudokuTime clockCount = msecTime * 200000;
     MilliSleepFunc func = createMilliSleepFunc(msecTime);
     checkGetClockInterval(pTimer.get(), func, clockCount);
@@ -144,8 +144,8 @@ void SudokuWindowsTimerTest::test_PrintTime() {
     std::unique_ptr<SudokuOutStream> pOutStream(new SudokuOutStream());
     auto pTimer = createTimerInstance();
     {
-        constexpr FILETIME startTimestamp  {0x3e8UL, 0UL};  // 1000 * 100nsec
-        constexpr FILETIME stopTimestamp   {0xbb8UL, 0UL};  // 3000 * 100nsec
+        constexpr FILETIME startTimestamp  {0x3e8UL, 0UL};  // 1000 * 100 nsec
+        constexpr FILETIME stopTimestamp   {0xbb8UL, 0UL};  // 3000 * 100 nsec
         pTimer->startTimestamp_ = startTimestamp;
         pTimer->stopTimestamp_ = stopTimestamp;
         setUpPrintTime1(pTimer.get(), pOutStream.get());
@@ -153,15 +153,15 @@ void SudokuWindowsTimerTest::test_PrintTime() {
 
     {
         constexpr FILETIME startTimestamp  {0x0, 0UL};
-        constexpr FILETIME stopTimestamp   {0x754d4c0, 0UL};  // 123000000 * 100nsec
+        constexpr FILETIME stopTimestamp   {0x754d4c0, 0UL};  // 123000000 * 100 nsec
         pTimer->startTimestamp_ = startTimestamp;
         pTimer->stopTimestamp_ = stopTimestamp;
         setUpPrintTime2(pTimer.get(), pOutStream.get());
     }
 
     {
-        constexpr FILETIME startTimestamp  {0x4e72a000, 0xfffff918};  //  10000000000000 (0が13個) * 100nsec
-        constexpr FILETIME stopTimestamp   {0x5eece003, 0x0000540b};  // 110000000000003 (0が間に12個) * 100nsec
+        constexpr FILETIME startTimestamp  {0x4e72a000, 0xfffff918};  //  10000000000000 (13 zeros) * 100 nsec
+        constexpr FILETIME stopTimestamp   {0x5eece003, 0x0000540b};  // 110000000000003 (12 zeros) * 100 nsec
         pTimer->startTimestamp_ = startTimestamp;
         pTimer->stopTimestamp_ = stopTimestamp;
         setUpAndCheckPrintTime(pTimer.get(), pOutStream.get());
@@ -172,7 +172,7 @@ void SudokuWindowsTimerTest::test_PrintTime() {
 
 void SudokuWindowsTimerTest::test_convertTimeToNum() {
     struct TestSet {
-        FILETIME   filetime; // low, highの順
+        FILETIME   filetime; // low and high
         SudokuTime sudokutime;
     };
 
@@ -192,17 +192,17 @@ void SudokuWindowsTimerTest::test_convertTimeToNum() {
     return;
 }
 
-// 各テスト・ケースの実行直前に呼ばれる
+// Call before running a test
 void SudokuWindowsProcessorBinderTest::setUp() {
     return;
 }
 
-// 各テスト・ケースの実行直後に呼ばれる
+// Call after running a test
 void SudokuWindowsProcessorBinderTest::tearDown() {
     return;
 }
 
-// これ以降はテスト・ケースの実装内容
+// Test cases
 void SudokuWindowsProcessorBinderTest::test_Constructor() {
     auto pBinder = Sudoku::CreateProcessorBinder();
     ProcessorBinder* pConcreteBinder = dynamic_cast<decltype(pConcreteBinder)>(pBinder.get());

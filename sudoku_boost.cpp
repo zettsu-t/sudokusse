@@ -1,6 +1,6 @@
 // solver with SSE 4.2 / AVX
 // Copyright (C) 2012-2016 Zettsu Tatsuya
-// Boost C++ Libraries 依存部
+// Boost C++ Libraries dependent implementation
 
 #ifdef SOLVE_PARALLEL_WITH_BOOST_THREAD
 

@@ -1,12 +1,12 @@
 // solver with SSE 4.2 / AVX
 // Copyright (C) 2012-2016 Zettsu Tatsuya
-// Windows依存部
+// Windows dependent implementation
 
 #include "sudoku_os_dependent.h"
 #include <windows.h>
 
 namespace Sudoku {
-    // 関数を使う前に定義しないとエラーになる
+    // Need to instantiate this template before being used, or compilation errors occur.
     template <> void Timer<TimerPlatform::WINDOWS, FILETIME>::reset(void) {
         constexpr decltype(startTimestamp_) zeroTimeStamp {0, 0};
         startTimestamp_ = zeroTimeStamp;
@@ -25,7 +25,6 @@ namespace Sudoku {
         return;
     }
 
-    // Windows時刻を取得する
     template <> void Timer<TimerPlatform::WINDOWS, FILETIME>::getTimeOfSys(FILETIME& timestamp) {
         GetSystemTimeAsFileTime(&timestamp);
         return;
@@ -34,7 +33,9 @@ namespace Sudoku {
     template <> SudokuTime Timer<TimerPlatform::WINDOWS, FILETIME>::convertTimeToNum(const FILETIME& timestamp) {
         SudokuTime timeIn100nsec = timestamp.dwHighDateTime;
 
-        // 一度に32bitまとめてシフトしない(x86のシフト命令はシフト幅が5bitしかない)
+        // Do not shift N-bit integer N-times at once.
+        // It results in a platform-dependent behavior and x86 has 'mod 32'
+        // shift count system (mod 64 with REX.W).
         for(size_t i=0;i<sizeof(timestamp.dwLowDateTime); ++i) {
             timeIn100nsec <<= 8;
         }
@@ -44,7 +45,6 @@ namespace Sudoku {
     }
 
     template <> ProcessorBinder<TimerPlatform::WINDOWS>::ProcessorBinder(void) {
-        /* 使うCPUを固定すると、processorとcacheのaffinityが上がる */
         DWORD_PTR procMask = 1;
         if (!SetProcessAffinityMask(GetCurrentProcess(), procMask)) {
             std::cout << "SetProcessAffinityMask failed\n";

@@ -4,10 +4,11 @@
 #include "sudoku.h"
 
 int main(int argc, char *argv[]) {
-    /* 使うCPUを固定すると、processorとcacheのaffinityが上がるが、
-     * マルチスレッドもできなくなるので、ここでは設定しない */
+    // Do not set processor affinity here. It prevents threads from
+    // running on multiple cores.
 
-    /* 本当はデータのポインタと関数のポインタは互換ではない */
+    // Actually, a data pointer and a pointer to a function are not convertible.
+    // This depends on x64 ABI specific behavior.
     static_assert(sizeof(uintptr_t) == sizeof(&PrintPattern), "Unexpected uintptr_t size");
     static_assert(sizeof(sudokuXmmPrintFunc) == sizeof(uintptr_t), "Unexpected sudokuXmmPrintFunc size");
     sudokuXmmPrintFunc = reinterpret_cast<uintptr_t>(&PrintPattern);
