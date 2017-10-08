@@ -1,6 +1,6 @@
 // Sudoku solver with SSE 4.2 / AVX
 // Copyright (C) 2012-2017 Zettsu Tatsuya
-// WindowsとLinux、C++11とBoost C++ Librariesの違いを吸収する
+// Absorb platform dependencies between Windows and Linux, C++11 and Boost C++ Libraries
 
 #ifndef SUDOKU_OS_DEPENDENT_H_INCLUDED
 #define SUDOKU_OS_DEPENDENT_H_INCLUDED
@@ -12,7 +12,7 @@
 #include <memory>
 #include <vector>
 
-using SudokuTime = unsigned long long;   // 時刻と時間
+using SudokuTime = unsigned long long;   // time (timestamp and duration)
 static_assert(sizeof(SudokuTime) == 8, "Unexpected SudokuTime size");
 
 // unit tests
@@ -24,44 +24,45 @@ class SudokuLinuxProcessorBinderTest;
 class SudokuBaseParallelRunnerTest;
 class SudokuParallelRunnerTest;
 
-// 読み込みと実行時間測定
 namespace Sudoku {
-    // OSから時刻を取得する方法
+    // Operating Systems
     enum class TimerPlatform {
         WINDOWS,
         LINUX
     };
 
-    // OSから時刻を取得するクラス
+    // Time and clock
     class ITimer {
     protected:
         ITimer(void) = default;
     public:
         virtual ~ITimer(void) = default;
     public:
-        virtual void Reset(void) = 0;         // 保存している時刻を破棄する
-        virtual void SetStartTime(void) = 0;  // 開始時刻を打つ
-        virtual void SetStopTime(void) = 0;   // 終了時刻を打つ
-        // OSの時刻を取得するのは時間がかかるので、
-        // クロックだけ短時間で取得したい時があるため別I/Fにする
-        virtual void StartClock(void) = 0;    // 開始クロックを打つ
-        virtual void StopClock(void) = 0;     // 終了クロックを打つ
-        virtual SudokuTime GetElapsedTime(void)  = 0;   // 開始から終了までの経過時間を取得する
-        virtual SudokuTime GetClockInterval(void) = 0;  // 開始から終了までの経過クロック数を取得する
+        virtual void Reset(void) = 0;         // resets internal timestamps
+        virtual void SetStartTime(void) = 0;  // called after starting something
+        virtual void SetStopTime(void) = 0;   // called after ending something already started
+
+        // Getting a timestamp via OS takes long and getting CPU clock is used to avoid the delay.
+        virtual void StartClock(void) = 0;    // called after starting something
+        virtual void StopClock(void) = 0;     // called after ending something already started
+        virtual SudokuTime GetElapsedTime(void)  = 0;   // returns elapsed time from SetStartTime to SetStopTime
+        virtual SudokuTime GetClockInterval(void) = 0;  // returns elapsed CPU clock counts from StartClock to StopClock
+
+        // This writes time and CPU clock counts to pOutStream
         virtual void PrintTime(std::ostream* pOutStream, SudokuTime count,
-                               SudokuTime leastClock, bool showAverage) = 0;  // 経過時間とクロック数を表示する
+                               SudokuTime leastClock, bool showAverage) = 0;
     };
 
-    // 使用するプロセッサを固定してProcessor Affinityを向上するよう設定するクラス
+    // Binding a CPU thread and a kernel thread to improve processor affinity
     class IProcessorBinder {
     public:
         IProcessorBinder(void) = default;
         virtual ~IProcessorBinder(void) = default;
     };
 
-    // OSから時刻を取得するクラス(CPUクロックは64bit固定)
+    // Implementation to get x64 CPU clock
     class BaseTimer : public ITimer {
-        // unit test
+        // unit tests
         friend class ::SudokuTimerTest;
     protected:
         BaseTimer(void) = default;
@@ -75,14 +76,14 @@ namespace Sudoku {
             return stopClockCount_ - startClockCount_;
         }
     protected:
-        using ClockCount = uint64_t;  // CPUから取得するクロック
+        using ClockCount = uint64_t;  // x64 CPU clock
 
         void reset(void) {
             startClockCount_ = 0;
             stopClockCount_ = 0;
         }
 
-        // CPUクロックカウンタを取得する
+        // Get CPU clock via an instruction
         void getTimeOfClock(ClockCount& timestamp) {
             auto pTime = &timestamp;
             asm volatile (
@@ -94,14 +95,14 @@ namespace Sudoku {
             return;
         }
 
-        static constexpr SudokuTime SudokuTimeUnitInUsec = 10;       // 1usecの時間単位(100nsec*10単位)
-        static constexpr SudokuTime SudokuTimeUsecPerSec = 1000000;  // 1秒当たり1usec
-        static constexpr SudokuTime SudokuTimeSecPerMinute = 60;     // 1分当たり秒
+        static constexpr SudokuTime SudokuTimeUnitInUsec = 10;       // microsecond per 100 nanoseconds (Windows time resolution)
+        static constexpr SudokuTime SudokuTimeUsecPerSec = 1000000;  // second per microsecond
+        static constexpr SudokuTime SudokuTimeSecPerMinute = 60;     // minute per second
         ClockCount startClockCount_ {0};
         ClockCount stopClockCount_ {0};
     };
 
-    // OSから時刻を取得する具象クラス
+    // Implementation to get OS timestamp
     template <TimerPlatform timerPlatform, typename TimeSpecType>
     class Timer : public BaseTimer {
         // Unit test
@@ -117,15 +118,13 @@ namespace Sudoku {
             return convertTimeToNum(stopTimestamp_) - convertTimeToNum(startTimestamp_);
         }
 
-        // 処理時間を表示する
         virtual void PrintTime(std::ostream* pOutStream, SudokuTime count,
                                SudokuTime leastClock, bool showAverage) override {
             if (pOutStream == nullptr) {
                 return;
             }
 
-            // 解の数だけ求める場合
-            const SudokuTime actualCount = (count) ? count : 1;
+            const SudokuTime actualCount = (count) ? count : 1;  // 1 for counting solutions
             const SudokuTime usecTime = GetElapsedTime() / SudokuTimeUnitInUsec;
             const SudokuTime clockElapsed = GetClockInterval();
             const double usecOnceTime = static_cast<decltype(usecOnceTime)>(usecTime) /
@@ -157,9 +156,9 @@ namespace Sudoku {
             return;
         }
     private:
-        // Windows/Linuxのシステム時刻を取得する
+        // Get Windows/Linux system time
         void getTimeOfSys(TimeSpecType& timestamp);
-        // 時間構造体の値を整数にする
+        // Convert a time struct into an integer
         SudokuTime convertTimeToNum(const TimeSpecType& timestamp);
         void reset(void);
         TimeSpecType startTimestamp_;
@@ -171,15 +170,15 @@ namespace Sudoku {
         friend class ::SudokuWindowsProcessorBinderTest;
         friend class ::SudokuLinuxProcessorBinderTest;
     public:
-        ProcessorBinder(void);  // 使うCPUを固定する
-        virtual ~ProcessorBinder(void) = default;  // 使うCPUを固定したら戻さない
+        ProcessorBinder(void);
+        virtual ~ProcessorBinder(void) = default;  // does not resolve CPU binding
         ProcessorBinder(const ProcessorBinder&) = delete;
         ProcessorBinder& operator =(const ProcessorBinder&) = delete;
     private:
-        bool failed_ {false};  // 設定に失敗した
+        bool failed_ {false};  // true if initialization failed
     };
 
-    // bool f(void)群を非同期実行して、結果のORを取るクラス
+    // This runs "bool f(void)" parallel and reduces their results.
     class BaseParallelRunner {
         // unit test
         friend class ::SudokuBaseParallelRunnerTest;
@@ -213,7 +212,8 @@ namespace Sudoku {
 #else
             ResultType result = (numberOfCores <= 1) ? runSequential() : runParallel(evaluatorSet_);
 #endif
-            // この関数から返った後に、関数オブジェクトが指すものが破棄されることに備える
+            // Need to clear to prevent using dangling pointers that
+            // the function objects destroy after returning this function.
             evaluatorSet_.clear();
             return result;
         }
@@ -243,11 +243,11 @@ namespace Sudoku {
         EvaluatorSet evaluatorSet_;
     };
 
-    // WindowsとLinuxに応じたインスタンスを取得する
+    // Create an instance for using Windows or Linux
     extern std::unique_ptr<ITimer> CreateTimerInstance(void);
     extern std::unique_ptr<IProcessorBinder> CreateProcessorBinder(void);
 
-    // C++11とBoost C++ Librariesに応じたインスタンスを取得する
+    // Create an instance for using C++11 or Boost C++ Libraries
     extern std::unique_ptr<BaseParallelRunner> CreateParallelRunner(void);
 }
 

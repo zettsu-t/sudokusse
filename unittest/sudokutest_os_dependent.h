@@ -1,7 +1,7 @@
-// 機種依存部をテストする
-// Copyright (C) 2012-2016 Zettsu Tatsuya
+// Testing platform dependent implementation
+// Copyright (C) 2012-2017 Zettsu Tatsuya
 //
-// クラス定義は下記から流用
+// I use CppUnit code on the website.
 // http://www.atmarkit.co.jp/fdotnet/cpptest/cpptest02/cpptest02_03.html
 
 #include <functional>
@@ -9,13 +9,13 @@
 #include "sudoku.h"
 #include "sudokutest.h"
 
-// Windows/Linux共通
+// Common for Windows and Linux
 class SudokuTimerTest : public CPPUNIT_NS::TestFixture {
 protected:
-    // 1ミリ秒以上待つ関数を注入できるようにする
+    // We inject a function to test cases to sleep 1 msec and over
     using MilliSleepFunc = std::function<void(void)>;
 
-    // 派生クラスから呼び出して検査する
+    // Call from derived classes
     void checkConstructor(Sudoku::BaseTimer* pTimer) {
         CPPUNIT_ASSERT(!pTimer->startClockCount_);
         CPPUNIT_ASSERT(!pTimer->stopClockCount_);
@@ -55,9 +55,9 @@ protected:
         pTimer->SetStartTime();
         milliSleep();
         pTimer->SetStopTime();
-        // 指定時間以上sleepする
+        // Sleep() does not sleep exact specified time. It may take longer.
         CPPUNIT_ASSERT(pTimer->GetElapsedTime() >= leastSleepTime);
-        // sleepが長すぎるのも設定値が間違っている
+        // We assume this test is failed if it sleeps too long time.
         CPPUNIT_ASSERT(pTimer->GetElapsedTime() < (leastSleepTime * 10));
     }
 
@@ -65,7 +65,7 @@ protected:
         pTimer->StartClock();
         milliSleep();
         pTimer->StopClock();
-        // 指定時間以上sleepしたが、クロックは進んでいる
+        // We do not expect wraparound of CPU clock.
         CPPUNIT_ASSERT(pTimer->GetClockInterval() >= leastClockCount);
     }
 
@@ -75,9 +75,9 @@ protected:
         pTimer->startClockCount_ = startClockCount;
         pTimer->stopClockCount_ = stopClockCount;
 
-        // Total時間は     200 usec(100ns単位->usecになるので1/10)
-        // 1回の時間は     66.667 usec
-        // 1回の最小時間は 40.000 usec (1.333 * 30 clock)
+        // Total time : 200 usec (divide by 10 to convert the time unit from 100 nsec to 1 usec)
+        // once          66.667 usec
+        // least         40.000 usec (1.333 * 30 clock)
         pTimer->PrintTime(pOutStream, 3, 30, true);
     }
 
@@ -87,9 +87,9 @@ protected:
         pTimer->startClockCount_ = startClockCount;
         pTimer->stopClockCount_ = stopClockCount;
 
-        // Total時間は     12 300 000 usec(100ns単位->usecになるので1/10)
-        // 1回の時間は     66.667 usec
-        // 1回の最小時間は 40.000 usec (1.333 * 30 clock)
+        // Total time :  12 300 000 usec (divide by 10)
+        // once          66.667 usec
+        // least         40.000 usec (1.333 * 30 clock)
         pTimer->PrintTime(pOutStream, 3, 300, true);
     }
 
@@ -99,13 +99,13 @@ protected:
         pTimer->startClockCount_ = startClockCount;
         pTimer->stopClockCount_ = stopClockCount;
 
-        // Total時間は 10000000000000 usec (0が13個)
-        // 1回の時間は        2000000 usec (0が6個)
-        // 1回の最小時間は 12.3456usec
+        // Total 10000000000000 usec (13 zeros)
+        // once         2000000 usec (6 zeros)
+        // least        12.3456 usec
         pTimer->PrintTime(pOutStream, 5000000, 100000, true);
         pTimer->PrintTime(pOutStream, 5000000, 100000, false);
 
-        // 画面に表示するはずの内容を確認する
+        // Confirm a string that we can see on terminals
         std::string expectedstr;
         expectedstr = "Total : 200usec, 150clock\nAverage : 66.667usec, 50clock\n";
         expectedstr += "Once least : 40.000usec, 30clock\n\n";

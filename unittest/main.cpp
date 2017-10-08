@@ -1,7 +1,7 @@
-// CppTest実行メイン部
-// Copyright (C) 2012-2015 Zettsu Tatsuya
+// Launching CppTest
+// Copyright (C) 2012-2017 Zettsu Tatsuya
 //
-// クラス定義は下記から流用
+// I use CppUnit code on the website.
 // http://www.atmarkit.co.jp/fdotnet/cpptest/cpptest02/cpptest02_03.html
 
 #include <cppunit/BriefTestProgressListener.h>
@@ -12,23 +12,23 @@
 #include <cppunit/TestRunner.h>
 
 int main(int argc, char* argv[] ) {
-    // イベント・マネージャとテスト・コントローラを生成する
+    // Create an event manager and a test controller
     CPPUNIT_NS::TestResult controller;
 
-    // テスト結果収集リスナをコントローラにアタッチする
+    // Attach a listener that collects results of tests to the controller
     CPPUNIT_NS::TestResultCollector result;
     controller.addListener(&result);
 
-    // 「.」で進行状況を出力するリスナをアタッチする
+    // Attach a progress listener that prints '.'s to the controller
     CPPUNIT_NS::BriefTestProgressListener progress;
     controller.addListener(&progress);
 
-    // テスト・ランナーにテスト群を与え、テストする
+    // Set tests to a test runner and run the tests
     CPPUNIT_NS::TestRunner runner;
     runner.addTest(CPPUNIT_NS::TestFactoryRegistry::getRegistry().makeTest());
     runner.run(controller);
 
-    // テスト結果を標準出力に吐き出す
+    // Write results of the tests to stdout
     CPPUNIT_NS::CompilerOutputter outputter(&result, CPPUNIT_NS::stdCOut());
     outputter.write();
 

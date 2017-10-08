@@ -1,31 +1,30 @@
 #!/usr/bin/ruby
 # -*- coding: utf-8 -*-
-# 数独のグループを"sudokuConst*.h"に出力する
-# Copyright (C) 2012-2015 Zettsu Tatsuya
+# This script writes groups of cells in a Sudoku puzzle to "sudokuConst*.h".
+# Copyright (C) 2012-2017 Zettsu Tatsuya
 
-# 数独の規則
-SUDOKU_ROWS_IN_MAP = 9          # 列の数
-SUDOKU_COLUMNS_IN_MAP = 9       # 行の数
-SUDOKU_GROUPS_IN_MAP = 9        # 列、行、3*3の数
-SUDOKU_CELLS_IN_GROUP = 9       # それぞれの列、行、3*3に含まれる要素数
-SUDOKU_BOX_VERTICAL_SIZE = 3    # 3*3のマス(縦)の数
-SUDOKU_BOX_HORIZONTAL_SIZE = 3  # 3*3のマス(横)の数
-SUDOKU_BOX_IN_ROW = 3           # 3*3の一辺(縦)の個数
-SUDOKU_BOX_IN_COLUMN = 3        # 3*3の一辺(横)の個数
-SUDOKU_LOOKUP_CELLS = 512       # 早見表のサイズ
-SUDOKU_NUMBER_OF_CANDIDATES = 9 # 候補数
+# Constants for Sudoku
+SUDOKU_ROWS_IN_MAP = 9          # Number of cells in a row
+SUDOKU_COLUMNS_IN_MAP = 9       # Number of cells in a column
+SUDOKU_GROUPS_IN_MAP = 9        # Number of columns, rows, and boxes in a puzzle
+SUDOKU_CELLS_IN_GROUP = 9       # Number of cells in a column, row, and box
+SUDOKU_BOX_VERTICAL_SIZE = 3    # Number of boxes in a column
+SUDOKU_BOX_HORIZONTAL_SIZE = 3  # Number of boxes in a row
+SUDOKU_BOX_IN_ROW = 3           # Width of a box
+SUDOKU_BOX_IN_COLUMN = 3        # Height of a box
+SUDOKU_LOOKUP_CELLS = 512       # The number of elements in a cell look-up table
+SUDOKU_NUMBER_OF_CANDIDATES = 9 # Number of candidates in a cell
 
-# XMMレジスタ番号
-SUDOKU_HEAD_XMM_REGISTER = 1           # 最初の行を置くxmmレジスタ番号
-SUDOKU_XMM_PER_GENERAL_REGISTER = 4    # xmmレジスタが汎用レジスタ何個分か
+SUDOKU_HEAD_XMM_REGISTER = 1         # The number of an XMM register which holds the top row
+SUDOKU_XMM_PER_GENERAL_REGISTER = 4  # General purpose registers per XMM register
 
-# 生成するヘッダファイル
+# Generated code
 class SudokuConst
   def initialize(basename)
     @filename = "sudokuConst" + basename + ".h"
   end
 
-  # 文字列を生成してファイルに書き出す
+  # Writes generated code to a file
   def write
     open(@filename, "w") do |file|
       file.puts(getCppString)
@@ -33,18 +32,18 @@ class SudokuConst
   end
 end
 
-# 定数一覧を出力するヘッダファイル
+# Generated header file
 class SudokuConstAll < SudokuConst
   def initialize
     super("All")
   end
 
-  # ファイルに出力するすべての文字列を生成する
+  # Generates all code in a generated file
   def getCppString
     getGroupString + "\n" + getReverseGroupString + "\n" + getCellLookUpString
   end
 
-  # SudokuMap::Group_を生成する
+  # Generates SudokuMap::Group_
   def getGroupString
     str = "const SudokuIndex SudokuMap::Group_"
     str += "[Sudoku::SizeOfGroupsPerCell][Sudoku::SizeOfGroupsPerMap][Sudoku::SizeOfCellsPerGroup] {\n"
@@ -59,21 +58,19 @@ class SudokuConstAll < SudokuConst
     "{" + lineStrSet.join(",\n") + "}#{delim}\n"
   end
 
-  # 各列
   def getRowsStrSet
     SUDOKU_ROWS_IN_MAP.times.map do |row|
       "{" + SUDOKU_COLUMNS_IN_MAP.times.map { |column| (row * SUDOKU_COLUMNS_IN_MAP + column) }.join(",") + "}"
     end
   end
 
-  # 各行
   def getColumnsStrSet
     SUDOKU_COLUMNS_IN_MAP.times.map do |column|
       "{" + SUDOKU_ROWS_IN_MAP.times.map { |row| (row * SUDOKU_COLUMNS_IN_MAP + column) }.join(",") + "}"
     end
   end
 
-  # 3*3を表示
+  # 3*3 cell box (square)
   def getBoxesStrSet
     SUDOKU_BOX_IN_ROW.times.map do |y|
       startY = y * SUDOKU_BOX_VERTICAL_SIZE
@@ -90,27 +87,28 @@ class SudokuConstAll < SudokuConst
     end
   end
 
-  # SudokuMap::ReverseGroup_を生成する
+  # Generates SudokuMap::ReverseGroup_
   def getReverseGroupString
     str = "const SudokuIndex SudokuMap::ReverseGroup_"
     str += "[Sudoku::SizeOfAllCells][Sudoku::SizeOfGroupsPerCell] {\n"
 
-    # マスの縦、横、3*3(番号の対応は上と整合性をとる)を表示
-    str + SUDOKU_ROWS_IN_MAP.times.map do |row|
-      SUDOKU_COLUMNS_IN_MAP.times.map do |column|
-        group = (row / SUDOKU_BOX_IN_ROW) * SUDOKU_BOX_HORIZONTAL_SIZE + (column / SUDOKU_BOX_IN_COLUMN)
-        "{#{row},#{column},#{group}}"
+    # Joins columns, rows, and boxes in each cell
+    str + SUDOKU_COLUMNS_IN_MAP.times.map do |column|
+      SUDOKU_ROWS_IN_MAP.times.map do |row|
+        group = (column / SUDOKU_BOX_IN_COLUMN) * SUDOKU_BOX_HORIZONTAL_SIZE + (row / SUDOKU_BOX_IN_ROW)
+        "{#{column},#{row},#{group}}"
       end.join(",")
     end.join(",\n") + "\n};\n"
   end
 
-  # SudokuCell::CellLookUp_を生成する
+  # Generates SudokuCell::CellLookUp_
   def getCellLookUpString
     str = "const SudokuCellLookUp SudokuCell::CellLookUp_"
     str += "[Sudoku::SizeOfLookUpCell] {\n"
 
-    # 候補のビットマップごとに、唯一の候補かどうかと、候補の数を返す
-    # 候補1..9がbit0..8に対応する
+    # Returns the following items for each bitmap in which bits[0..8] corresponds to candidate 1..9
+    # - whether it has a unique candidate
+    # - number of its candidate
     str + (2 ** SUDOKU_CELLS_IN_GROUP).times.map do |bitmap|
       count = 0
       bitmask = 1
@@ -122,15 +120,15 @@ class SudokuConstAll < SudokuConst
       isunique = (count == 1) ? "true" : "false"
       ismultiple = (count > 1) ? "true" : "false"
       elementStr = "{#{isunique},#{ismultiple},#{count}}"
-      # .を後で改行に置き換える
+      # Replaces . to \n later
       elementStr += "." if (bitmap % 8) == 7
       elementStr
     end.join(",").gsub(/\.(,?)/,"\\1\n") + "};\n"
-    # 最後の要素の後には,はないので、あれば?で一致させる
+    # The last element is not followed by ',' and '?' in the regex is required.
   end
 end
 
-# すべてのインクルードファイルを出力する
+# Writes all header files
 [:SudokuConstAll].each do |className|
   Object.const_get(className).new.write
 end

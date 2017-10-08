@@ -1,13 +1,13 @@
 // solver with SSE 4.2 / AVX
 // Copyright (C) 2012-2016 Zettsu Tatsuya
-// Linux依存部
+// Linux dependent implementation
 
 #include <time.h>
 #include <sched.h>
 #include "sudoku_os_dependent.h"
 
 namespace Sudoku {
-    // 関数を使う前に定義しないとエラーになる
+    // Need to instantiate this template before being used, or compilation errors occur.
     template <> void Timer<TimerPlatform::LINUX, timespec>::reset(void) {
         constexpr decltype(startTimestamp_) zeroTimeStamp {0, 0};
         startTimestamp_ = zeroTimeStamp;
@@ -26,7 +26,6 @@ namespace Sudoku {
         return;
     }
 
-    // Linux時刻を取得する
     template <> void Timer<TimerPlatform::LINUX, timespec>::getTimeOfSys(timespec& timestamp) {
         clock_gettime(CLOCK_MONOTONIC, &timestamp);
         return;
@@ -43,7 +42,6 @@ namespace Sudoku {
     }
 
     template <> ProcessorBinder<TimerPlatform::LINUX>::ProcessorBinder(void) {
-        /* 使うCPUを固定すると、processorとcacheのaffinityが上がる */
         cpu_set_t mask;
         CPU_ZERO(&mask);
         CPU_SET(0, &mask);

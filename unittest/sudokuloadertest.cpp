@@ -1,7 +1,7 @@
-// SudokuLoaderクラスをテストする
+// Testing class SudokuLoader
 // Copyright (C) 2012-2017 Zettsu Tatsuya
 //
-// クラス定義は下記から流用
+// I use CppUnit code on the website.
 // http://www.atmarkit.co.jp/fdotnet/cpptest/cpptest02/cpptest02_02.html
 
 #include <cppunit/extensions/HelperMacros.h>
@@ -741,11 +741,11 @@ protected:
     void test_enumerateSudoku();
 private:
     std::unique_ptr<SudokuInStream> createSudokuStream(const std::string& str);
-    // istringstreamの代わりにistrstreamを使うと、istrstreamが正しく初期化されない
-    std::unique_ptr<SudokuInStream>  pSudokuInStream_;   // 初期マップ入力元
-    std::unique_ptr<SudokuOutStream> pSudokuOutStream_;  // 結果出力先
-    std::unique_ptr<SudokuLoader>    pInstance_;         // インスタンス
-    // コマンドライン引数
+    // Use istringstream and do not use istrstream
+    std::unique_ptr<SudokuInStream>  pSudokuInStream_;   // source of initial puzzle maps
+    std::unique_ptr<SudokuOutStream> pSudokuOutStream_;  // destination to write strings
+    std::unique_ptr<SudokuLoader>    pInstance_;         // tested object
+    // command line arguments
     static const int argc_ = 1;
     static const char* const argv_[2];
 };
@@ -755,7 +755,7 @@ const char* const SudokuLoaderTest::argv_[] {"sudoku", 0};
 CPPUNIT_TEST_SUITE_REGISTRATION(SudokuLoaderTest);
 
 std::unique_ptr<SudokuInStream> SudokuLoaderTest::createSudokuStream(const std::string& str) {
-    // 一行ごとに分ける
+    // Split into each line
     std::string lines;
 
     for(SudokuIndex lineCount = 0; lineCount<Sudoku::SizeOfGroupsPerMap; ++lineCount) {
@@ -766,7 +766,7 @@ std::unique_ptr<SudokuInStream> SudokuLoaderTest::createSudokuStream(const std::
     return std::unique_ptr<SudokuInStream>(new SudokuInStream(lines.c_str()));
 }
 
-// 各テスト・ケースの実行直前に呼ばれる
+// Call before running a test
 void SudokuLoaderTest::setUp() {
     pSudokuInStream_ = createSudokuStream(SudokuTestPattern::NoBacktrackString);
     pSudokuOutStream_ = decltype(pSudokuOutStream_)(new SudokuOutStream());
@@ -774,7 +774,7 @@ void SudokuLoaderTest::setUp() {
     return;
 }
 
-// 各テスト・ケースの実行直後に呼ばれる
+// Call after running a test
 void SudokuLoaderTest::tearDown() {
     assert(pInstance_);
     assert(pSudokuOutStream_);
@@ -798,7 +798,7 @@ void SudokuLoaderTest::test_Constructor() {
     CPPUNIT_ASSERT(inst.printAllCandidate_ == 0);
 }
 
-// これ以降はテスト・ケースの実装内容
+// Test cases
 void SudokuLoaderTest::test_setSingleMode() {
     size_t streamIndex = 0;
     for(const auto& test : SudokuTestPattern::testArgs) {
@@ -828,12 +828,12 @@ void SudokuLoaderTest::test_setSingleMode() {
         streamIndex = (streamIndex + 1) % arraySizeof(SudokuTestPattern::testSet);
     }
 
-    // ストリームを設定しない
+    // Missing a stream does not make SudokuLoader crash
     auto pSudokuInStream = createSudokuStream(SudokuTestPattern::testSet[streamIndex].presetStr);
     SudokuLoader instNoOut(SudokuTestPattern::testArgs[0].argc,
-                           SudokuTestPattern::testArgs[0].argv, pSudokuInStream.get(), 0);
+                           SudokuTestPattern::testArgs[0].argv, pSudokuInStream.get(), nullptr);
     SudokuLoader instNoIn(SudokuTestPattern::testArgs[0].argc,
-                          SudokuTestPattern::testArgs[0].argv, 0, pSudokuOutStream_.get());
+                          SudokuTestPattern::testArgs[0].argv, nullptr, pSudokuOutStream_.get());
 
     return;
 }
@@ -850,7 +850,7 @@ struct SudokuTestArgsMultiMode {
 
 namespace {
     constexpr SudokuTestArgsMultiMode testArgsMultiMode[] {
-        // 解を一つ求める
+        // Find a solution
         {1, {"sudoku", nullptr, nullptr, nullptr, nullptr},
                 true, SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
                     SudokuSolverPrint::DO_NOT_PRINT, 1},
