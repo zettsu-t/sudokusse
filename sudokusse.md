@@ -28,18 +28,18 @@ shown below are required.
 
 ### Generate executables
 
-1. Launch a terminal and change its current directory to a directory
-  that contains _sudoku.cpp_.
+Launch a terminal and change its current directory to a directory
+that contains _sudoku.cpp_.
 
-  ```bash
-  cd .../sudokusse
-  ```
+```bash
+cd .../sudokusse
+```
 
-1. Execute make without arguments to build.
+And execute make without arguments to build.
 
-  ```bash
-  make
-  ```
+```bash
+make
+```
 
 After built successfully, these two executable files are generated.
 
@@ -54,7 +54,7 @@ compile-time, not in runtime.
 
 SudokuSSE with AVX uses ANDN instruction of BMI1 (Bit Manipulation
 Instructions), which is available on Haswell and newer
-microarchitecture. If you cannot run on such processors, set
+microarchitectures. If you cannot run on such processors, set
 _EnableAvx_ to 0 or an invalid opcode exception occurs.
 
 ### Solve parallel
@@ -80,7 +80,7 @@ SudokuSSE accepts sudoku puzzles in text files.
 
 * For cells with an initial number, write the number (1 to 9).
 * For cells which are blank and going to be filled by solvers, write a
-  printable non-number character such as a period or white space.
+  printable character such as a period, 0, or white space.
 
 SudokuSSE accepts two formats. Redundant lines are not parsed in both
 formats and you can write anything there as comments. Every sudoku
@@ -156,7 +156,7 @@ I assume the average is much longer than the least for these reasons.
   Windows power option may relax this situation.
 
 Process affinity must not set in using std::future because it prevents
-running a process on multi-core.
+running threads of a process on multi-core.
 
 #### Print steps to solve a sudoku puzzle
 
@@ -287,7 +287,7 @@ solve.
 
 ## Test SudokuSSE
 
-### Check to solve sudoku puzzles correctly
+### Check if solving sudoku puzzles correctly
 
 Execute
 
@@ -349,9 +349,9 @@ top to bottom as shown below and set in `SudokuCell::indexNumber_`.
 
 #### SudokuMap::Group_ and SudokuMap::ReverseGroup_
 
-Look up table in which each cell is in which row, column, or 3x3 box.
-`Group_` looks up forward (a 9 cells group to cells) and
-`ReverseGroup_` looks up reverse (a cell to 9 cells groups).
+Look up table that indicates each cell is in which row, column, or 3x3
+box.  `Group_` looks up forward (a 9-cells group to cells) and
+`ReverseGroup_` looks up reverse (a cell to 9-cells groups).
 
 Rows are numbered top to bottom, columns are numbered left to right,
 and boxes are placed as shown below.
@@ -391,7 +391,7 @@ Classes _SudokuSse*_ are data structures using SIMD instructions.
 XMM1..9 registers hold rows in a sudoku puzzle. XMM-N register
 (128bit) holds the Nth row that contains four 32bit parts; 0(32bit),
 left 3 cells, middle 3 cells, right 3 cells. The part (32bit) consists
-of 0(5bit), left cell(9bit), middle cell(9bit), right cell(9bit).
+of 0s(5bit), left cell(9bit), middle cell(9bit), right cell(9bit).
 
 The cell has candidate bitmap as in the form of SudokuCellCandidates.
 Each bit in the bitmap indicates each of 1..9 is a candidate of the
@@ -484,8 +484,8 @@ causes link errors.
 g++ accepts assembly code in Intel syntax but it causes errors to mix
 up Intel and AT&T syntax. This occurs when your inline assembly code is
 in Intel syntax and inline assembly code in header files is in AT&T
-syntax. I found this issue in using boost::future and do not find in
-std::future.
+syntax. I found this issue in using boost::future and do not find it
+in std::future.
 
 Its workarounds are:
 * Writing a compact file that contains inline assembly with fewer header files
@@ -493,9 +493,9 @@ Its workarounds are:
 
 ### Footprints
 
-Here is a size (41,163 bytes) of core code solving sudoku puzzles in
-assembly. This is 26% larger than the L1 I-cache size (32 KBytes per
-core) in my CPU.
+Here is a size (41,163 bytes) of core code solving sudoku puzzles in a
+version of assembly. This is 26% larger than the L1 I-cache size (32
+KBytes per core) in my CPU.
 
 ```bash
 $ objdump -x --section=.text bin/sudokusse | sort
@@ -556,7 +556,7 @@ complementary set of {1..7}.
 
 #### Step 2
 
-For a cell, if there is a number that cannot be set in a row, column
+For a cell, if there is a number that is exclusive for a row, column
 and box that the cell belongs, we can fill the cell with the number.
 This is commonly called _hidden single_.
 
@@ -594,9 +594,11 @@ sudoku map.
 
 When every cell in the ongoing sudoku map has unique candidate,
 SudokuSSE checks whether all rows, columns, and boxes in the map are
-correct. If it is correct, it is a solution of the map. Guessing a
-candidate sometimes leads an incorrect solution when the guess is
-wrong and SudokuSSE filters it out.
+correct. If it is correct, it is a solution of the map.
+
+Guessing a candidate sometimes leads an incorrect solution in finding
+inconsistent cells. When the guess is wrong, SudokuSSE filters it out
+and continues to backtracking.
 
 Before starting backtracking, SudokuSSE makes a copy of the sudoku map
 to rewind backtracking. The map has only primitives so we can use
@@ -604,8 +606,8 @@ compiler-generated copying (trivial copy) and avoid object aliasing.
 
 ### Algorithm to count solutions of sudoku puzzles
 
-Backtracking only. Set a cell to candidate 1 to 9 if not blank and
-recursively set other cells.
+Backtracking only. Set a cell to candidate 1 to 9 if it is not a
+blank, and recursively set other cells.
 
 Assume that cells are packed top left and count fast if the assumption
 is true.
@@ -636,7 +638,7 @@ a profiler to SudokuSSE.
 
 * Use the inline keyword and switch it via a macro. SudokuSSE enables
   inlining and unit tests disable inlining. Inlining causes link
-  errors in unit test.
+  errors in unit tests.
 
 * Eliminate virtual function calls. This also prohibits virtual
   destructor. If you can define virtual destructor as a good practice,
@@ -649,7 +651,8 @@ a profiler to SudokuSSE.
 
 * Use const and constexpr as much as possible. This is useful to set a
   constant expression in an if-statement. Constant propagation removes
-  constant expressions and unused blocks in an if-statement.
+  constant expressions and unused blocks in an if-statement (C++17 will
+  support this with _if-constexpr_ officially).
   _SudokuCell::CountCandidatesIfMultiple_ and
   _SudokuCell::MaskCandidatesUnlessMultiple_ eliminates if-statements.
 
@@ -720,3 +723,7 @@ like to share your solution on
 6. I posted a question for assembly and received some useful advice.
 
   http://stackoverflow.com/questions/41107642/how-to-convert-x86-64-64-bit-register-names-to-their-corresponding-32-bit-regist
+
+7. I learned best practices in C++ from books listed below.
+
+  https://github.com/zettsu-t/zettsu-t.github.io/wiki/Books-English
