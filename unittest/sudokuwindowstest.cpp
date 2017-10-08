@@ -134,7 +134,7 @@ void SudokuWindowsTimerTest::test_GetElapsedTime() {
 void SudokuWindowsTimerTest::test_GetClockInterval() {
     auto pTimer = createTimerInstance();
     constexpr SudokuTime msecTime = 1;
-    // clock = 1nsec at 1GHz. We expect x64 CPUs run at 0.2GHz or over.
+    // 1 clock = 1nsec at 1GHz. We expect x64 CPUs run at 0.2GHz or over.
     constexpr SudokuTime clockCount = msecTime * 200000;
     MilliSleepFunc func = createMilliSleepFunc(msecTime);
     checkGetClockInterval(pTimer.get(), func, clockCount);

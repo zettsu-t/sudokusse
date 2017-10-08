@@ -4,7 +4,7 @@
 #
 # Usage: Launch this script from Cygwin terminal.
 #   $ perl sudoku_search_timelog.pl filename
-# The filename indicates a file which sudoku_solve_all.pl wrote.
+# The filename designates a file which sudoku_solve_all.pl wrote.
 #   $ perl sudoku_search_timelog.pl SudokuTime_2013_09_27_21_34_56.log
 #
 # Set an executable filename to $EXE_SUDOKU_BASE and this script

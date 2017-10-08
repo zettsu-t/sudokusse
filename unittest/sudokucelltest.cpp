@@ -248,7 +248,7 @@ SudokuCellCommonTest<TestedT, CandidatesT>::~SudokuCellCommonTest() {
 
 template <class TestedT, class CandidatesT>
 void SudokuCellCommonTest<TestedT, CandidatesT>::test_Preset() {
-    constexpr CandidatesT dirty = 0xe6;          // when this cell in not set
+    constexpr CandidatesT dirty = 0xe6;          // when this cell is not set yet
     constexpr char invalidCharSet[] {"0Ab. "};   // invalid characters for preset
 
     // If non-digit char and 0 are given, candidates of cells are not changed.
@@ -594,7 +594,7 @@ void SudokuCellTest::test_GetNextCandidate() {
 }
 
 void SudokuCellTest::test_updateState() {
-    // Confirm this returns
+    // Confirm this just returns
     pInstance_->updateState();
     return;
 }

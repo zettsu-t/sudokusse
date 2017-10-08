@@ -15,7 +15,7 @@
 using SudokuTime = unsigned long long;   // time (timestamp and duration)
 static_assert(sizeof(SudokuTime) == 8, "Unexpected SudokuTime size");
 
-// Unit tests
+// unit tests
 class SudokuTimerTest;
 class SudokuWindowsTimerTest;
 class SudokuLinuxTimerTest;
@@ -62,7 +62,7 @@ namespace Sudoku {
 
     // Implementation to get x64 CPU clock
     class BaseTimer : public ITimer {
-        // Unit tests
+        // unit tests
         friend class ::SudokuTimerTest;
     protected:
         BaseTimer(void) = default;

@@ -8,7 +8,7 @@
         # .set    EnableAvx, 1
 
         # Set CellsPacked to 1 to assume that initial cells in a
-        # sudoku puzzle is packed in its top-left.
+        # sudoku puzzle are packed in its top-left.
         # .set    CellsPacked, 0
 
         # Set LastCellsToFilled to 10 to assume each cell in the
@@ -164,7 +164,7 @@ sudokuXmmDummyToAlign:  .quad 0
 .set    inBoxIndexInvalid,  (candidatesInRowPart + 1)  # Indicating an out-of-bounds index of cells in a box
 .set    outBoxIndexInvalid, (rowPartNum + 1)           # Indicating an out-of-bounds index of boxes
 .set    rowNumberInvalid,   (numberOfRows + 1)         # Indicating an out-of-bounds index of rows
-.set    nextCellFound,            1  # Indicating it found a cell and guess a its candidate for backtracking
+.set    nextCellFound,            1  # Indicating it found a cell and guess its candidate for backtracking
 .set    minCandidatesNumToSearch, 2  # Minimum number of candidates to guess a candidate in a cell
 
 .set    elementBitMask, 0x1ff      # Bit mask for candidates of a cell
@@ -446,7 +446,7 @@ testIsPowerOf2ToFlagsA:
 testIsPowerOf2ToFlagsB:
         ret
 
-# Set regSrc to regDst if regSrc is power of 2, otherwise set 0 to regDst
+# Set regSrc to regDst if regSrc is a power of 2, otherwise set 0 to regDst
 # All registers must be 64-bit or 32-bit width.
 .macro PowerOf2or0 regDst, regSrc, regWork1
         popcnt  \regWork1, \regSrc
@@ -553,7 +553,7 @@ testFilterUniqueCandidatesInRowPartSub:
         ret
 
 # Leave unique candidates and clear others in consecutive three cells.
-# regRowPart is a 64-bit registger and must have only three cells,
+# regRowPart is a 64-bit register and must have only three cells,
 # cannot contain other three cells in its upper/lower 32 bits.
 .macro FilterUniqueCandidatesInRowPart regDst, regRowPart, shift32bit, regWork1, regWork2, regWork3, regWork4
         popcnt \regWork2, \regRowPart
@@ -2155,7 +2155,7 @@ testFastCollectCandidatesAtColumn88:
         cmp     \regWork2, candidatesNum
         JumpIfGreaterEqual 10012f
 
-        # If we abort here, the whole process does not get faster
+        # Even if we abort here, the whole calculation does not get faster
         .if ((CellsPacked == 0) || ((\rowNumber % 3) != 0))
         FastCollectCandidatesAtBox \regWork1, \xRegSrcOther1, \regWork2, \otherColumnNumber1, \otherColumnNumber2, \rowNumber
         or  \regSum, \regWork1
@@ -2388,7 +2388,7 @@ testFastSetUniqueCandidatesAtCellSub88:
         setnz   gRegWork1Byte
         add     gRegWork2Byte, gRegWork1Byte
 
-        # Branch near to jump fast
+        # It is faster to branch near than far
         .if ((LastCellsToFilled != 0) && (\cellCount + LastCellsToFilled) >= maxElementNumber)
         # Default branch prediction does not expect jump forward
         jz      10012f
@@ -2436,7 +2436,7 @@ testFastSetUniqueCandidatesAtCellSub88:
         and     gRegSum, gRegFastBitMask
 
 10033:
-        # Expand with CountUniqueCandidatesAtNextCell gets slower
+        # Expanding these instructions with CountUniqueCandidatesAtNextCell gets slower
         mov     gRegNewCandidate64, gRegOne64
         bsf     gRegShift, gRegSum
         shl     gRegNewCandidate, cl
@@ -2463,7 +2463,7 @@ testFastSetUniqueCandidatesAtCellSub88:
         jmp     gRegReturn
 
 10035:
-        # Branch by candidates and use tail call
+        # Use tail call
         JmpCountUniqueCandidatesAtCell (\cellCount + 1)
         .endif
 .endm

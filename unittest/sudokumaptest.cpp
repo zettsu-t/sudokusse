@@ -143,7 +143,7 @@ SudokuCellCandidates SudokuMapTest::indexToCandidate(SudokuIndex index) {
     return SudokuTestCommon::ConvertToCandidate(index);
 }
 
-// Set a unique candidate to cells
+// Sets a unique candidate to cells
 void SudokuMapTest::setAllCellsFilled(void) {
     for(SudokuIndex i=0;i<Sudoku::SizeOfAllCells;++i) {
         pInstance_->cells_[i].candidates_ = SudokuTestCandidates::OneOnly;
@@ -151,7 +151,7 @@ void SudokuMapTest::setAllCellsFilled(void) {
     return;
 }
 
-// Set multiple and part of 1..9 candidate to cells
+// Sets multiple and part of 1..9 candidate to cells
 void SudokuMapTest::setAllCellsMultiCandidates(void) {
     for(SudokuIndex i=0;i<Sudoku::SizeOfAllCells;++i) {
         pInstance_->cells_[i].candidates_ = SudokuTestCandidates::TwoToNine;
@@ -160,7 +160,7 @@ void SudokuMapTest::setAllCellsMultiCandidates(void) {
     return;
 }
 
-// Set all 1..9 candidate to cells
+// Sets all 1..9 candidate to cells
 void SudokuMapTest::setAllCellsFullCandidates(void) {
     for(SudokuIndex i=0;i<Sudoku::SizeOfAllCells;++i) {
         pInstance_->cells_[i].candidates_ = SudokuTestCandidates::All;
@@ -186,7 +186,7 @@ void SudokuMapTest::setConsistentCells(SudokuCellCandidates candidates) {
     }
 }
 
-// Set a candidate to cells in the top row except its rightmost
+// Sets a candidate to cells in the top row except its rightmost
 void SudokuMapTest::setTopLineExceptRightest(void) {
     for(SudokuIndex i=0;i<Sudoku::SizeOfCellsPerGroup - 1;++i) {
         pInstance_->cells_[i].candidates_ = indexToCandidate(i+1);
@@ -309,7 +309,7 @@ void SudokuMapTest::testFillCrossingBox(SudokuIndex boxX, SudokuIndex boxY,
     // ..2......
     // .........
     // .........
-    // ?=1, *=[4,6], !=2, ^=9 are filled in this order.
+    // ?=1, *=[4,6], !=2, ^=9 are filled.
     // Setting 4 to @ makes this map inconsistent.
 
     // This test fills these cells in the map and checks the map after calling FillCrossing().
@@ -353,7 +353,7 @@ void SudokuMapTest::testFillCrossingBox(SudokuIndex boxX, SudokuIndex boxY,
         CPPUNIT_ASSERT_EQUAL(result.candidates, pInstance_->cells_[target].candidates_);
     }
 
-    // Intentionally makes the map inconsistent
+    // Makes the map inconsistent intentionally
     for(const auto& conflict : conflictSet) {
         const auto target = convertCellPosition(conflict.cellIndex, boxX, boxY, inboxOfsX, inboxOfsY);
         pInstance_->cells_[target].candidates_ = indexToCandidate(conflict.candidatesIndex);
@@ -485,7 +485,8 @@ void SudokuMapTest::test_SelectBacktrackedCellIndex() {
     // The second cell is selected because it has a smaller index than the last cell.
     CPPUNIT_ASSERT_EQUAL(expected, pInstance_->SelectBacktrackedCellIndex());
 
-    // Set two candidates to a cell. The cell is selected because it has least candidates.
+    // Set two candidates to two cells in a box.
+    // A cell is selected in the box because the box has least candidates.
     expected = SudokuTestPosition::Backtracked;
     pInstance_->cells_[expected].candidates_ = SudokuTestCandidates::FourAndSix;
     CPPUNIT_ASSERT_EQUAL(expected, pInstance_->SelectBacktrackedCellIndex());
@@ -506,7 +507,7 @@ void SudokuMapTest::test_IsConsistent() {
     setAllCellsFullCandidates();
     CPPUNIT_ASSERT_EQUAL(true, pInstance_->IsConsistent());
 
-    // Set a candidate 1 to cells in each box.
+    // Set a candidate '1' to cells in each box.
     setConsistentCells(SudokuTestCandidates::OneOnly);
     CPPUNIT_ASSERT_EQUAL(true, pInstance_->IsConsistent());
 
@@ -514,7 +515,7 @@ void SudokuMapTest::test_IsConsistent() {
     pInstance_->cells_[SudokuTestPosition::Last].candidates_ = SudokuTestCandidates::Empty;
     CPPUNIT_ASSERT_EQUAL(false, pInstance_->IsConsistent());
 
-    // Set a candidate 1 to cells and it makes the map inconsistent.
+    // Set a candidate '1' to cells and it makes the map inconsistent.
     setConsistentCells(SudokuTestCandidates::OneOnly);
     pInstance_->cells_[SudokuTestPosition::Conflict].candidates_ = SudokuTestCandidates::OneOnly;
     CPPUNIT_ASSERT_EQUAL(false, pInstance_->IsConsistent());

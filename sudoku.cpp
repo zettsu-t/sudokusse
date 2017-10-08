@@ -47,7 +47,7 @@ extern "C" {
 }
 
 namespace Sudoku {
-    // Set a number to a cell if valid
+    // Sets a number to a cell if valid
     template <typename SudokuNumberType>
     bool ConvertCharToSudokuCandidate(SudokuNumberType minNum, SudokuNumberType maxNum, char c, int& num) {
         char s[2] {'\0', '\0'};
@@ -65,7 +65,7 @@ namespace Sudoku {
         return true;
     }
 
-    // Print all candidates in a cell
+    // Prints all candidates in a cell
     template <typename SudokuElementType>
     void PrintSudokuElement(SudokuElementType candidates, SudokuElementType uniqueCandidates,
                             SudokuElementType emptyCandidates, std::ostream* pSudokuOutStream) {
@@ -141,7 +141,7 @@ INLINE bool SudokuCell::IsConsistent(SudokuCellCandidates candidates) const {
     if (HasMultipleCandidates() != false) {
         return true;
     }
-    // It is faster to evaluate the below after the above.
+    // It runs faster to evaluate the below after the above.
     if (candidates_ == SudokuEmptyCandidates) {
         return false;
     }
@@ -156,10 +156,10 @@ INLINE bool SudokuCell::HasNoCandidates(void) const {
     return IsEmptyCandidates(candidates_);
 }
 
-// Makes candidates of a cell with the argument candidates
+// Makes candidates of a cell with the argument 'candidates'
 INLINE void SudokuCell::SetCandidates(SudokuCellCandidates candidates) {
     candidates_ &= candidates;
-    // update mutable states of this cell
+    // Update mutable states of this cell.
     // It is required in C++11 that const member functions are thread-safe,
     // so it is hard to update mutable state in const member functions.
     updateState();
@@ -187,7 +187,7 @@ INLINE SudokuIndex SudokuCell::CountCandidatesIfMultiple(void) const {
 }
 
 // Returns 0 if a cell has none of or one candidate,
-// otherwise returns number of candidates of the cell.
+// otherwise returns a number of candidates of the cell.
 INLINE SudokuIndex SudokuCell::MaskCandidatesUnlessMultiple(SudokuIndex numberOfCandidates) {
     return (numberOfCandidates & Sudoku::OutOfRangeMask);
 }
@@ -233,7 +233,7 @@ INLINE void SudokuCell::updateState(void) {
 
 SudokuMap::SudokuMap(void) {
     for(SudokuIndex i=0;i<Sudoku::SizeOfAllCells;++i) {
-        // Assign same index as in the look up table
+        // Assign the same index as in the look up table
         cells_[i].SetIndex(i);
     }
 
@@ -391,9 +391,9 @@ INLINE bool SudokuMap::IsFilled(void) const {
     return false;
 }
 
-// Aborts if finding a cell which cannot be filled
+// Aborts if finding a cell which is inconsistent
 // {} is same as do-while(0) to define a block scope and prevent
-// unintended expantion of these macro.
+// unintended expansion of these macros.
 #define unrolledFindUnusedCandidate(index) \
     { \
         if ((cells_[index].IsFilled() == false) && (findUnusedCandidate(cells_[index]))) { \
@@ -673,7 +673,7 @@ INLINE SudokuIndex SudokuMap::unrolledSelectBacktrackedCellIndexInnerCommon(Sudo
     const auto count = SudokuCell::MaskCandidatesUnlessMultiple(countOrOutOfRange);
     assert(count <= Sudoku::SizeOfCandidates);
 
-    // 'count' is larger than number of the cells if there are no candidate for the cells.
+    // 'count' is larger than a number of the cells if there are no candidate for the cells.
     if (leastCountOfGroup > countOrOutOfRange) {
         leastCountOfGroup = count;
         candidateCellIndex = cellIndex;
@@ -707,7 +707,7 @@ INLINE SudokuIndex SudokuMap::SelectBacktrackedCellIndex(void) const {
         SudokuIndex candidateCellIndex = 0;
         if (FastMode == false) {
             for(SudokuLoopIndex j=0;j<Sudoku::SizeOfCellsPerGroup;++j) {
-                // Select a cell which has minimum number of candidates and is not filled.
+                // Select a cell which has a minimum number of candidates and is not filled.
                 const SudokuIndex cellIndex = Group_[backtrackedGroup_][i][j];
                 const SudokuIndex count = cells_[cellIndex].CountCandidates();
                 groupCount += count;
@@ -801,15 +801,15 @@ INLINE SudokuCellCandidates SudokuMap::unrolledFindUnusedCandidateOuter<0>(Sudok
     return unrolledFindUnusedCandidateOuterCommon(targetCellIndex, 0, candidates);
 }
 
-// Searchs a row, column, and box that the targetCell belongs and
+// Searches a row, column, and box that the targetCell belongs and
 // sets a unique candidate to the cell if available.
-// This is commonly called naked single.
-//
+// This is commonly called 'naked single'.
+
 // Actually, we do not need to check whether the cell has one candidate
 // or not here. we simply mask by a complementary set of unique candidates
 // of a row, column, and box that the targetCell belongs.
 bool SudokuMap::findUnusedCandidate(SudokuCell& targetCell) const {
-    // Return true if finding a cell that cannot be filled.
+    // Returns true if finding a cell that cannot be filled.
     auto candidates = SudokuCell::GetEmptyCandidates();
     const auto targetCellIndex = targetCell.GetIndex();
 
@@ -859,7 +859,7 @@ INLINE SudokuCellCandidates SudokuMap::unrolledFindUniqueCandidateInner<0>(Sudok
 }
 
 // {} is same as do-while(0) to define a block scope and prevent
-// unintended expantion of these macro.
+// unintended expansion of these macros.
 #define findUniqueCandidateOuterLoop(index) { \
     { \
         auto candidates = SudokuCell::GetEmptyCandidates(); \
@@ -879,9 +879,9 @@ INLINE SudokuCellCandidates SudokuMap::unrolledFindUniqueCandidateInner<0>(Sudok
 
 // Set a candidate to the targetCell if there is a number that cannot
 // be set in a row, column, and box that the cell belongs.
-// This is commonly called hidden single.
+// This is commonly called 'hidden single'.
 bool SudokuMap::findUniqueCandidate(SudokuCell& targetCell) const {
-    // Return true if finding a cell that cannot be filled.
+    // Returns true if finding a cell that cannot be filled.
     const auto targetCellIndex = targetCell.GetIndex();
 
     if (FastMode == false) {
@@ -974,7 +974,7 @@ void SudokuSseEnumeratorMap::Print(bool solved, const XmmRegisterSet& xmmRegSet)
 
         SudokuSseElement regValue = 0;
         // This narrowing conversion below causes no problem
-        // because this static_assert assures range of the input value.
+        // because this static_assert assures a range of the input value.
         static_assert(CellBitWidth <= std::numeric_limits<decltype(regValue)>::digits, "regValue too small");
 
         if ((row + 1) == Sudoku::SizeOfGroupsPerMap) {
@@ -999,7 +999,7 @@ void SudokuSseEnumeratorMap::PrintFromAsm(const XmmRegisterSet& xmmRegSet) {
     }
 
     ++patternNumber_;
-    // The assembly code has responsibility to save registers.
+    // The assembly code has a responsibility to save registers.
     pSudokuOutStream_->flush();
     (*pSudokuOutStream_) << "[Solution " << patternNumber_ << "]\n";
     Print(true, xmmRegSet);
@@ -1072,7 +1072,7 @@ void SudokuSseEnumeratorMap::presetCell(SudokuLoopIndex index, int num) {
 
 SudokuSolver::SudokuSolver(const std::string& presetStr, SudokuIndex seed, std::ostream* pSudokuOutStream)
     : SudokuBaseSolver(pSudokuOutStream) {
-    // Actually, it it good to set always 0 to seed
+    // Actually, it is good to set always 0 to seed
     map_.Preset(presetStr, 0);
     return;
 }
@@ -1126,9 +1126,9 @@ bool SudokuSolver::solve(SudokuMap& map, bool topLevel, bool verbose) {
         oldCount = newCount;
     }
 
-    // We start backtracking because we cannot reduce candidates any more
+    // We start backtracking because we cannot reduce candidates anymore
     const auto cellIndex = map.SelectBacktrackedCellIndex();
-    // Guess a number of 1..9 in the cell in a solution
+    // Guesses a number of 1..9 in the cell in a solution
     auto candidate = SudokuCell::GetInitialCandidate();
     for(;;) {
         const auto canSet = map.CanSetUniqueCell(cellIndex, candidate);
@@ -1352,10 +1352,10 @@ void SudokuSseSolver::PrintType(void) {
 
 bool SudokuSseSolver::solve(SudokuSseMap& map, bool topLevel, bool verbose) {
     for(;;) {
-        // Solves forward until we cannot reduce candidates any more
+        // Solves forward until we cannot reduce candidates anymore
         SudokuSseMapResult result;
         fillCells(map, topLevel, verbose, result);
-        // Undo backtracking because we cannot fill a cell that leads a guess was wrong
+        // Undo backtracking because we cannot fill a cell and it leads a guess was wrong
         if (result.aborted) {
             return false;
         }
@@ -1365,14 +1365,14 @@ bool SudokuSseSolver::solve(SudokuSseMap& map, bool topLevel, bool verbose) {
             return true;
         }
 
-        // We start backtracking because we cannot reduce candidates any more
+        // We start backtracking because we cannot reduce candidates anymore
         SudokuSseCandidateCell cell;
         auto found = map.GetNextCell(result, cell);
         if (!found) {
             return false;
         }
 
-        // Guess a number of 1..9 in a cell in a solution
+        // Guesses a number of 1..9 in a cell in a solution
         auto candidate = SudokuCell::GetInitialCandidate();
         for(;;) {
             const auto canSet = map.CanSetUniqueCell(cell, candidate);
@@ -1472,7 +1472,7 @@ bool SudokuChecker::parseRow(SudokuIndex row, const std::string& rowLine, Grid& 
 
     constexpr auto minLength = Sudoku::SizeOfCellsPerGroup * 2 - 1;
     if (rowLine.size() < minLength) {
-        // A row has wrong size of cells
+        // A row has the wrong size of cells
         valid = false;
     }
 
@@ -1537,7 +1537,7 @@ bool SudokuChecker::compare(const std::string& puzzle, const std::string& soluti
     return valid;
 }
 
-// Checks whether all rows, columns and boxes meet the Sudoku rule
+// Checks whether all rows, columns, and boxes meet the Sudoku rule
 bool SudokuChecker::check(const Grid& grid, std::ostream* pSudokuOutStream) {
     return checkRowSet(grid, pSudokuOutStream) &&
         checkColumnSet(grid, pSudokuOutStream) &&
@@ -1974,7 +1974,7 @@ void SudokuLoader::measureTimeToSolve(SudokuSolverType solverType) {
             solveSudoku(solverType, i, true);
         }
 
-        // We expect cache is filled at second execution
+        // We expect cache has been filled at second execution
         SudokuTime leastTimeClock = 0;
         std::unique_ptr<Sudoku::ITimer> pTimer(Sudoku::CreateTimerInstance());
         pTimer->SetStartTime();
@@ -1998,7 +1998,7 @@ void SudokuLoader::measureTimeToSolve(SudokuSolverType solverType) {
         pTimer->StopClock();
         pTimer->SetStopTime();
 
-        // Casts to SudokuTime
+        // Converts to SudokuTime
         pTimer->PrintTime(pSudokuOutStream_, measureCount_, leastTimeClock, showAverage);
     }
 }

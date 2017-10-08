@@ -11,8 +11,8 @@ shown below are required.
 
 |Tool|Cygwin 64bit|Bash on Ubuntu on Windows|MinGW-w64|
 |:------|:------|:------|:------|
-|GCC (g++)|6.3.0|4.8.4|6.3.0|
-|GNU assembler (as)|2.25.2|2.24|2.27|
+|GCC (g++)|6.4.0|4.8.4|7.2.0|
+|GNU assembler (as)|2.29.51|2.24|2.29|
 |GNU Make|4.2.1|3.81|4.2.1|
 |Ruby|2.3.3p222|1.9.3p484|ActiveScriptRuby 2.4.0p0|
 |Perl|5.22.4|5.18.2|Cygwin perl|

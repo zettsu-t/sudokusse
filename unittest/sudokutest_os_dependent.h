@@ -12,10 +12,10 @@
 // Common for Windows and Linux
 class SudokuTimerTest : public CPPUNIT_NS::TestFixture {
 protected:
-    // We inject a function to test cases to sleep 1 msec and more
+    // We inject a function to test cases to sleep 1 msec and over
     using MilliSleepFunc = std::function<void(void)>;
 
-    // Called from derives classes
+    // Call from derived classes
     void checkConstructor(Sudoku::BaseTimer* pTimer) {
         CPPUNIT_ASSERT(!pTimer->startClockCount_);
         CPPUNIT_ASSERT(!pTimer->stopClockCount_);
@@ -55,7 +55,7 @@ protected:
         pTimer->SetStartTime();
         milliSleep();
         pTimer->SetStopTime();
-        // Sleep() does not sleep exact specified time. It may get longer.
+        // Sleep() does not sleep exact specified time. It may take longer.
         CPPUNIT_ASSERT(pTimer->GetElapsedTime() >= leastSleepTime);
         // We assume this test is failed if it sleeps too long time.
         CPPUNIT_ASSERT(pTimer->GetElapsedTime() < (leastSleepTime * 10));
@@ -75,7 +75,7 @@ protected:
         pTimer->startClockCount_ = startClockCount;
         pTimer->stopClockCount_ = stopClockCount;
 
-        // Total time : 200 usec (divide by 10 to convert the time unit from 100nsec to 1usec)
+        // Total time : 200 usec (divide by 10 to convert the time unit from 100 nsec to 1 usec)
         // once          66.667 usec
         // least         40.000 usec (1.333 * 30 clock)
         pTimer->PrintTime(pOutStream, 3, 30, true);

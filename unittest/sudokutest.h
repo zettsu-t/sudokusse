@@ -82,7 +82,7 @@ namespace SudokuTestPosition {
     constexpr SudokuIndex Centerorigin = 30; // top-left corner of the center box
     constexpr SudokuIndex Conflict = 62;     // the cell marked ! above
     constexpr SudokuIndex Backtracked = 70;  // the cell marked b above (selected for backtracking)
-    constexpr SudokuIndex Last = Sudoku::SizeOfAllCells - 1;  // last and bottom-righr corner
+    constexpr SudokuIndex Last = Sudoku::SizeOfAllCells - 1;  // last and bottom-right corner
 };
 
 // These cases are based on the book;
@@ -121,19 +121,19 @@ namespace SudokuTestPattern {
         int    argc;
         const char* argv[4];
         bool   isBenchmark;   // true when it runs for benchmarking
-        bool   verbose;       // true if printing steps to solving a puzzle
+        bool   verbose;       // true when it prints steps to solving a puzzle
         int    measureCount;  // how many times it solves a puzzle
-        SudokuPatternCount printAllCandidate;  // number of candicates
+        SudokuPatternCount printAllCandidate;  // number of candidates
     };
 
     constexpr TestArgs testArgs[] {
-        // Solving a solution. Specify how many times test cases solve.
+        // These are used to find a solution. Specify how many times test cases solve.
         {1, {"sudoku", 0,      0, 0}, false, true,  1,   0},  // not specified
         {2, {"sudoku", "1",    0, 0}, true,  false, 1,   0},  // solve once
         {2, {"sudoku", "100",  0, 0}, true,  false, 100, 0},  // 100 times
         {2, {"sudoku", "-1",   0, 0}, false, true,  1,   0},  // once
         {2, {"sudoku", "-200", 0, 0}, false, true,  200, 0},  // once
-        // Counting solutions
+        // These are used to count solutions.
         {2, {"sudoku", "0", 0,    0}, false, true, 0, 0},  // none of solutions
         {3, {"sudoku", "0", "",   0}, false, true, 0, 0},  // none
         {3, {"sudoku", "0", "0",  0}, false, true, 0, 0},  // none

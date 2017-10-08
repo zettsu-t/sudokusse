@@ -70,19 +70,19 @@ namespace SudokuOption {
     }
 }
 
-// Primitive type aliases.
+// Primitive type aliases
 // We have to choose appropriate types to run this solver faster.
 // Built-in short is faster than int in some cases.
 // Notice all data in this solver should fit in 32Kbyte L1 Data Cache.
-using SudokuIndex = unsigned short;          // Indexes of cells and groups of cells (short is faster)
-using SudokuLoopIndex = unsigned int;        // Indexes of loops for cells and groups of cells (int is faster)
-using SudokuCellCandidates = unsigned int;   // Candidates [1..9] of a cell
-using SudokuNumber = int;                    // A preset number of a cell
-using SudokuSseElement = uint32_t;           // Three adjacent cells to solve with SSE4.2 instructions
-using gRegister = uint64_t;                  // A number that a general purpose register holds (must be unsigned)
-using xmmRegister = __m128;                  // A number that an XMM register holds
-using SudokuPatternCount = uint64_t;         // A number of solutions of a puzzle
-using SudokuPuzzleCount = size_t;            // A number of puzzles in an input file
+using SudokuIndex = unsigned short;          // indexes of cells and groups of cells (short is faster)
+using SudokuLoopIndex = unsigned int;        // indexes of loops for cells and groups of cells (int is faster)
+using SudokuCellCandidates = unsigned int;   // candidates [1..9] of a cell
+using SudokuNumber = int;                    // a preset number of a cell
+using SudokuSseElement = uint32_t;           // three adjacent cells to solve with SSE4.2 instructions
+using gRegister = uint64_t;                  // a number that a general purpose register holds (must be unsigned)
+using xmmRegister = __m128;                  // a number that an XMM register holds
+using SudokuPatternCount = uint64_t;         // a number of solutions of a puzzle
+using SudokuPuzzleCount = size_t;            // a number of puzzles in an input file
 
 static_assert(sizeof(SudokuSseElement) == 4, "Unexpected SudokuSseElement size");
 static_assert(sizeof(xmmRegister) == 16, "Unexpected xmmRegister size");
@@ -90,8 +90,8 @@ static_assert((alignof(xmmRegister) % 16) == 0, "Unexpected xmmRegister alignmen
 
 // Size for SSE4.2 instructions
 namespace SudokuSse {
-    constexpr size_t RegisterCnt = 16;    // The number of XMM registers
-    constexpr size_t RegisterWordCnt = 4; // The number of words in an XMM register
+    constexpr size_t RegisterCnt = 16;    // the number of XMM registers
+    constexpr size_t RegisterWordCnt = 4; // the number of words in an XMM register
 }
 
 // All XMM registers (128-bit * 16 registers)
@@ -102,38 +102,38 @@ union XmmRegisterSet {
 
 // Constants for Sudoku
 namespace Sudoku {
-    constexpr SudokuIndex SizeOfCellsPerGroup = 9;    // The number of cells in a column, row, and box (square)
-    constexpr SudokuIndex SizeOfGroupsPerMap = 9;     // The number of column, row, and box in a puzzle
-    constexpr SudokuIndex SizeOfAllCells = 81;        // The number of cells in a puzzle
-    constexpr SudokuIndex SizeOfCandidates = 9;       // The maximum number of candidates in a cell
-    constexpr SudokuIndex SizeOfUniqueCandidate = 1;  // The minimum number of candidates in a cell
-    constexpr SudokuIndex OutOfRangeCandidates = 0x10;  // A special number of candidates if a cell has none of or one candidate (must be 2^n)
-    constexpr SudokuIndex OutOfRangeMask = OutOfRangeCandidates - 1;  // A bitmask for a number of candidates when a cell has none of or one candidate
-    constexpr SudokuIndex SizeOfGroupsPerCell = 3;    // An index which column, row, and box a cell belongs to
-    constexpr SudokuIndex SizeOfLookUpCell = 512;     // The number of elements in a cell look-up table
-    constexpr SudokuIndex SizeOfBoxesOnEdge = 3;      // The number of row and column in a puzzle has three boxes
-    constexpr SudokuIndex SizeOfCellsOnBoxEdge = 3;   // The number of cells in a row and column of a box
-    // Hold these constants in their least bits needed. Compilers expand them if needed.
-    constexpr unsigned short EmptyCandidates = 0;     // presents a cell holds no candidates.
-    constexpr unsigned short UniqueCandidates = 1;    // presents a cell holds one candidate.
-    constexpr unsigned short AllCandidates = 0x1ff;   // presents a cell holds all 9 candidates.
-    constexpr SudokuSseElement AllThreeCandidates = 0x7ffffff;  // presents all three adjacent cells hold all 27 candidates.
-    constexpr short MinCandidatesNumber = 1;          // A minimum preset number of a cell
-    constexpr short MaxCandidatesNumber = 9;          // A maximum preset number of a cell
+    constexpr SudokuIndex SizeOfCellsPerGroup = 9;    // the number of cells in a column, row, and box (square)
+    constexpr SudokuIndex SizeOfGroupsPerMap = 9;     // the number of columns, rows, and boxes in a puzzle
+    constexpr SudokuIndex SizeOfAllCells = 81;        // the number of cells in a puzzle
+    constexpr SudokuIndex SizeOfCandidates = 9;       // the maximum number of candidates in a cell
+    constexpr SudokuIndex SizeOfUniqueCandidate = 1;  // the minimum number of candidates in a cell
+    constexpr SudokuIndex OutOfRangeCandidates = 0x10;  // a special number of candidates if a cell has none of or one candidate (must be 2^n)
+    constexpr SudokuIndex OutOfRangeMask = OutOfRangeCandidates - 1;  // a bitmask for a number of candidates when a cell has none of or one candidate
+    constexpr SudokuIndex SizeOfGroupsPerCell = 3;    // indicates that a cell belongs to a column, row, and box.
+    constexpr SudokuIndex SizeOfLookUpCell = 512;     // the number of elements in a cell look-up table
+    constexpr SudokuIndex SizeOfBoxesOnEdge = 3;      // indicates that a row and column have three boxes.
+    constexpr SudokuIndex SizeOfCellsOnBoxEdge = 3;   // indicates that a box has three rows and columns.
+    // Hold these constants in their narrowest bit width needed. Compilers expand them if needed.
+    constexpr unsigned short EmptyCandidates = 0;     // indicates that a cell holds no candidates.
+    constexpr unsigned short UniqueCandidates = 1;    // indicates that a cell holds one candidate.
+    constexpr unsigned short AllCandidates = 0x1ff;   // indicates that a cell holds all 9 candidates.
+    constexpr SudokuSseElement AllThreeCandidates = 0x7ffffff;  // indicates that all three adjacent cells hold all 27 candidates.
+    constexpr short MinCandidatesNumber = 1;          // a minimum preset number of a cell
+    constexpr short MaxCandidatesNumber = 9;          // a maximum preset number of a cell
     // Allocate larger memory than the cache line size to prevent false sharing in heap memory.
     constexpr uint32_t CacheGuardSize = 128;
 }
 
 // Common functions
 namespace Sudoku {
-    void LoadXmmRegistersFromMem(const xmmRegister *pData);  // Load XMM registers from main memory
-    void SaveXmmRegistersToMem(xmmRegister *pData);          // Save XMM registers to main memory
+    void LoadXmmRegistersFromMem(const xmmRegister *pData);  // loads XMM registers from main memory
+    void SaveXmmRegistersToMem(xmmRegister *pData);          // saves XMM registers to main memory
 
-    // Set a number to a cell if valid
+    // Sets a number to a cell if valid
     template <typename SudokuNumberType>
     bool ConvertCharToSudokuCandidate(SudokuNumberType minNum, SudokuNumberType maxNum, char c, int& num);
 
-    // Print all candidates in a cell
+    // Prints all candidates in a cell
     template <typename SudokuElementType>
     void PrintSudokuElement(SudokuElementType candidates, SudokuElementType uniqueCandidates,
                             SudokuElementType emptyCandidates, std::ostream* pSudokuOutStream);
@@ -174,14 +174,14 @@ protected:
 // An element of a look-up table to get attributes of a cell from a cell candidate bitboard.
 class SudokuCellLookUp {
 public:
-    bool        IsUnique;           // presents this cell has a unique candidate
-    bool        IsMultiple;         // presents this cell has multiple candidates
+    bool        IsUnique;           // indicates that this cell has a unique candidate
+    bool        IsMultiple;         // indicates that this cell has multiple candidates
     SudokuIndex NumberOfCandidates; // presents a number of candidates this cell has
 };
 
 // A cell in a Sudoku puzzle
 class SudokuCell {
-    // Unit tests
+    // unit tests
     friend class SudokuCellTest;
     friend class SudokuMapTest;
     friend class SudokuSolverTest;
@@ -224,8 +224,8 @@ public:
 private:
     INLINE void updateState(void);
     // All members are trivially copyable.
-    SudokuIndex          indexNumber_;  // A serial number in all cells
-    SudokuCellCandidates candidates_;   // Candidates (each of 1..9 matches bit 0..8)
+    SudokuIndex          indexNumber_;  // a serial number in all cells
+    SudokuCellCandidates candidates_;   // candidates (each of 1..9 matches bit 0..8)
     // A look-up table to get attributes of cells from their bitboard.
     static const SudokuCellLookUp CellLookUp_[Sudoku::SizeOfLookUpCell];
 
@@ -239,7 +239,7 @@ private:
 
 // All cells in solving C++ template metaprogramming without assembly
 class SudokuMap {
-    // Unit tests
+    // unit tests
     friend class SudokuMapTest;
     friend class SudokuSolverTest;
     template <class TestedT, class CandidatesT> friend class SudokuSolverCommonTest;
@@ -265,7 +265,7 @@ private:
     bool findUniqueCandidate(SudokuCell& targetCell) const;
     // All cells in a puzzle
     SudokuCell cells_[Sudoku::SizeOfAllCells];
-    // This determines which cell in columns, rows, or boxes do we select in backtracking.
+    // determines which cell in columns, rows, or boxes do we select in backtracking.
     SudokuIndex backtrackedGroup_;
 
     // Cells in all columns, all rows, and all boxes
@@ -274,7 +274,7 @@ private:
     // Columns, rows, and boxes which all cells belong to
     static const SudokuIndex ReverseGroup_[Sudoku::SizeOfAllCells][Sudoku::SizeOfGroupsPerCell];
 
-    // The serial number of a box in 9-cells groups {columns:0, rows:1}.
+    // The serial number of a box in 9-cells groups {rows:0, columns:1, box:3}.
     static constexpr SudokuIndex SudokuBoxGroupId = 2;
 
     // Use inlining and unrolling to solve puzzles faster.
@@ -303,7 +303,7 @@ private:
 
 // A Sudoku solver with C++ template metaprogramming without assembly
 class SudokuSolver : public SudokuBaseSolver {
-    // Unit tests
+    // unit tests
     friend class SudokuSolverTest;
     template <class TestedT, class CandidatesT> friend class SudokuSolverCommonTest;
 public:
@@ -321,7 +321,7 @@ private:
 
 // A cell in solving assembly
 class SudokuSseCell {
-    // Unit tests
+    // unit tests
     friend class SudokuSseCellTest;
     template <class TestedT, class CandidatesT> friend class SudokuCellCommonTest;
     template <class TestedT, class CandidatesT> friend class SudokuSolverCommonTest;
@@ -367,9 +367,9 @@ extern "C" {
 
 // Candidates for backtracking
 struct SudokuSseCandidateCell {
-    size_t           regIndex;  // A general purpose register number of this cell
-    SudokuSseElement shift;     // A bit position from LSB in a register of this cell
-    SudokuSseElement mask;      // A bit mask in a register that holds this cell
+    size_t           regIndex;  // a general purpose register number of this cell
+    SudokuSseElement shift;     // a bit position from LSB in a register of this cell
+    SudokuSseElement mask;      // a bit mask in a register that holds this cell
 };
 
 // Results for solving in sudokusse.s
@@ -384,7 +384,7 @@ struct SudokuSseMapResult {
 
 // All cells in solving assembly
 class SudokuSseMap {
-    // Unit test
+    // unit tests
     friend class SudokuSseMapTest;
     template <class TestedT, class CandidatesT> friend class SudokuSolverCommonTest;
 private:
@@ -405,13 +405,13 @@ public:
 
 // All cells to counting solutions of a puzzle in assembly
 class SudokuSseEnumeratorMap {
-    // Unit tests
+    // unit tests
     friend class SudokuSseEnumeratorMapTest;
 private:
-    static constexpr size_t InitialRegisterNum = 1;      // The number of an XMM register which holds the top row.
-    static constexpr size_t RightColumnRegisterNum = 10; // The number of an XMM register which holds the rightmost column.
-    static constexpr size_t CellBitWidth = 16;           // The number of bits for a cell
-    static constexpr size_t BitsPerByte = 8;             // Bits per byte
+    static constexpr size_t InitialRegisterNum = 1;      // the number of an XMM register which holds the top row.
+    static constexpr size_t RightColumnRegisterNum = 10; // the number of an XMM register which holds the rightmost column.
+    static constexpr size_t CellBitWidth = 16;           // the number of bits for a cell
+    static constexpr size_t BitsPerByte = 8;             // bits per byte
     SudokuCellCandidates rightBottomElement_;
     gRegister firstCell_;
     SudokuPatternCount patternNumber_;
@@ -436,7 +436,7 @@ private:
 
 // A Sudoku solver with assembly
 class SudokuSseSolver : public SudokuBaseSolver {
-    // Unit test
+    // unit tests
     friend class SudokuSseSolverTest;
     template <class TestedT, class CandidatesT> friend class SudokuSolverCommonTest;
 
@@ -452,7 +452,7 @@ private:
     bool solve(SudokuSseMap& map, bool topLevel, bool verbose);
     bool fillCells(SudokuSseMap& map, bool topLevel, bool verbose, SudokuSseMapResult& result);
 
-    SudokuSseMap map_;    // A sudoku puzzle (we allocate copies of this in backtracking)
+    SudokuSseMap map_;    // a sudoku puzzle (we allocate copies of this in backtracking)
     SudokuSseEnumeratorMap enumeratorMap_;
     SudokuPatternCount printAllCandidate_;
 };
@@ -460,7 +460,7 @@ private:
 // Checking solutions are correct and meet constraints for Sudoku
 class SudokuCheckerTest;
 class SudokuChecker {
-    // Unit tests
+    // unit tests
     friend class SudokuCheckerTest;
 public:
     SudokuChecker(const std::string& puzzle, const std::string& solution, SudokuSolverPrint printSolution, std::ostream* pSudokuOutStream);
@@ -489,7 +489,7 @@ class SudokuMultiDispatcherTest;
 // Reading and solving a puzzle in a thread.
 // This class is movable and cannot be inherited to be pushed to a vector.
 class SudokuDispatcher final {
-    // Unit test
+    // unit tests
     friend class SudokuDispatcherTest;
     friend class SudokuMultiDispatcherTest;
     friend class SudokuLoaderTest;
@@ -513,7 +513,7 @@ private:
 // Reading and solving puzzles in a thread
 class SudokuMultiDispatcher {
 public:
-    // Unit tests
+    // unit tests
     friend class SudokuMultiDispatcherTest;
     friend class SudokuLoaderTest;
 
@@ -535,7 +535,7 @@ private:
 
 // Reading puzzles and measuring how long does it take to solve them.
 class SudokuLoader {
-    // Unit tests
+    // unit tests
     friend class SudokuLoaderTest;
     friend struct SudokuTestArgsMultiMode;
 
@@ -573,7 +573,7 @@ private:
     std::string sudokuStr_;  // represents a puzzle (set of initial numbers)
     std::string multiLineFilename_;      // name of a file that holds Sudoku puzzles in lines.
     std::unique_ptr<Sudoku::BaseParallelRunner> pParallelRunner_;  // set of parallel runners of solvers
-    NumberOfCores     numberOfThreads_;  // number of many threads solving puzzles
+    NumberOfCores     numberOfThreads_;  // How many threads solving puzzles
     SudokuSolverType  solverType_;  // How to solve Sudoku puzzles
     SudokuSolverCheck check_;       // Whether or not checking solutions
     SudokuSolverPrint print_;       // Whether or not printing results
