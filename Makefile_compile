@@ -29,11 +29,17 @@ sudokusse_cells_packed.o : sudokusse.s
 
 $(HEADERS): ;
 
-$(GENERATED_CODE) : $(GENERATOR_SCRIPT)
-	$(RUBY) $(GENERATOR_SCRIPT)
+$(GENERATED_CODE) : $(GENERATOR_SCRIPTS)
+ifneq (,$(RUBY))
+	$(RUBY) $(GENERATOR_SCRIPT_RUBY)
+else
+ifneq (,$(PYTHON))
+	$(PYTHON) $(GENERATOR_SCRIPT_PYTHON) $(GENERATED_CODE)
+endif
+endif
 
 clean:
-	$(RM) $(TARGETS) $(OBJS) $(GENERATED_CODE) ./*.o
+	$(RM) $(TARGETS) $(OBJS) $(GENERATED_CODE) $(GENERATED_CODE_PYTHON) ./*.o
 
 #Local Variables:
 #mode: Makefile

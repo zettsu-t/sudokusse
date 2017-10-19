@@ -3,9 +3,9 @@ THIS_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(THIS_DIR)Makefile_vars
 
 .SUFFIXES: .o .cpp .h .s
-.PHONY: all clean
+.PHONY: all clean force
 
-all: $(TARGETS)
+all: force $(TARGETS)
 
 $(CELLS_UNPACKED_TARGET_SSE): $(CELLS_UNPACKED_OBJS_SSE)
 	$(LD) $(LIBPATH) -o $@ $(LDFLAGS) $^ $(LIBS)
@@ -25,22 +25,22 @@ $(NO_PARALLEL_TARGET): $(NO_PARALLEL_OBJS)
 $(USE_BOOST_TARGET): $(USE_BOOST_OBJS)
 	$(LD) $(LIBPATH) -o $@ $(LDFLAGS) $^ $(LIBS_BOOST) $(LIBS)
 
-%$(POSTFIX_SSE).o : %.cpp $(HEADERS) $(GENERATED_CODES)
+%$(POSTFIX_SSE).o : %.cpp $(HEADERS) $(GENERATED_CODE)
 	$(CXX) -c $(CPPFLAGS_SSE) $(CPPFLAGS_INTEL_SYNTAX) $< -o $@
 
-%$(POSTFIX_AVX).o : %.cpp $(HEADERS) $(GENERATED_CODES)
+%$(POSTFIX_AVX).o : %.cpp $(HEADERS) $(GENERATED_CODE)
 	$(CXX) -c $(CPPFLAGS_AVX) $(CPPFLAGS_INTEL_SYNTAX) $< -o $@
 
-%$(POSTFIX_NO_PARALLEL).o : %.cpp $(HEADERS) $(GENERATED_CODES)
+%$(POSTFIX_NO_PARALLEL).o : %.cpp $(HEADERS) $(GENERATED_CODE)
 	$(CXX) -c $(CPPFLAGS_NO_PARALLEL) $(CPPFLAGS_INTEL_SYNTAX) $< -o $@
 
-%$(POSTFIX_USE_BOOST).o : %.cpp $(HEADERS) $(GENERATED_CODES)
+%$(POSTFIX_USE_BOOST).o : %.cpp $(HEADERS) $(GENERATED_CODE)
 	$(CXX) -c $(CPPFLAGS_USE_BOOST) $(CPPFLAGS_INTEL_SYNTAX) $< -o $@
 
-sudokuparalleltest$(POSTFIX_USE_BOOST).o : sudokuparalleltest.cpp $(HEADERS) $(GENERATED_CODES)
+sudokuparalleltest$(POSTFIX_USE_BOOST).o : sudokuparalleltest.cpp $(HEADERS) $(GENERATED_CODE)
 	$(CXX) -c $(CPPFLAGS_USE_BOOST) $< -o $@
 
-sudoku_boost$(POSTFIX_USE_BOOST).o : sudoku_boost.cpp $(HEADERS) $(GENERATED_CODES)
+sudoku_boost$(POSTFIX_USE_BOOST).o : sudoku_boost.cpp $(HEADERS) $(GENERATED_CODE)
 	$(CXX) -c $(CPPFLAGS_USE_BOOST) $< -o $@
 
 sudokusse_cells$(POSTFIX_UNPACKED)$(POSTFIX_SSE).o : sudokusse.s
@@ -57,11 +57,17 @@ sudokusse_cells$(POSTFIX_PACKED)$(POSTFIX_AVX).o : sudokusse.s
 
 $(HEADERS): ;
 
-$(GENERATED_CODES) : $(GENERATOR_SCRIPT)
-	$(RUBY) $(GENERATOR_SCRIPT)
+force: $(GENERATED_CODE)
+
+$(GENERATED_CODE) : $(GENERATOR_SCRIPTS)
+	$(RUBY) $(GENERATOR_SCRIPT_RUBY)
+ifneq (,$(PYTHON))
+	$(PYTHON) $(GENERATOR_SCRIPT_PYTHON) $(GENERATED_CODE_PYTHON)
+	diff --strip-trailing-cr $(GENERATED_CODE) $(GENERATED_CODE_PYTHON)
+endif
 
 clean:
-	$(RM) $(TARGETS) $(OBJS) $(GENERATED_CODES) ./*.o
+	$(RM) $(TARGETS) $(OBJS) $(GENERATED_CODE_SET) ./*.o
 
 #Local Variables:
 #mode: Makefile
