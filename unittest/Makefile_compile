@@ -3,9 +3,9 @@ THIS_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(THIS_DIR)Makefile_vars
 
 .SUFFIXES: .o .cpp .h .s
-.PHONY: all clean force
+.PHONY: all clean script
 
-all: force $(TARGETS)
+all: script $(TARGETS)
 
 $(CELLS_UNPACKED_TARGET_SSE): $(CELLS_UNPACKED_OBJS_SSE)
 	$(LD) $(LIBPATH) -o $@ $(LDFLAGS) $^ $(LIBS)
@@ -57,7 +57,7 @@ sudokusse_cells$(POSTFIX_PACKED)$(POSTFIX_AVX).o : sudokusse.s
 
 $(HEADERS): ;
 
-force: $(GENERATED_CODE)
+script: $(GENERATED_CODE)
 
 $(GENERATED_CODE) : $(GENERATOR_SCRIPTS)
 	$(RUBY) $(GENERATOR_SCRIPT_RUBY)
