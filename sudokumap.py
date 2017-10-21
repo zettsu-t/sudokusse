@@ -111,7 +111,7 @@ class SudokuConstAll:
     def get_reverse_group_cell_str(self, column, row):
         group = ((column // SUDOKU_BOX_IN_COLUMN)
                  * SUDOKU_BOX_HORIZONTAL_SIZE) + (row // SUDOKU_BOX_IN_ROW)
-        return "{%d,%d,%d}" % (column, row, group)
+        return '{' + '{},{},{}'.format(column, row, group) + '}'
 
     def get_reverse_group_column_str(self, column):
         f = lambda row: self.get_reverse_group_cell_str(column, row)
@@ -138,7 +138,7 @@ class SudokuConstAll:
         count = self.count_bits(bitmap)
         is_unique = 'true' if (count == 1) else 'false'
         is_multiple = 'true' if (count > 1) else 'false'
-        str = '{%s,%s,%d}' % (is_unique, is_multiple, count)
+        str = '{' + '{},{},{}'.format(is_unique, is_multiple, count) + '}'
         str += '.' if (bitmap % 8) == 7 else ''
         return str
 
