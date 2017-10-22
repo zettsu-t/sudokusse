@@ -100,13 +100,13 @@ class SudokuConstAll():
         return row * SUDOKU_COLUMNS_IN_MAP + column
 
     @staticmethod
-    def get_cells_str(cell_str_func, length):
+    def get_cells_str(func, length):
         '''
         Converts numbers 0..(length-1) to a C++ array
         via cell_str_func.
         '''
         code_str = '{'
-        code_str += ','.join(list(map(cell_str_func, range(length))))
+        code_str += ','.join(list(map(func, range(length))))
         code_str += '}'
         return code_str
 
