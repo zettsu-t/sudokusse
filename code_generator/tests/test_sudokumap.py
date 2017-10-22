@@ -12,6 +12,7 @@ import tempfile
 from unittest import TestCase
 import sudokumap.sudokumap as tested
 
+
 class TestConstants(TestCase):
     '''Testing global constants'''
 
@@ -89,6 +90,7 @@ EXPECTED_GENERATED_CODE += '{Boxes,\nCode}\n'
 EXPECTED_GENERATED_CODE += '};\n\n'
 EXPECTED_GENERATED_CODE += 'ReverseGroupCode\n'
 EXPECTED_GENERATED_CODE += 'ForwardGroupCode'
+
 
 class TestGenratingCode(TestCase):
     '''Testing to generate and write code'''
@@ -198,7 +200,8 @@ class TestCommonFunctions(TestCase):
                  [0, 0, 1, '1,10,19'],
                  [6, 3, 2, '35,44,53']]
         for base_x, base_y, ofs_x, expected in cases:
-            actual = tested.SudokuConstAll.get_box_line_str(base_x, base_y, ofs_x)
+            actual = tested.SudokuConstAll.get_box_line_str(
+                base_x, base_y, ofs_x)
             self.assertEqual(actual, expected)
 
     def test_box_str_set(self):
@@ -242,7 +245,8 @@ class TestCommonFunctions(TestCase):
                  [5, 8, '{5,8,5}'], [8, 5, '{8,5,7}'],
                  [6, 6, '{6,6,8}'], [7, 8, '{7,8,8}'], [8, 7, '{8,7,8}']]
         for column, row, expected in cases:
-            actual = tested.SudokuConstAll.get_reverse_group_cell_str(column, row)
+            actual = tested.SudokuConstAll.get_reverse_group_cell_str(
+                column, row)
             self.assertEqual(actual, expected)
 
     def test_reverse_group_column_str(self):
@@ -277,10 +281,12 @@ class TestCommonFunctions(TestCase):
         '''Testing an element in the cell forward group'''
 
         cases = [[0, '{false,false,0}'], [1, '{true,false,1}'],
-                 [2, '{true,false,1}'], [3, '{false,true,2}'], [7, '{false,true,3}.'],
+                 [2, '{true,false,1}'], [3, '{false,true,2}'],
+                 [7, '{false,true,3}.'],
                  [510, '{false,true,8}'], [511, '{false,true,9}.']]
         for bitmap, expected in cases:
-            actual = tested.SudokuConstAll([]).get_cell_lookup_element_str(bitmap)
+            actual = tested.SudokuConstAll([]). \
+                     get_cell_lookup_element_str(bitmap)
             self.assertEqual(actual, expected)
 
     def test_cell_lookup_str(self):
