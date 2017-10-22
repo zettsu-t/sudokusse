@@ -16,7 +16,7 @@ endef
 
 .PHONY: all check clean rebuild script show FORCE
 
-all: $(TARGETS) check
+all: script $(TARGETS) check
 
 # Compile if source files are changed
 $(TARGETS): FORCE

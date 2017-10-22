@@ -4,13 +4,15 @@
 '''
 This script writes code which is same as sudokumap.rb writes.
 Copyright (C) 2017 Zettsu Tatsuya
+
+usage : python3 sudokumap.py [outfilename]
+If you give a filename as a command line argument, this script writes
+code to the file, otherwise write to the file specified below.
 '''
 
 import re
 import sys
 
-# If you give a filename as a command line argument, this script writes
-# code to the file, otherwise write to the file specified below.
 SUDOKU_GENERATED_FILENAME = 'sudokuConstAll.h'
 
 # Constants for Sudoku
@@ -38,10 +40,10 @@ SUDOKU_XMM_PER_GENERAL_REGISTER = 4
 class SudokuConstAll():
     '''Generated header file'''
 
-    def __init__(self):
+    def __init__(self, command_line_arguments):
         self.filename = SUDOKU_GENERATED_FILENAME
-        if len(sys.argv) > 1:
-            self.filename = sys.argv[1]
+        if len(command_line_arguments) > 1:
+            self.filename = command_line_arguments[1]
 
     def write(self):
         '''Writes generated code to a file'''
@@ -74,6 +76,19 @@ class SudokuConstAll():
         code_str += get_lines_str(self.get_boxes_str_set(), '')
         code_str += '};\n'
         return code_str
+
+    @staticmethod
+    def count_bits(bitmap):
+        '''Returns the number of bit 1s in the integet bitmap'''
+
+        count = 0
+        bitmask = 1
+        bit_pos = 0
+        while bit_pos < SUDOKU_CELLS_IN_GROUP:
+            count += 1 if (bitmap & bitmask) else 0
+            bitmask *= 2
+            bit_pos += 1
+        return count
 
     @staticmethod
     def get_cell_index(column, row):
@@ -203,19 +218,6 @@ class SudokuConstAll():
         code_str += '\n};\n'
         return code_str
 
-    @staticmethod
-    def count_bits(bitmap):
-        '''Returns the number of bit 1s in the integet bitmap'''
-
-        count = 0
-        bitmask = 1
-        bit_pos = 0
-        while bit_pos < SUDOKU_CELLS_IN_GROUP:
-            count += 1 if (bitmap & bitmask) else 0
-            bitmask *= 2
-            bit_pos += 1
-        return count
-
     def get_cell_lookup_element_str(self, bitmap):
         '''Returns code of an element in a cell lookup table'''
 
@@ -235,5 +237,6 @@ class SudokuConstAll():
                                      range(2 ** SUDOKU_CELLS_IN_GROUP))))
         return header + re.sub(r'\.(,?)', '\\1\n', code_str) + '};'
 
-SudokuConstAll().write()
-sys.exit(0)
+if __name__ == "__main__":
+    SudokuConstAll(sys.argv).write()
+    sys.exit(0)
