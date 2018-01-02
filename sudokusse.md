@@ -691,6 +691,16 @@ its 32-bit register alias, for example RAX to EAX register, I would
 like to share your solution on
 [the Stack Overflow Community](http://stackoverflow.com/questions/41107642/how-to-convert-x86-64-64-bit-register-names-to-their-corresponding-32-bit-regist).
 
+## Solving Sudoku puzzles with NumPy
+
+I write a Python script to solve Sudoku puzzles with NumPy.
+This script accepts files in the format 2 (81 characters in one line).
+Notice that its backtracking is very slow.
+
+```bash
+$ python3 sudoku_numpy.py puzzle_text_filename
+```
+
 ## Bibliography and acknowledgments
 
 1. I cite the sudoku solver algorithm and puzzle examples from the
