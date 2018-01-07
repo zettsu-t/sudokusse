@@ -62,7 +62,7 @@ class SudokuSolver(object):
             while line:
                 sudoku_str = line.strip()
                 sudoku_map = self.parse_puzzle_str(sudoku_str)
-                if not sudoku_map is None:
+                if sudoku_map is not None:
                     sudoku_maps.append((sudoku_str, sudoku_map))
                 line = infile.readline()
 
@@ -90,7 +90,7 @@ class SudokuSolver(object):
             column = index % 9
             try:
                 num = int(num_str)
-                if num >= 1 and num <= 9:
+                if 1 <= num <= 9:
                     sudoku_map[row, column] = np.full((9), False, dtype=bool)
                     sudoku_map[row, column, num - 1] = True
             except ValueError:
