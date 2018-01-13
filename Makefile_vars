@@ -1,6 +1,7 @@
 # Makefile
 LD=g++
-CXX=g++
+# Set clang++ if you like
+CXX?=g++
 AS=as
 RUBY=ruby
 
@@ -43,6 +44,7 @@ endif
 
 else
 # MinGW does not support C++11 thread
+BUILD_ON_MINGW=yes
 PYTHON=python
 ifeq (yes,$(USE_BOOST_THREAD))
 LDFLAGS=-LC:\MinGW\lib
@@ -54,14 +56,50 @@ LIBS=
 CPPFLAGS_PARALLEL=-DNO_PARALLEL
 endif
 
+# Workaround for clang++ and ld
+ifeq ($(CXX),clang++)
+LDFLAGS+=-Wl,--allow-multiple-definition
 endif
+endif
+endif
+
+GCC_FULL_VERSION:=$(shell export LC_ALL=C ; gcc -v 2>&1 | tail -1 | cut -d " " -f 3)
+ifeq ($(CXX),clang++)
+# Using clang++
+LLVM_VERSION:=$(shell export LC_ALL=C ; clang++ -v 2>&1 | head -1 | sed -e "s/.* \\([0-9]\\)\\.\\([0-9]\\).*/\\1.\\2/")
+LLVM_CPP17_VERSION=5.0
+VERSION_COMPARED=$(shell echo "$(LLVM_VERSION) >= $(LLVM_CPP17_VERSION)" | bc)
+
+ifeq ($(BUILD_ON_MINGW),yes)
+CLANG_FLAGS=-target x86_64-pc-windows-gnu -fno-exceptions
+MINGW_DIR=C:\MinGW
+MINGW_GCC_INCLUDE_DIR=$(MINGW_DIR)\lib\gcc\x86_64-w64-mingw32\$(GCC_FULL_VERSION)\include
+ISYSTEM_MINGW_INCLUDE_DIR = $(subst $(SPACE),$(COMMA),$(MINGW_DIR))\include
+ISYSTEM_MINGW_INCLUDE_CPP_DIR = $(subst $(SPACE),$(COMMA),$(MINGW_DIR))\include\c++\$(GCC_FULL_VERSION)
+ISYSTEM_MINGW_INCLUDE_X86_DIR = $(subst $(SPACE),$(COMMA),$(MINGW_DIR))\include\c++\$(GCC_FULL_VERSION)\x86_64-w64-mingw32
+ISYSTEM_X64_DIR = $(subst $(SPACE),$(COMMA),$(MINGW_DIR))\x86_64-w64-mingw32\include
+ISYSTEM_GCC_INCLUDE_DIR = $(subst $(SPACE),$(COMMA),$(MINGW_GCC_INCLUDE_DIR))
+MINGW_ALL_INCLUDES = $(subst $(COMMA),$(SPACE),$(addprefix -isystem ,$(addsuffix ,$(ISYSTEM_MINGW_INCLUDE_DIR) $(ISYSTEM_MINGW_INCLUDE_CPP_DIR) $(ISYSTEM_MINGW_INCLUDE_X86_DIR) $(ISYSTEM_X64_DIR))))
+endif
+
+else
+# Using g++
+GCC_VERSION:=$(shell export LC_ALL=C ; g++ -v 2>&1 | tail -1 | sed -e "s/.* \\([0-9]\\)\\.\\([0-9]\\).*/\\1.\\2/")
+GCC_CPP17_VERSION=7.2
+VERSION_COMPARED=$(shell echo "$(GCC_VERSION) >= $(GCC_CPP17_VERSION)" | bc)
+endif
+
+ifeq ($(VERSION_COMPARED),1)
+CPP_STD=-std=c++17
+else
+CPP_STD=-std=c++11
 endif
 
 # -O2 optimization is better than -O3 in this program
 # Do not set -masm=intel for sources which include boost::thread
 # -Wconversion causes warnings that are ignorable.
 CPPFLAGS_WALL=-Wall -W -Wformat=2 -Wcast-qual -Wcast-align -Wwrite-strings -Wfloat-equal -Wpointer-arith -Wno-unused-parameter
-CPPFLAGS=-std=c++11 -O2 $(CPPFLAGS_WALL) -m64 $(CPPFLAGS_SSE_AVX) $(CPPFLAGS_PARALLEL)
+CPPFLAGS=$(CPP_STD) $(CLANG_FLAGS) -O2 $(CPPFLAGS_WALL) -m64 $(CPPFLAGS_SSE_AVX) $(CPPFLAGS_PARALLEL) $(MINGW_ALL_INCLUDES)
 
 CELLS_UNPACKED_TARGET=bin/sudokusse
 CELLS_PACKED_TARGET=bin/sudokusse_cells_packed
@@ -87,7 +125,11 @@ GENERATOR_SCRIPTS=$(GENERATOR_SCRIPT_RUBY) $(GENERATOR_SCRIPT_PYTHON)
 ALL_UPDATED_VARIABLES= \
 	LD CXX AS RUBY PYTHON \
 	USE_AVX_VALUE ASFLAGS_SSE_AVX CPPFLAGS_SSE_AVX CPPFLAGS_INTEL_SYNTAX \
-	USE_BOOST_THREAD GCC_MAJOR_VERSION LDFLAGS LIBS CPPFLAGS_PARALLEL CPPFLAGS \
+	USE_BOOST_THREAD GCC_MAJOR_VERSION LDFLAGS LIBS CPPFLAGS_PARALLEL \
+	GCC_FULL_VERSION LLVM_VERSION LLVM_CPP17_VERSION \
+	GCC_VERSION GCC_CPP17_VERSION VERSION_COMPARED \
+	CLANG_FLAGS MINGW_DIR MINGW_GCC_INCLUDE_DIR MINGW_ALL_INCLUDES \
+	CPP_STD CPPFLAGS_WALL CPPFLAGS \
 	CELLS_UNPACKED_TARGET CELLS_PACKED_TARGET TARGETS \
 	OS_DEPENDENT_OBJ CELLS_COMMON_OBJS CELLS_UNPACKED_OBJS CELLS_PACKED_OBJS OBJS \
 	HEADERS GENERATED_CODE GENERATED_CODE_PYTHON GENERATOR_SCRIPT_RUBY \

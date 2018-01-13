@@ -1,5 +1,5 @@
 // Sudoku solver with SSE 4.2 / AVX
-// Copyright (C) 2012-2017 Zettsu Tatsuya
+// Copyright (C) 2012-2018 Zettsu Tatsuya
 // Absorb platform dependencies between Windows and Linux, C++11 and Boost C++ Libraries
 
 #ifndef SUDOKU_OS_DEPENDENT_H_INCLUDED
@@ -64,6 +64,7 @@ namespace Sudoku {
     class BaseTimer : public ITimer {
         // unit tests
         friend class ::SudokuTimerTest;
+        friend class ::SudokuWindowsTimerTest;
     protected:
         BaseTimer(void) = default;
     public:
@@ -86,11 +87,13 @@ namespace Sudoku {
         // Get CPU clock via an instruction
         void getTimeOfClock(ClockCount& timestamp) {
             auto pTime = &timestamp;
+            // We cannot use %reg in clang inline assembly
             asm volatile (
+                ".intel_syntax noprefix\n\t"
                 "RDTSC\n\t"
-                "mov [%0], eax\n\t"
-                "mov [%0+4], edx\n\t"
-                ::"r"(pTime):"eax", "edx"
+                "mov [rbx], eax\n\t"
+                "mov [rbx + 4], edx\n\t"
+                ::"b"(pTime):"eax", "edx"
                 );
             return;
         }

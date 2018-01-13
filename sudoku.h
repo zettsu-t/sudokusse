@@ -1,5 +1,5 @@
 // Sudoku solver with SSE 4.2 / AVX
-// Copyright (C) 2012-2017 Zettsu Tatsuya
+// Copyright (C) 2012-2018 Zettsu Tatsuya
 
 #ifndef SUDOKU_H_INCLUDED
 #define SUDOKU_H_INCLUDED
@@ -8,6 +8,7 @@
 #include <array>
 #include <string>
 #include <vector>
+#include <utility>
 #include <nmmintrin.h>
 
 // Undefine this macro if we use virtual functions.
@@ -16,6 +17,13 @@
 
 // Set this macro to use fast but complicated code
 #define FAST_MODE (true)
+
+// if-constexpr {} in C++17
+#if __cplusplus >= 201703L
+#define CPP17_IF_CONSTEXPR constexpr
+#else
+#define CPP17_IF_CONSTEXPR
+#endif
 
 // Do not use inlining in unit tests to prevent link errors.
 #if !defined(UNITTEST)
@@ -130,9 +138,13 @@ namespace Sudoku {
     void SaveXmmRegistersToMem(xmmRegister *pData);          // saves XMM registers to main memory
 
     // Sets a number to a cell if valid
+#if __cplusplus >= 201703L
+    template <typename SudokuNumberType>
+    std::pair<bool, int> ConvertCharToSudokuCandidate(SudokuNumberType minNum, SudokuNumberType maxNum, char c);
+#else
     template <typename SudokuNumberType>
     bool ConvertCharToSudokuCandidate(SudokuNumberType minNum, SudokuNumberType maxNum, char c, int& num);
-
+#endif
     // Prints all candidates in a cell
     template <typename SudokuElementType>
     void PrintSudokuElement(SudokuElementType candidates, SudokuElementType uniqueCandidates,

@@ -12,10 +12,11 @@ shown below are required.
 |Tool|Cygwin 64bit|Bash on Ubuntu on Windows|MinGW-w64|
 |:------|:------|:------|:------|
 |GCC (g++)|6.4.0|4.8.4|7.2.0|
+|LLVM (clang++)|5.0.1|-|5.0.1|
 |GNU assembler (as)|2.29.51|2.24|2.29|
 |GNU Make|4.2.1|3.81|4.2.1|
 |Ruby|2.3.3p222|1.9.3p484|ActiveScriptRuby 2.4.0p0|
-|Perl|5.22.4|5.18.2|Cygwin perl|
+|Perl|5.26.4|5.18.2|Cygwin perl|
 |CppUnit|1.13.2|1.13.0|-|
 
 * SudokuSSE requires C++ compilers that support C++11 and GNU style
@@ -45,6 +46,24 @@ After built successfully, these two executable files are generated.
 
 * sudokusse.exe (standard)
 * sudokusse_cells_packed.exe (special ; explained later)
+
+### Use LLVM and C++17
+
+Set environment variable _CXX_ to clang++ and you can compile C++
+source files of SudokuSSE with clang++ instead of g++.
+
+```bash
+# Cygwin
+export CXX=clang++ ; make
+
+# Windows cmd
+set CXX=clang++
+make
+```
+
+The _Makefile_ in SudokuSSE compiles C++ source files as C++17 (with
+-std=c++17 option) if the compilers support C++17. It is hard-coded
+in the Makefile_vars that GCC 7.2<= and LLVM 5.0<= support C++17.
 
 ### Switch to using SSE4.2 and AVX
 
