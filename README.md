@@ -13,6 +13,7 @@ tools.
 * Cygwin 64bit version
 * GNU Make
 * g++
+* clang++ (LLVM)
 * GNU assembler
 * Ruby
 * Perl
