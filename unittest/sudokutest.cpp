@@ -1,5 +1,5 @@
 // Testing common functions
-// Copyright (C) 2012-2017 Zettsu Tatsuya
+// Copyright (C) 2012-2018 Zettsu Tatsuya
 //
 // I use CppUnit code on the website.
 // http://www.atmarkit.co.jp/fdotnet/cpptest/cpptest02/cpptest02_03.html
@@ -107,7 +107,12 @@ void SudokuTemplateTest::test_ConvertCharToSudokuCandidate() {
     constexpr decltype(Sudoku::MinCandidatesNumber) minNum = 2;
     constexpr decltype(Sudoku::MinCandidatesNumber) maxNum = 8;
     for(const auto& test : testSet) {
+#if __cplusplus >= 201703L
         const auto [converted, num] = Sudoku::ConvertCharToSudokuCandidate(minNum, maxNum, test.c);
+#else
+        int num = -1;
+        const auto converted = Sudoku::ConvertCharToSudokuCandidate(minNum, maxNum, test.c, num);
+#endif
         CPPUNIT_ASSERT_EQUAL(test.expected_converted, converted);
         CPPUNIT_ASSERT_EQUAL(test.expected_num, num);
     }

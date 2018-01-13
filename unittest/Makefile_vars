@@ -1,6 +1,7 @@
 # Makefile
 LD=g++
-CXX=clang++
+# Set clang++ if you like
+CXX?=g++
 AS=as
 RUBY=ruby
 
@@ -36,10 +37,26 @@ LIBS+=
 endif
 endif
 
+ifeq ($(CXX),clang++)
+LLVM_VERSION:=$(shell export LC_ALL=C ; clang++ -v 2>&1 | head -1 | sed -e "s/.* \\([0-9]\\)\\.\\([0-9]\\).*/\\1.\\2/")
+LLVM_CPP17_VERSION=5.0
+VERSION_COMPARED=$(shell echo "$(LLVM_VERSION) >= $(LLVM_CPP17_VERSION)" | bc)
+else
+GCC_VERSION:=$(shell export LC_ALL=C ; g++ -v 2>&1 | tail -1 | sed -e "s/.* \\([0-9]\\)\\.\\([0-9]\\).*/\\1.\\2/")
+GCC_CPP17_VERSION=7.2
+VERSION_COMPARED=$(shell echo "$(GCC_VERSION) >= $(GCC_CPP17_VERSION)" | bc)
+endif
+
+ifeq (1,$(VERSION_COMPARED))
+CPP_STD=-std=c++17
+else
+CPP_STD=-std=c++11
+endif
+
 # -Wconversion causes warnings that are ignorable.
 CPPFLAGS_WALL=-Wall -W -Wformat=2 -Wcast-qual -Wcast-align -Wwrite-strings -Wfloat-equal -Wpointer-arith -Wno-unused-parameter
 CPPFLAGS_INTEL_SYNTAX=-masm=intel
-CPPFLAGS_COMMON=-std=c++17 -O0 -g $(CPPFLAGS_WALL) -m64 -DUNITTEST $(INCLUDES) $(LIBCFLAGS)
+CPPFLAGS_COMMON=$(CPP_STD) -O0 -g $(CPPFLAGS_WALL) -m64 -DUNITTEST $(INCLUDES) $(LIBCFLAGS)
 CPPFLAGS_SSE=$(CPPFLAGS_COMMON) -msse4.2 -DSUDOKU_USE_AVX=0
 CPPFLAGS_AVX=$(CPPFLAGS_COMMON) -mavx2 -DSUDOKU_USE_AVX=1
 CPPFLAGS_NO_PARALLEL=$(CPPFLAGS_COMMON) -msse4.2 -DSUDOKU_USE_AVX=0 -DNO_PARALLEL
@@ -126,6 +143,7 @@ VPATH=. ..
 ALL_UPDATED_VARIABLES= \
 	LD CXX AS RUBY PYTHON \
 	INCLUDES LIBPATH LIBCFLAGS LIBS LIBS_BOOST GCC_MAJOR_VERSION LDFLAGS \
+	LLVM_VERSION LLVM_CPP17_VERSION GCC_VERSION GCC_CPP17_VERSION VERSION_COMPARED CPP_STD \
 	CPPFLAGS_INTEL_SYNTAX CPPFLAGS_COMMON CPPFLAGS_SSE CPPFLAGS_AVX \
 	CPPFLAGS_NO_PARALLEL CPPFLAGS_USE_BOOST \
 	ASFLAGS_UNPACKED ASFLAGS_PACKED ASFLAGS_SSE ASFLAGS_AVX \
