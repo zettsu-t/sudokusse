@@ -1,6 +1,6 @@
 # Makefile
 LD=g++
-CXX=g++
+CXX=clang++
 AS=as
 RUBY=ruby
 
@@ -61,7 +61,7 @@ endif
 # Do not set -masm=intel for sources which include boost::thread
 # -Wconversion causes warnings that are ignorable.
 CPPFLAGS_WALL=-Wall -W -Wformat=2 -Wcast-qual -Wcast-align -Wwrite-strings -Wfloat-equal -Wpointer-arith -Wno-unused-parameter
-CPPFLAGS=-std=c++11 -O2 $(CPPFLAGS_WALL) -m64 $(CPPFLAGS_SSE_AVX) $(CPPFLAGS_PARALLEL)
+CPPFLAGS=-std=c++17 -O2 $(CPPFLAGS_WALL) -m64 $(CPPFLAGS_SSE_AVX) $(CPPFLAGS_PARALLEL)
 
 CELLS_UNPACKED_TARGET=bin/sudokusse
 CELLS_PACKED_TARGET=bin/sudokusse_cells_packed

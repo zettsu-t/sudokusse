@@ -23,6 +23,16 @@ protected:
 
 CPPUNIT_TEST_SUITE_REGISTRATION(SudokuMacroTest);
 
+class SudokuTemplateTest : public CPPUNIT_NS::TestFixture {
+    CPPUNIT_TEST_SUITE(SudokuTemplateTest);
+    CPPUNIT_TEST(test_ConvertCharToSudokuCandidate);
+    CPPUNIT_TEST_SUITE_END();
+protected:
+    void test_ConvertCharToSudokuCandidate();
+};
+
+CPPUNIT_TEST_SUITE_REGISTRATION(SudokuTemplateTest);
+
 void SudokuMacroTest::test_arraySizeof() {
     constexpr size_t expected = 7;
     static int array[expected];
@@ -48,7 +58,7 @@ void SudokuMacroTest::test_setMode() {
     constexpr int invalid = -1;
     constexpr int valid = 2;
 
-    struct Test{
+    struct Test {
         int argc;
         int argIndex;
         int expected;
@@ -68,6 +78,38 @@ void SudokuMacroTest::test_setMode() {
         int actual = invalid;
         SudokuOption::setMode(test.argc, Argv, test.argIndex, OptionSet, actual, valid);
         CPPUNIT_ASSERT_EQUAL(test.expected, actual);
+    }
+}
+
+void SudokuTemplateTest::test_ConvertCharToSudokuCandidate() {
+    struct Test {
+        char c;
+        bool expected_converted;
+        int expected_num;
+    };
+
+    const Test testSet[] = {
+        {'0', false, 0},
+        {'1', false, 1},
+        {'2', true, 2},
+        {'3', true, 3},
+        {'4', true, 4},
+        {'5', true, 5},
+        {'6', true, 6},
+        {'7', true, 7},
+        {'8', true, 8},
+        {'9', false, 9},
+        {'a', false, 0},
+        {'\r', false, 0},
+        {'\0', false, 0}
+    };
+
+    constexpr decltype(Sudoku::MinCandidatesNumber) minNum = 2;
+    constexpr decltype(Sudoku::MinCandidatesNumber) maxNum = 8;
+    for(const auto& test : testSet) {
+        const auto [converted, num] = Sudoku::ConvertCharToSudokuCandidate(minNum, maxNum, test.c);
+        CPPUNIT_ASSERT_EQUAL(test.expected_converted, converted);
+        CPPUNIT_ASSERT_EQUAL(test.expected_num, num);
     }
 }
 

@@ -43,7 +43,7 @@ namespace Sudoku {
         virtual ~NullParallelRunner(void) = default;
     protected:
         virtual NumberOfCores getHardwareConcurrency(void) override { return 0; }
-        virtual ResultType runParallel(EvaluatorSet& evaluatorSet) { return true; }
+        virtual ResultType runParallel(EvaluatorSet& evaluatorSet) override { return true; }
     };
 
     std::unique_ptr<BaseParallelRunner> CreateParallelRunner(void) {

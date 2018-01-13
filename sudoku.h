@@ -8,6 +8,7 @@
 #include <array>
 #include <string>
 #include <vector>
+#include <utility>
 #include <nmmintrin.h>
 
 // Undefine this macro if we use virtual functions.
@@ -131,7 +132,7 @@ namespace Sudoku {
 
     // Sets a number to a cell if valid
     template <typename SudokuNumberType>
-    bool ConvertCharToSudokuCandidate(SudokuNumberType minNum, SudokuNumberType maxNum, char c, int& num);
+    std::pair<bool, int> ConvertCharToSudokuCandidate(SudokuNumberType minNum, SudokuNumberType maxNum, char c);
 
     // Prints all candidates in a cell
     template <typename SudokuElementType>

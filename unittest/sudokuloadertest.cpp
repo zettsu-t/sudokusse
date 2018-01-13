@@ -59,16 +59,16 @@ const std::string SudokuCheckerTest::solutionWrong_           = "1:2:3:4:5:6:7:8
 CPPUNIT_TEST_SUITE_REGISTRATION(SudokuCheckerTest);
 
 void SudokuCheckerTest::setUp() {
-    SudokuChecker::Group row1 {1,2,3,4,5,6,7,8,9};
-    SudokuChecker::Group row2 {4,5,6,7,8,9,1,2,3};
-    SudokuChecker::Group row3 {7,8,9,1,2,3,4,5,6};
-    SudokuChecker::Group row4 {2,9,5,8,7,4,6,3,1};
-    SudokuChecker::Group row5 {3,1,4,2,6,5,8,9,7};
-    SudokuChecker::Group row6 {6,7,8,3,9,1,2,4,5};
-    SudokuChecker::Group row7 {5,3,1,6,4,2,9,7,8};
-    SudokuChecker::Group row8 {8,6,2,9,3,7,5,1,4};
-    SudokuChecker::Group row9 {9,4,7,5,1,8,3,6,2};
-    SudokuChecker::Grid grid {row1, row2, row3, row4, row5, row6, row7, row8, row9};
+    SudokuChecker::Group row1 {{1,2,3,4,5,6,7,8,9}};
+    SudokuChecker::Group row2 {{4,5,6,7,8,9,1,2,3}};
+    SudokuChecker::Group row3 {{7,8,9,1,2,3,4,5,6}};
+    SudokuChecker::Group row4 {{2,9,5,8,7,4,6,3,1}};
+    SudokuChecker::Group row5 {{3,1,4,2,6,5,8,9,7}};
+    SudokuChecker::Group row6 {{6,7,8,3,9,1,2,4,5}};
+    SudokuChecker::Group row7 {{5,3,1,6,4,2,9,7,8}};
+    SudokuChecker::Group row8 {{8,6,2,9,3,7,5,1,4}};
+    SudokuChecker::Group row9 {{9,4,7,5,1,8,3,6,2}};
+    SudokuChecker::Grid grid {{row1, row2, row3, row4, row5, row6, row7, row8, row9}};
     grid_ = grid;
     return;
 }
@@ -365,12 +365,12 @@ void SudokuCheckerTest::test_checkUnique() {
     };
 
     const Test testSet[] = {
-        {{1, 2, 3, 4, 5, 6, 7, 8, 9}, true},
-        {{9, 8, 7, 6, 5, 4, 3, 2, 1}, true},
-        {{1, 9, 2, 8, 3, 7, 4, 6, 5}, true},
-        {{1, 2, 3, 4, 5, 6, 7, 8, 1}, false},
-        {{1, 9, 2, 8, 3, 7, 4, 1, 9}, false},
-        {{1, 2, 3, 4, 5, 6, 7, 8}, false}
+        {{{1, 2, 3, 4, 5, 6, 7, 8, 9}}, true},
+        {{{9, 8, 7, 6, 5, 4, 3, 2, 1}}, true},
+        {{{1, 9, 2, 8, 3, 7, 4, 6, 5}}, true},
+        {{{1, 2, 3, 4, 5, 6, 7, 8, 1}}, false},
+        {{{1, 9, 2, 8, 3, 7, 4, 1, 9}}, false},
+        {{{1, 2, 3, 4, 5, 6, 7, 8}}, false}
     };
 
     for(const auto& test : testSet) {
@@ -1126,10 +1126,10 @@ void SudokuLoaderTest::test_readLines() {
         SudokuLoader::DispatcherPtrSet dispatcherSet;
         for(SudokuPuzzleCount i=0; i<numberOfPuzzles; ++i) {
             dispatcherSet.push_back(
-                std::move(SudokuLoader::DispatcherPtr(
-                              new SudokuMultiDispatcher(
-                                  SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::DO_NOT_CHECK,
-                                  SudokuSolverPrint::DO_NOT_PRINT, 0))));
+                SudokuLoader::DispatcherPtr(
+                    new SudokuMultiDispatcher(
+                        SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::DO_NOT_CHECK,
+                        SudokuSolverPrint::DO_NOT_PRINT, 0)));
         }
 
         SudokuInStream is(pattern);
@@ -1169,10 +1169,10 @@ void SudokuLoaderTest::test_execAll() {
 
             for(SudokuLoader::NumberOfCores i=0; i<numberOfCores; ++i) {
                 dispatcherSet.push_back(
-                    std::move(SudokuLoader::DispatcherPtr(
-                                  new SudokuMultiDispatcher(
-                                      SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
-                                      SudokuSolverPrint::DO_NOT_PRINT, 0))));
+                    SudokuLoader::DispatcherPtr(
+                        new SudokuMultiDispatcher(
+                            SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
+                            SudokuSolverPrint::DO_NOT_PRINT, 0)));
             }
 
             SudokuInStream is(pattern);
@@ -1190,10 +1190,10 @@ void SudokuLoaderTest::test_writeMessage() {
     constexpr SudokuLoader::NumberOfCores numberOfCores = 3;
     for(SudokuLoader::NumberOfCores i=0; i<numberOfCores; ++i) {
         dispatcherSet.push_back(
-            std::move(SudokuLoader::DispatcherPtr(
-                          new SudokuMultiDispatcher(
-                              SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::DO_NOT_CHECK,
-                              SudokuSolverPrint::DO_NOT_PRINT, 0))));
+            SudokuLoader::DispatcherPtr(
+                new SudokuMultiDispatcher(
+                    SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::DO_NOT_CHECK,
+                    SudokuSolverPrint::DO_NOT_PRINT, 0)));
     }
 
     constexpr SudokuPuzzleCount sizeOfPuzzles = 7;

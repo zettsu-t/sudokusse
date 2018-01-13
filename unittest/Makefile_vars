@@ -1,6 +1,6 @@
 # Makefile
 LD=g++
-CXX=g++
+CXX=clang++
 AS=as
 RUBY=ruby
 
@@ -39,7 +39,7 @@ endif
 # -Wconversion causes warnings that are ignorable.
 CPPFLAGS_WALL=-Wall -W -Wformat=2 -Wcast-qual -Wcast-align -Wwrite-strings -Wfloat-equal -Wpointer-arith -Wno-unused-parameter
 CPPFLAGS_INTEL_SYNTAX=-masm=intel
-CPPFLAGS_COMMON=-std=c++11 -O0 -g $(CPPFLAGS_WALL) -m64 -DUNITTEST $(INCLUDES) $(LIBCFLAGS)
+CPPFLAGS_COMMON=-std=c++17 -O0 -g $(CPPFLAGS_WALL) -m64 -DUNITTEST $(INCLUDES) $(LIBCFLAGS)
 CPPFLAGS_SSE=$(CPPFLAGS_COMMON) -msse4.2 -DSUDOKU_USE_AVX=0
 CPPFLAGS_AVX=$(CPPFLAGS_COMMON) -mavx2 -DSUDOKU_USE_AVX=1
 CPPFLAGS_NO_PARALLEL=$(CPPFLAGS_COMMON) -msse4.2 -DSUDOKU_USE_AVX=0 -DNO_PARALLEL
@@ -81,8 +81,13 @@ TESTER_OS_DEPENDENT_OBJ=sudokuwindowstest.o
 endif
 OS_DEPENDENT_OBJS=$(TESTED_OS_DEPENDENT_OBJ) $(TESTER_OS_DEPENDENT_OBJ)
 
-TESTER_OBJS=main.o sudokussetest.o sudokutest.o sudokucelltest.o \
+TESTER_OBJS=main.o sudokutest.o sudokucelltest.o \
             sudokumaptest.o sudokusolvertest.o sudokuloadertest.o sudokuparalleltest.o
+# We cannot use %reg in clang inline assembly
+ifneq ($(CXX),clang++)
+TESTER_OBJS+=sudokussetest.o
+endif
+
 TESTED_OBJS=sudoku.o sudokuxmmreg.o sudoku_std.o
 TESTED_BOOST_OBJS=sudoku_boost.o
 CPP_OBJS=$(TESTER_OBJS) $(TESTED_OBJS)

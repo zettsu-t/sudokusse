@@ -49,20 +49,21 @@ extern "C" {
 namespace Sudoku {
     // Sets a number to a cell if valid
     template <typename SudokuNumberType>
-    bool ConvertCharToSudokuCandidate(SudokuNumberType minNum, SudokuNumberType maxNum, char c, int& num) {
+    std::pair<bool, int> ConvertCharToSudokuCandidate(SudokuNumberType minNum, SudokuNumberType maxNum, char c) {
+        int num = 0;
         char s[2] {'\0', '\0'};
 
         if (!::isdigit(c)) {
-            return false;
+            return {false, num};
         }
 
         s[0] = c;
-        num = (::atoi(s));
+        num = ::atoi(s);
         if ((num < minNum) || (num > maxNum)) {
-            return false;
+            return {false, num};
         }
 
-        return true;
+        return {true, num};
     }
 
     // Prints all candidates in a cell
@@ -101,8 +102,9 @@ SudokuCell::SudokuCell(void) : indexNumber_(0), candidates_(SudokuAllCandidates)
 
 // Presets a number in a given puzzle to a cell
 void SudokuCell::Preset(char c) {
-    int num = 0;
-    if (Sudoku::ConvertCharToSudokuCandidate(SudokuMinCandidatesNumber, SudokuMaxCandidatesNumber, c, num)) {
+    if (const auto [converted, num] = Sudoku::ConvertCharToSudokuCandidate(
+            SudokuMinCandidatesNumber, SudokuMaxCandidatesNumber, c);
+        converted) {
         // Does nothing for 0
         candidates_ = (num == 0) ? candidates_ : (SudokuUniqueCandidates << (num - 1));
     }
@@ -285,7 +287,7 @@ void SudokuMap::Print(std::ostream* pSudokuOutStream) const {
 
 // Returns whether all cells are filled
 INLINE bool SudokuMap::IsFilled(void) const {
-    if (FastMode == false) {
+    if constexpr (FastMode == false) {
         for(SudokuLoopIndex i=0;i<Sudoku::SizeOfAllCells;++i) {
             if(cells_[i].IsFilled() == false) {
                 return false;
@@ -414,7 +416,7 @@ bool SudokuMap::FillCrossing(void) {
     // Returns true if finding an inconsistent cell
 
     // It is faster to apply same functions continuously than interleave them.
-    if (FastMode == false) {
+    if constexpr (FastMode == false) {
         for(SudokuLoopIndex i=0;i<Sudoku::SizeOfAllCells;++i) {
             if (cells_[i].IsFilled()) {
                 continue;
@@ -650,7 +652,7 @@ INLINE SudokuIndex SudokuMap::unrolledCountFilledCells<0>(SudokuIndex accumCount
 INLINE SudokuIndex SudokuMap::CountFilledCells(void) const {
     SudokuIndex count = 0;
 
-    if (FastMode == false) {
+    if constexpr (FastMode == false) {
         for(SudokuLoopIndex i=0;i<Sudoku::SizeOfAllCells;++i) {
             if (cells_[i].IsFilled()) {
                 ++count;
@@ -664,8 +666,8 @@ INLINE SudokuIndex SudokuMap::CountFilledCells(void) const {
 }
 
 INLINE SudokuIndex SudokuMap::unrolledSelectBacktrackedCellIndexInnerCommon(SudokuIndex outerIndex, SudokuIndex innerIndex,
-                                                                           SudokuIndex& leastCountOfGroup,
-                                                                           SudokuIndex& candidateCellIndex) const {
+                                                                            SudokuIndex& leastCountOfGroup,
+                                                                            SudokuIndex& candidateCellIndex) const {
     const auto cellIndex = Group_[backtrackedGroup_][outerIndex][innerIndex];
     // Use an out-of-range value to eliminate branches
     const auto countOrOutOfRange = cells_[cellIndex].CountCandidatesIfMultiple();
@@ -701,12 +703,12 @@ INLINE SudokuIndex SudokuMap::SelectBacktrackedCellIndex(void) const {
     SudokuIndex resultCellIndex = 0;
 
     // It makes this function run slower if we unroll the outer loop below.
-    for(SudokuLoopIndex i=0;i<Sudoku::SizeOfGroupsPerMap;++i) {
+    for(SudokuLoopIndex i = 0; i < Sudoku::SizeOfGroupsPerMap; ++i) {
         SudokuIndex groupCount = 0;
         SudokuIndex leastCountOfGroup = Sudoku::SizeOfCandidates;
         SudokuIndex candidateCellIndex = 0;
-        if (FastMode == false) {
-            for(SudokuLoopIndex j=0;j<Sudoku::SizeOfCellsPerGroup;++j) {
+        if constexpr (FastMode == false) {
+            for(SudokuLoopIndex j = 0; j<Sudoku::SizeOfCellsPerGroup; ++j) {
                 // Select a cell which has a minimum number of candidates and is not filled.
                 const SudokuIndex cellIndex = Group_[backtrackedGroup_][i][j];
                 const SudokuIndex count = cells_[cellIndex].CountCandidates();
@@ -759,8 +761,8 @@ INLINE SudokuCellCandidates SudokuMap::unrolledFindUnusedCandidateInnerCommon(Su
                                                                               SudokuIndex groupIndex, SudokuIndex innerIndex,
                                                                               SudokuCellCandidates candidates) const {
     auto newCandidates = candidates;
-    const auto cellIndex = Group_[outerIndex][groupIndex][innerIndex];
-    if (cellIndex != targetCellIndex) {
+    if (const auto cellIndex = Group_[outerIndex][groupIndex][innerIndex];
+        cellIndex != targetCellIndex) {
         const auto cellCandidates = cells_[cellIndex].GetUniqueCandidate();
         newCandidates = SudokuCell::MergeCandidates(candidates, cellCandidates);
     }
@@ -813,7 +815,7 @@ bool SudokuMap::findUnusedCandidate(SudokuCell& targetCell) const {
     auto candidates = SudokuCell::GetEmptyCandidates();
     const auto targetCellIndex = targetCell.GetIndex();
 
-    if (FastMode == false) {
+    if constexpr (FastMode == false) {
         for(SudokuLoopIndex i=0;i<Sudoku::SizeOfGroupsPerCell;++i) {
             const auto groupIndex = ReverseGroup_[targetCellIndex][i];
             for(SudokuLoopIndex j=0;j<Sudoku::SizeOfCellsPerGroup;++j) {
@@ -837,8 +839,8 @@ INLINE SudokuCellCandidates SudokuMap::unrolledFindUniqueCandidateInnerCommon(Su
                                                                               SudokuIndex groupIndex, SudokuIndex innerIndex,
                                                                               SudokuCellCandidates candidates) const {
     auto newCandidates = candidates;
-    const auto cellIndex = Group_[outerIndex][groupIndex][innerIndex];
-    if (cellIndex != targetCellIndex) {
+    if (const auto cellIndex = Group_[outerIndex][groupIndex][innerIndex];
+        cellIndex != targetCellIndex) {
         newCandidates = SudokuCell::MergeCandidates(candidates, cells_[cellIndex].GetCandidates());
     }
     return newCandidates;
@@ -884,14 +886,14 @@ bool SudokuMap::findUniqueCandidate(SudokuCell& targetCell) const {
     // Returns true if finding a cell that cannot be filled.
     const auto targetCellIndex = targetCell.GetIndex();
 
-    if (FastMode == false) {
+    if constexpr (FastMode == false) {
         for(SudokuLoopIndex i=0;i<Sudoku::SizeOfGroupsPerCell;++i) {
             auto candidates = SudokuCell::GetEmptyCandidates();
             const auto groupIndex = ReverseGroup_[targetCellIndex][i];
-            if (FastMode == false) {
+            if constexpr (FastMode == false) {
                 for(SudokuLoopIndex j=0;j<Sudoku::SizeOfCellsPerGroup;++j) {
-                    const auto cellIndex = Group_[i][groupIndex][j];
-                    if (cellIndex != targetCellIndex) {
+                    if (const auto cellIndex = Group_[i][groupIndex][j];
+                        cellIndex != targetCellIndex) {
                         candidates = SudokuCell::MergeCandidates(candidates, cells_[cellIndex].GetCandidates());
                     }
                 }
@@ -942,9 +944,9 @@ void SudokuSseEnumeratorMap::Preset(const std::string& presetStr) {
         if (i >= presetStr.length()) {
             break;
         }
-        int num = 0;
-        if (!Sudoku::ConvertCharToSudokuCandidate(Sudoku::MinCandidatesNumber,
-                                                  Sudoku::MaxCandidatesNumber, presetStr[i], num)) {
+        const auto [converted, num] = Sudoku::ConvertCharToSudokuCandidate(Sudoku::MinCandidatesNumber,
+                                                                           Sudoku::MaxCandidatesNumber, presetStr[i]);
+        if (!converted) {
             foundEmpty = true;
             continue;
         }
@@ -1012,9 +1014,10 @@ SudokuPatternCount SudokuSseEnumeratorMap::Enumerate(void) {
 
     sudokuXmmRightBottomElement = rightBottomElement_;
 
+#ifndef __clang__
     static_assert((alignof(xmmRegSet_) % alignof(xmmRegister)) == 0, "Unexpected xmmRegSet_ alignment");
+#endif
     Sudoku::LoadXmmRegistersFromMem(reinterpret_cast<const xmmRegister *>(xmmRegSet_.regVal_));
-
     asm volatile (
         "call sudokuXmmCountFromCell\n\t"
         ::"a"(firstCell_):"rbx", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
@@ -1131,10 +1134,8 @@ bool SudokuSolver::solve(SudokuMap& map, bool topLevel, bool verbose) {
     // Guesses a number of 1..9 in the cell in a solution
     auto candidate = SudokuCell::GetInitialCandidate();
     for(;;) {
-        const auto canSet = map.CanSetUniqueCell(cellIndex, candidate);
-
         // We continue to solve the puzzle if we can set a valid candidate to the cell
-        if (canSet) {
+        if (map.CanSetUniqueCell(cellIndex, candidate)) {
             auto newMap = map;
             newMap.SetUniqueCell(cellIndex, candidate);
             if (solve(newMap, false, verbose)) {
@@ -1173,8 +1174,9 @@ SudokuSseCell::SudokuSseCell(void) {
 }
 
 void SudokuSseCell::Preset(char c) {
-    int num = 0;
-    if (Sudoku::ConvertCharToSudokuCandidate(SudokuMinCandidatesNumber, SudokuMaxCandidatesNumber, c, num)) {
+    const auto [converted, num] = Sudoku::ConvertCharToSudokuCandidate(
+        SudokuMinCandidatesNumber, SudokuMaxCandidatesNumber, c);
+    if (converted) {
         candidates_ = SudokuUniqueCandidates << (num - 1);
     }
     return;
@@ -1431,9 +1433,9 @@ bool SudokuChecker::Valid() const {
 
 bool SudokuChecker::parse(const std::string& puzzle, const std::string& solution,
                           SudokuSolverPrint printSolution, std::ostream* pSudokuOutStream) {
-    Grid grid {0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,
-               0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,
-               0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0};
+    Grid grid {{{{0,0,0,0,0,0,0,0,0}}, {{0,0,0,0,0,0,0,0,0}}, {{0,0,0,0,0,0,0,0,0}},
+                {{0,0,0,0,0,0,0,0,0}}, {{0,0,0,0,0,0,0,0,0}}, {{0,0,0,0,0,0,0,0,0}},
+                {{0,0,0,0,0,0,0,0,0}}, {{0,0,0,0,0,0,0,0,0}}, {{0,0,0,0,0,0,0,0,0}}}};
     bool valid = true;
     std::string solutionLine;
     solutionLine.reserve(Sudoku::CacheGuardSize);
@@ -1489,10 +1491,10 @@ bool SudokuChecker::parseRow(SudokuIndex row, const std::string& rowLine, Grid& 
         }
 
         // Checking numbers of each cell
-        int num = 0;
         const char c = rowLine.at(column * 2);
-        if (Sudoku::ConvertCharToSudokuCandidate(
-                Sudoku::MinCandidatesNumber, Sudoku::MaxCandidatesNumber, c, num)) {
+        const auto [converted, num] = Sudoku::ConvertCharToSudokuCandidate(
+            Sudoku::MinCandidatesNumber, Sudoku::MaxCandidatesNumber, c);
+        if (converted) {
             if ((grid.size() <= row) || (grid.at(0).size() <= column)) {
                 return false;
             }
@@ -1520,9 +1522,10 @@ bool SudokuChecker::compare(const std::string& puzzle, const std::string& soluti
     bool valid = true;
 
     for(SudokuIndex i=0; valid && (i < Sudoku::SizeOfAllCells); ++i) {
-        int num = 0;
         const char c = fullPuzzle.at(i);
-        if (!Sudoku::ConvertCharToSudokuCandidate(Sudoku::MinCandidatesNumber, Sudoku::MaxCandidatesNumber, c, num)) {
+        const auto [converted, num] = Sudoku::ConvertCharToSudokuCandidate(
+            Sudoku::MinCandidatesNumber, Sudoku::MaxCandidatesNumber, c);
+        if (!converted) {
             continue;
         }
 
@@ -1562,7 +1565,7 @@ bool SudokuChecker::checkRowSet(const Grid& grid, std::ostream* pSudokuOutStream
 bool SudokuChecker::checkColumnSet(const Grid& grid, std::ostream* pSudokuOutStream) {
     // Checks whether each of 1..9 appears just once in each column
     for(SudokuIndex column = 0; column < Sudoku::SizeOfGroupsPerMap; ++column) {
-        Group group {0,0,0,0,0,0,0,0,0};
+        Group group {{0,0,0,0,0,0,0,0,0}};
         for(SudokuIndex row = 0; row < Sudoku::SizeOfCellsPerGroup; ++row) {
             if (group.size() <= row) {
                 return false;
@@ -1586,7 +1589,7 @@ bool SudokuChecker::checkBoxSet(const Grid& grid, std::ostream* pSudokuOutStream
     // Checks whether each of 1..9 appears just once in each box
     for(SudokuIndex column = 0; column < Sudoku::SizeOfGroupsPerMap; column += Sudoku::SizeOfBoxesOnEdge) {
         for(SudokuIndex row = 0; row < Sudoku::SizeOfCellsPerGroup; row += Sudoku::SizeOfBoxesOnEdge) {
-            Group group {0,0,0,0,0,0,0,0,0};
+            Group group {{0,0,0,0,0,0,0,0,0}};
             Group::size_type index = 0;
             for(SudokuIndex x = 0; x < Sudoku::SizeOfCellsOnBoxEdge; ++x) {
                 for(SudokuIndex y = 0; y < Sudoku::SizeOfCellsOnBoxEdge; ++y) {
@@ -1613,7 +1616,7 @@ bool SudokuChecker::checkBoxSet(const Grid& grid, std::ostream* pSudokuOutStream
 
 // Returns whether each of 1..9 appears just once in 'line' as a row, column or box
 bool SudokuChecker::checkUnique(const Group& line) {
-    std::array<int, Sudoku::SizeOfCellsPerGroup + 1> cellMap {0,0,0,0,0,0,0,0,0,0};
+    std::array<int, Sudoku::SizeOfCellsPerGroup + 1> cellMap {{0,0,0,0,0,0,0,0,0,0}};
 
     for(const auto n : line) {
         if ((n < Sudoku::MinCandidatesNumber) || (n > Sudoku::MaxCandidatesNumber)
@@ -1878,8 +1881,8 @@ SudokuLoader::ExitStatusCode SudokuLoader::execMulti(std::istream* pSudokuInStre
 
     DispatcherPtrSet dispatcherSet;
     for(decltype(numberOfThreads_) i=0; i<numberOfThreads_; ++i) {
-        dispatcherSet.push_back(std::move(DispatcherPtr(
-                                              new SudokuMultiDispatcher(solverType_, check_, print_, printAllCandidate_))));
+        dispatcherSet.push_back(DispatcherPtr(
+                                    new SudokuMultiDispatcher(solverType_, check_, print_, printAllCandidate_)));
     }
 
     auto sizeOfPuzzle = readLines(numberOfThreads_, pSudokuInStream, dispatcherSet);
