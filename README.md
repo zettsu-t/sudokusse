@@ -12,7 +12,7 @@ tools.
 * Windows 10 Anniversary Update 64bit Edition
 * Cygwin 64bit version
 * GNU Make
-* g++
+* g++ (GCC)
 * clang++ (LLVM)
 * GNU assembler
 * Ruby

@@ -21,6 +21,8 @@ shown below are required.
 
 * SudokuSSE requires C++ compilers that support C++11 and GNU style
   inline assembly.
+* Inline assembly of clang++ is not compatible with the GNU style and
+  my unit tests for assembly do not run on clang++.
 * Building SudokuSSE on MinGW requires Cygwin _/usr/bin_ tools such as
   perl and rm. Set environment variable _PATH_ to find them.
 * I have not tried to build unittests with CppUnit on MinGW.
