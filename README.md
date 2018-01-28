@@ -40,8 +40,8 @@ After built successfully, executable files _bin/sudokusse*.exe_ are generated.
 
 This branch is a solver for Sudoku-X (diagonal Sudoku) puzzles. I tested with puzzles cited from these websites (these puzzles are not included in this repository).
 
-* http://logicmastersindia.com/BeginnersSudoku/Types/?test=B201312
-* [The hardest Sudoku-X puzzle](http://www.sudocue.net/minx.php)
+* http://logicmastersindia.com/BeginnersSudoku/Types/?test=B201312 (I cite this puzzle in my unit tests.)
+* [The hardest Sudoku-X puzzle](http://www.sudocue.net/minx.php) (I passed all of these 7193 puzzles.)
 
 Execute the generated binary from a terminal. _sudokusse.exe_ solves a
 sudoku puzzle example 10,000 times and shows elapsed time to solve it.

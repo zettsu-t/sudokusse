@@ -501,6 +501,7 @@ private:
     bool checkRowSet(const Grid& grid, std::ostream* pSudokuOutStream);
     bool checkColumnSet(const Grid& grid, std::ostream* pSudokuOutStream);
     bool checkBoxSet(const Grid& grid, std::ostream* pSudokuOutStream);
+    bool checkDiagonal(const Grid& grid, std::ostream* pSudokuOutStream);
     bool checkUnique(const Group& line);
     bool valid_;
 };

@@ -21,6 +21,7 @@ class SudokuCheckerTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST(test_checkRowSet);
     CPPUNIT_TEST(test_checkColumnSet);
     CPPUNIT_TEST(test_checkBoxSet);
+    CPPUNIT_TEST(test_checkDiagonal);
     CPPUNIT_TEST(test_checkUnique);
     CPPUNIT_TEST_SUITE_END();
 
@@ -35,6 +36,7 @@ protected:
     void test_checkRowSet();
     void test_checkColumnSet();
     void test_checkBoxSet();
+    void test_checkDiagonal();
     void test_checkUnique();
 
     SudokuChecker::Grid grid_;
@@ -74,6 +76,7 @@ void SudokuCheckerTest::setUp() {
 }
 
 void SudokuCheckerTest::tearDown() {
+    SudokuXmode = false;
     return;
 }
 
@@ -276,6 +279,46 @@ void SudokuCheckerTest::test_checkRowSet() {
             }
         }
     }
+}
+
+void SudokuCheckerTest::test_checkDiagonal() {
+    SudokuXmode = true;
+
+    // Cited from http://logicmastersindia.com/BeginnersSudoku/Types/?test=B201312
+    SudokuChecker::Group row1 {{2,4,3,9,7,8,1,5,6}};
+    SudokuChecker::Group row2 {{8,9,1,4,5,6,3,2,7}};
+    SudokuChecker::Group row3 {{7,6,5,3,2,1,8,9,4}};
+    SudokuChecker::Group row4 {{3,5,9,6,1,7,2,4,8}};
+    SudokuChecker::Group row5 {{4,7,6,8,3,2,5,1,9}};
+    SudokuChecker::Group row6 {{1,2,8,5,9,4,6,7,3}};
+    SudokuChecker::Group row7 {{5,3,4,1,8,9,7,6,2}};
+    SudokuChecker::Group row8 {{6,1,7,2,4,3,9,8,5}};
+    SudokuChecker::Group row9 {{9,8,2,7,6,5,4,3,1}};
+    SudokuChecker::Grid gridOriginal {{row1, row2, row3, row4, row5, row6, row7, row8, row9}};
+    SudokuChecker checker("", "", solutionPrint_, nullptr);
+
+    for(SudokuIndex row = 0; row < Sudoku::SizeOfCellsPerGroup; ++row) {
+        for(SudokuIndex column = 0; column < Sudoku::SizeOfCellsPerGroup; ++column) {
+            SudokuOutStream os;
+            auto grid = gridOriginal;
+            grid.at(row).at(column) = (grid.at(row).at(column) == 1) ? 2 : 1;
+
+            if ((row == column) || ((row + column + 1) == Sudoku::SizeOfCellsPerGroup)) {
+                CPPUNIT_ASSERT_EQUAL(false, checker.check(grid, nullptr));
+                CPPUNIT_ASSERT_EQUAL(false, checker.checkDiagonal(grid, &os));
+                std::string expectedStr;
+                if (row == column) {
+                    expectedStr = "Error in the top-left to bottom-right bar\n";
+                } else {
+                    expectedStr = "Error in the bottom-left to top-right bar\n";
+                }
+                CPPUNIT_ASSERT_EQUAL(expectedStr, os.str());
+                CPPUNIT_ASSERT_EQUAL(false, checker.check(grid, nullptr));
+            }
+        }
+    }
+
+    SudokuXmode = false;
 }
 
 void SudokuCheckerTest::test_checkColumnSet() {

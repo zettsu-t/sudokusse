@@ -1663,7 +1663,8 @@ bool SudokuChecker::compare(const std::string& puzzle, const std::string& soluti
 bool SudokuChecker::check(const Grid& grid, std::ostream* pSudokuOutStream) {
     return checkRowSet(grid, pSudokuOutStream) &&
         checkColumnSet(grid, pSudokuOutStream) &&
-        checkBoxSet(grid, pSudokuOutStream);
+        checkBoxSet(grid, pSudokuOutStream) &&
+        checkDiagonal(grid, pSudokuOutStream);
 }
 
 bool SudokuChecker::checkRowSet(const Grid& grid, std::ostream* pSudokuOutStream) {
@@ -1727,6 +1728,35 @@ bool SudokuChecker::checkBoxSet(const Grid& grid, std::ostream* pSudokuOutStream
                 }
                 return false;
             }
+        }
+    }
+
+    return true;
+}
+
+bool SudokuChecker::checkDiagonal(const Grid& grid, std::ostream* pSudokuOutStream) {
+    if (SudokuXmode) {
+        Group upToGroup {{0,0,0,0,0,0,0,0,0}};
+        Group downToGroup {{0,0,0,0,0,0,0,0,0}};
+
+        for(SudokuIndex index = 0; index < Sudoku::SizeOfCellsPerGroup; ++index) {
+            upToGroup.at(index) = grid.at(Sudoku::SizeOfCellsPerGroup - 1 - index).at(index);
+            downToGroup.at(index) = grid.at(index).at(index);
+        }
+
+        // Report an error in downToGroup for the center cell
+        if (!checkUnique(downToGroup)) {
+            if (pSudokuOutStream) {
+                *pSudokuOutStream << "Error in the top-left to bottom-right bar\n";
+            }
+            return false;
+        }
+
+        if (!checkUnique(upToGroup)) {
+            if (pSudokuOutStream) {
+                *pSudokuOutStream << "Error in the bottom-left to top-right bar\n";
+            }
+            return false;
         }
     }
 
