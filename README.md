@@ -36,46 +36,24 @@ make
 
 After built successfully, executable files _bin/sudokusse*.exe_ are generated.
 
-SudokuSSE with AVX uses ANDN instruction of BMI1 (Bit Manipulation
-Instructions), which is available on Haswell and newer
-microarchitectures. If you cannot run on such processors, set
-_EnableAvx_ in _Makefile_vars_ to 0 or an invalid opcode
-exception occurs.
+## Solve a Sudoku-X puzzle
 
-## Solve a sudoku puzzle example
+This branch is a solver for Sudoku-X (diagonal Sudoku) puzzles. I tested with puzzles cited from these websites (these puzzles are not included in this repository).
+
+* http://logicmastersindia.com/BeginnersSudoku/Types/?test=B201312
+* [The hardest Sudoku-X puzzle](http://www.sudocue.net/minx.php)
 
 Execute the generated binary from a terminal. _sudokusse.exe_ solves a
 sudoku puzzle example 10,000 times and shows elapsed time to solve it.
 
 ```bash
-bin/sudokusse 10000 < data/sudoku_example1.txt
+bin/sudokusse 10000 < data/sudoku_x_example1.txt
 ```
 
-## Solve the hardest sudoku puzzles
-
-SudokuSSE solves the hardest 49151 puzzles
-[sudoku17](http://staffhome.ecm.uwa.edu.au/~00013890/sudoku17) within
-10 seconds. You can replace _sudoku17_ with other files in the same
-format.
-
-```bash
-bin/sudokusse.exe sudoku17
-```
-
-When you place an argument "-N" following a filename, SudokuSSE
-solves puzzles with multi-threading.
-
-```bash
-bin/sudokusse.exe sudoku17 -N
-```
+I implemented this Sudoku-X solver with C++, not with SSE/AVX SIMD instructions.
 
 ## License
 
-Copyright (c) 2016, 2017 Zettsu Tatsuya
+Copyright (c) 2016-2018 Zettsu Tatsuya
 
 This software is released under the MIT License, see [LICENSE.txt](LICENSE.txt).
-
-## And more
-
-SudokuSSE uses bitboards to represent sudoku puzzles.
-I would like you to read [sudokusse.md](sudokusse.md) to know more details.

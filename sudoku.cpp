@@ -32,6 +32,19 @@
 // const SudokuCellLookUp SudokuCell::CellLookUp_[Sudoku::SizeOfLookUpCell];
 #include "sudokuConstAll.h"
 
+#if !defined(UNITTEST)
+static constexpr bool SudokuXmode = SUDOKU_X_MODE;
+#else
+bool SudokuXmode = false;
+#endif
+
+// Sudoku-X (diagonal Sudoku) table
+// bars (diagonal lines) to their cell indexes
+const SudokuIndex SudokuMap::DiagonalBarGroup_[Sudoku::SizeOfDiagonalBarsPerMap][Sudoku::SizeOfCellsPerGroup] = {
+    {0,10,20,30,40,50,60,70,80},
+    {8,16,24,32,40,48,56,64,72}
+};
+
 namespace {
     constexpr bool FastMode = FAST_MODE;
 }
@@ -780,6 +793,21 @@ bool SudokuMap::IsConsistent(void) const {
         }
     }
 
+    if (SudokuXmode) {
+        for(SudokuLoopIndex groupIndex=0; groupIndex<Sudoku::SizeOfDiagonalBarsPerMap; ++groupIndex) {
+            auto allCandidates = SudokuCell::GetEmptyCandidates();
+            for(SudokuLoopIndex i=0; i<Sudoku::SizeOfCellsPerGroup; ++i) {
+                const auto cellIndex = DiagonalBarGroup_[groupIndex][i];
+                const auto& cell = cells_[cellIndex];
+                if (cell.IsConsistent(allCandidates) == false) {
+                    return false;
+                }
+                const auto candidates = cell.GetUniqueCandidate();
+                allCandidates = cell.MergeCandidates(allCandidates, candidates);
+            }
+        }
+    }
+
     return true;
 }
 
@@ -847,6 +875,25 @@ bool SudokuMap::findUnusedCandidate(SudokuCell& targetCell) const {
     // Returns true if finding a cell that cannot be filled.
     auto candidates = SudokuCell::GetEmptyCandidates();
     const auto targetCellIndex = targetCell.GetIndex();
+
+    if (SudokuXmode) {
+        for(SudokuLoopIndex groupIndex=0; groupIndex<Sudoku::SizeOfDiagonalBarsPerMap; ++groupIndex) {
+            const auto& group = DiagonalBarGroup_[groupIndex];
+            // Run this fast if check (index mod 10 == 0) or (index mod 8 == 0 and index != 0)
+            if (std::find(std::begin(group), std::end(group), targetCellIndex) ==
+                std::end(DiagonalBarGroup_[groupIndex])) {
+                continue;
+            }
+
+            for(SudokuLoopIndex i=0; i<Sudoku::SizeOfCellsPerGroup; ++i) {
+                const auto cellIndex = group[i];
+                if (cellIndex != targetCellIndex) {
+                    const auto cellCandidates = cells_[cellIndex].GetUniqueCandidate();
+                    candidates = SudokuCell::MergeCandidates(candidates, cellCandidates);
+                }
+            }
+        }
+    }
 
     if CPP17_IF_CONSTEXPR (FastMode == false) {
         for(SudokuLoopIndex i=0;i<Sudoku::SizeOfGroupsPerCell;++i) {
@@ -1141,7 +1188,7 @@ SudokuSolver::SudokuSolver(const std::string& presetStr, SudokuIndex seed, std::
 
 // Solves a puzzle and writes its solution
 bool SudokuSolver::Exec(bool silent, bool verbose) {
-    const auto result = solve(map_, true, verbose);
+    const auto result = solve(map_, true, verbose, true);
     if (silent == false) {
         map_.Print(pSudokuOutStream_);
     }
@@ -1155,10 +1202,11 @@ void SudokuSolver::PrintType(void) {
 }
 
 // 'topLevel' is not used, just for interface compatibility with the SSE solver
-bool SudokuSolver::solve(SudokuMap& map, bool topLevel, bool verbose) {
+bool SudokuSolver::solve(SudokuMap& map, bool topLevel, bool verbose, bool first) {
     auto oldCount = map.CountFilledCells();
 
-    for(;;) {
+    // Start backtracking before filling cells for Sudoku-X puzzles
+    while(!SudokuXmode || !first) {
         if (fillCells(map, topLevel, verbose) == false) {
             return false;
         }
@@ -1190,7 +1238,7 @@ bool SudokuSolver::solve(SudokuMap& map, bool topLevel, bool verbose) {
         if (map.CanSetUniqueCell(cellIndex, candidate)) {
             auto newMap = map;
             newMap.SetUniqueCell(cellIndex, candidate);
-            if (solve(newMap, false, verbose)) {
+            if (solve(newMap, false, verbose, false)) {
                 // We can get a solution via trivial copy
                 map = newMap;
                 // Solved!
@@ -1387,7 +1435,7 @@ void SudokuSseSolver::initialize(const std::string& presetStr, std::ostream* pSu
 }
 
 bool SudokuSseSolver::Exec(bool silent, bool verbose) {
-    const auto result = solve(map_, true, verbose);
+    const auto result = solve(map_, true, verbose, true);
     if (silent == false) {
         map_.Print(pSudokuOutStream_);
     }
@@ -1410,7 +1458,7 @@ void SudokuSseSolver::PrintType(void) {
     return;
 }
 
-bool SudokuSseSolver::solve(SudokuSseMap& map, bool topLevel, bool verbose) {
+bool SudokuSseSolver::solve(SudokuSseMap& map, bool topLevel, bool verbose, bool first) {
     for(;;) {
         // Solves forward until we cannot reduce candidates anymore
         SudokuSseMapResult result;
@@ -1446,7 +1494,7 @@ bool SudokuSseSolver::solve(SudokuSseMap& map, bool topLevel, bool verbose) {
                 }
 
                 // Starts backtracking
-                const auto result = solve(newMap, false, verbose);
+                const auto result = solve(newMap, false, verbose, false);
                 if (result) {
                     // We can get a solution via trivial copy
                     map = newMap;
@@ -1931,7 +1979,11 @@ SudokuLoader::ExitStatusCode SudokuLoader::execSingle(void) {
     if (measureCount_) {
         measureTimeToSolve(SudokuSolverType::SOLVER_GENERAL);
     }
-    measureTimeToSolve(SudokuSolverType::SOLVER_SSE_4_2);
+
+    // The SSE code does not solve Sudoku-X puzzles
+    if (!SudokuXmode) {
+        measureTimeToSolve(SudokuSolverType::SOLVER_SSE_4_2);
+    }
     return ExitStatusPassed;
 }
 

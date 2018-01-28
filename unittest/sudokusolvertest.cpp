@@ -232,7 +232,7 @@ void SudokuSolverCommonTest<TestedT, CandidatesT>::test_solve() {
         SudokuOutStream sudokuOutStream;
         {
             TestedT inst(test.presetStr, 0, &sudokuOutStream, 0);
-            CPPUNIT_ASSERT_EQUAL(test.result, inst.solve(inst.map_, true, false));
+            CPPUNIT_ASSERT_EQUAL(test.result, inst.solve(inst.map_, true, false, true));
             CPPUNIT_ASSERT(inst.count_>=1);
         }
     }
