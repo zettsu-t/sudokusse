@@ -50,7 +50,12 @@ sudoku puzzle example 10,000 times and shows elapsed time to solve it.
 bin/sudokusse 10000 < data/sudoku_x_example1.txt
 ```
 
-I implemented this Sudoku-X solver with C++, not with SSE/AVX SIMD instructions.
+These commands solve puzzles in data/puzzle.txt, write their solutions into ./solution.txt and check whether their solutions are correct.
+
+```bash
+time bin/sudokusse data/puzzle.txt sse print > ./solution.txt
+python3 solve_sudoku_x.py --log ./solution.txt
+```
 
 ## License
 

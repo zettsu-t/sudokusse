@@ -8,7 +8,7 @@ MAKEFILE_PARALLEL=-j 5
 
 ALL_UPDATED_VARIABLES+= THIS_DIR MAKEFILE_SUB_COMPILE MAKEFILE_PARALLEL
 
-.PHONY: all clean rebuild check time show FORCE
+.PHONY: all clean rebuild check time test show FORCE
 
 all: $(TARGETS)
 
@@ -24,6 +24,12 @@ rebuild: clean all
 check: $(TARGETS)
 	perl sudoku_solve_all.pl
 	ruby sudoku_check.rb
+
+test: $(TARGETS)
+	time $(CELLS_UNPACKED_TARGET) $(TEST_CASE_PUZZLE) c++ print > $(TEST_CASE_SOLUTION)
+	$(PYTHON) $(SOLUTION_CHECKER_SCRIPT) --log $(TEST_CASE_SOLUTION)
+	time $(CELLS_UNPACKED_TARGET) $(TEST_CASE_PUZZLE) sse print > $(TEST_CASE_SOLUTION)
+	$(PYTHON) $(SOLUTION_CHECKER_SCRIPT) --log $(TEST_CASE_SOLUTION)
 
 time: $(TARGETS)
 	ruby sudoku_check.rb

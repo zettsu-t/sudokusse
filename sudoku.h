@@ -335,7 +335,7 @@ public:
     virtual bool Exec(bool silent, bool verbose) override;
     virtual void PrintType(void) override;
 private:
-    bool solve(SudokuMap& map, bool topLevel, bool verbose, bool first);
+    bool solve(SudokuMap& map, bool topLevel, bool verbose);
     bool fillCells(SudokuMap& map, bool topLevel, bool verbose);
 
     SudokuMap map_;  // A sudoku puzzle (we allocate copies of this in backtracking)
@@ -471,7 +471,7 @@ public:
     virtual void PrintType(void) override;
 private:
     void initialize(const std::string& presetStr, std::ostream* pSudokuOutStream);
-    bool solve(SudokuSseMap& map, bool topLevel, bool verbose, bool first);
+    bool solve(SudokuSseMap& map, bool topLevel, bool verbose);
     bool fillCells(SudokuSseMap& map, bool topLevel, bool verbose, SudokuSseMapResult& result);
 
     SudokuSseMap map_;    // a sudoku puzzle (we allocate copies of this in backtracking)

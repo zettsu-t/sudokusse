@@ -1188,7 +1188,7 @@ SudokuSolver::SudokuSolver(const std::string& presetStr, SudokuIndex seed, std::
 
 // Solves a puzzle and writes its solution
 bool SudokuSolver::Exec(bool silent, bool verbose) {
-    const auto result = solve(map_, true, verbose, true);
+    const auto result = solve(map_, true, verbose);
     if (silent == false) {
         map_.Print(pSudokuOutStream_);
     }
@@ -1202,11 +1202,11 @@ void SudokuSolver::PrintType(void) {
 }
 
 // 'topLevel' is not used, just for interface compatibility with the SSE solver
-bool SudokuSolver::solve(SudokuMap& map, bool topLevel, bool verbose, bool first) {
+bool SudokuSolver::solve(SudokuMap& map, bool topLevel, bool verbose) {
     auto oldCount = map.CountFilledCells();
 
     // Start backtracking before filling cells for Sudoku-X puzzles
-    while(!SudokuXmode || !first) {
+    for(;;) {
         if (fillCells(map, topLevel, verbose) == false) {
             return false;
         }
@@ -1238,7 +1238,7 @@ bool SudokuSolver::solve(SudokuMap& map, bool topLevel, bool verbose, bool first
         if (map.CanSetUniqueCell(cellIndex, candidate)) {
             auto newMap = map;
             newMap.SetUniqueCell(cellIndex, candidate);
-            if (solve(newMap, false, verbose, false)) {
+            if (solve(newMap, false, verbose)) {
                 // We can get a solution via trivial copy
                 map = newMap;
                 // Solved!
@@ -1435,7 +1435,7 @@ void SudokuSseSolver::initialize(const std::string& presetStr, std::ostream* pSu
 }
 
 bool SudokuSseSolver::Exec(bool silent, bool verbose) {
-    const auto result = solve(map_, true, verbose, true);
+    const auto result = solve(map_, true, verbose);
     if (silent == false) {
         map_.Print(pSudokuOutStream_);
     }
@@ -1458,7 +1458,7 @@ void SudokuSseSolver::PrintType(void) {
     return;
 }
 
-bool SudokuSseSolver::solve(SudokuSseMap& map, bool topLevel, bool verbose, bool first) {
+bool SudokuSseSolver::solve(SudokuSseMap& map, bool topLevel, bool verbose) {
     for(;;) {
         // Solves forward until we cannot reduce candidates anymore
         SudokuSseMapResult result;
@@ -1494,7 +1494,7 @@ bool SudokuSseSolver::solve(SudokuSseMap& map, bool topLevel, bool verbose, bool
                 }
 
                 // Starts backtracking
-                const auto result = solve(newMap, false, verbose, false);
+                const auto result = solve(newMap, false, verbose);
                 if (result) {
                     // We can get a solution via trivial copy
                     map = newMap;
@@ -2011,9 +2011,7 @@ SudokuLoader::ExitStatusCode SudokuLoader::execSingle(void) {
     }
 
     // The SSE code does not solve Sudoku-X puzzles
-    if (!SudokuXmode) {
-        measureTimeToSolve(SudokuSolverType::SOLVER_SSE_4_2);
-    }
+    measureTimeToSolve(SudokuSolverType::SOLVER_SSE_4_2);
     return ExitStatusPassed;
 }
 

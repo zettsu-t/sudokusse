@@ -1328,6 +1328,69 @@ testSaveLoopCnt:
         SaveLoopCnt rax, rbx
         ret
 
+.macro MergeThreeDiagonalElements regDstCellsD, regDstMergedD, regSrc1X, regSrc2X, regSrc3X, outBoxShift, regWork1D, regWork2D, regWork3D, regWork4D
+        mov         \regWork1D, gRegBitMaskD
+        MacroPextrd \regWork4D, \regSrc3X, \outBoxShift
+        and         \regWork4D, \regWork1D
+        PowerOf2or0 \regDstCellsD, \regWork4D, \regWork3D
+        and         \regDstCellsD, gRegBitMaskD
+        mov         \regDstMergedD, \regDstCellsD
+        ShlNonZero  \regWork1D, candidatesNum
+
+        MacroPextrd \regWork4D, \regSrc2X, \outBoxShift
+        and         \regWork4D, \regWork1D
+        PowerOf2or0 \regWork2D, \regWork4D, \regWork3D
+        or          \regDstCellsD, \regWork2D
+        ShrNonZero  \regWork2D, (candidatesNum * 1)
+        or          \regDstMergedD, \regWork2D
+        ShlNonZero  \regWork1D, candidatesNum
+
+        MacroPextrd \regWork4D, \regSrc1X, \outBoxShift
+        and         \regWork4D, \regWork1D
+        PowerOf2or0 \regWork2D, \regWork4D, \regWork3D
+        or          \regDstCellsD, \regWork2D
+        ShrNonZero  \regWork2D, (candidatesNum * 2)
+        or          \regDstMergedD, \regWork2D
+.endm
+
+.macro MergeNineDiagonalElements regDstCellsLeftD, regDstMergedLeftD, regDstCellsCenterD, regDstMergedCenterD, regDstCellsRightD, regDstMergedRightD, regSrc1X, regSrc2X, regSrc3X, regSrc4X, regSrc5X, regSrc6X, regSrc7X, regSrc8X, regSrc9X, regWork1D, regWork2D, regWork3D, regWork4D
+        MergeThreeDiagonalElements \regDstCellsLeftD, \regDstMergedLeftD, \regSrc1X, \regSrc2X, \regSrc3X, 2, \regWork1D, \regWork2D, \regWork3D, \regWork4D
+        MergeThreeDiagonalElements \regDstCellsCenterD, \regDstMergedCenterD, \regSrc4X, \regSrc5X, \regSrc6X, 1, \regWork1D, \regWork2D, \regWork3D, \regWork4D
+        MergeThreeDiagonalElements \regDstCellsRightD, \regDstMergedRightD, \regSrc7X, \regSrc8X, \regSrc9X, 0, \regWork1D, \regWork2D, \regWork3D, \regWork4D
+.endm
+
+.macro FindUnusedThreeDiagonalElements regDstX, regSrcCellsD, regSrcMerged1D, regSrcMerged2D, outBoxShift, inBoxShift, regWork1D, regWork2D
+        mov  \regWork1D, \regSrcCellsD
+        MergeTwoElements \regWork1D, \inBoxShift, \regWork2D
+        or   \regWork1D, \regSrcMerged1D
+        or   \regWork1D, \regSrcMerged2D
+        and  \regWork1D, gRegBitMaskD
+        ShlNonZero  \regWork1D, (candidatesNum * \inBoxShift)
+        not  \regWork1D
+
+        MacroPextrd \regWork2D, \regDstX, \outBoxShift
+        and  \regWork2D, \regWork1D
+        MacroPinsrd \regDstX, \regWork2D, \outBoxShift
+.endm
+
+.macro FindUnusedNineDiagonalElements regDst1X, regDst2X, regDst3X, regCellsD, regMerged1D, regMerged2D, outBoxShift, regWork1D, regWork2D, regWork3D, regWork4D
+        FindUnusedThreeDiagonalElements \regDst1X, \regCellsD, \regMerged1D, \regMerged2D, \outBoxShift, 2, \regWork1D, \regWork2D
+        FindUnusedThreeDiagonalElements \regDst2X, \regCellsD, \regMerged1D, \regMerged2D, \outBoxShift, 1, \regWork1D, \regWork2D
+        FindUnusedThreeDiagonalElements \regDst3X, \regCellsD, \regMerged1D, \regMerged2D, \outBoxShift, 0, \regWork1D, \regWork2D
+.endm
+
+.macro FindUnusedDiagonalElements regRow1X, regRow2X, regRow3X, regRow4X, regRow5X, regRow6X, regRow7X, regRow8X, regRow9X, regCellsLeftD, regMergedLeftD, regCellsCenterD, regMergedCenterD, regCellsRightD, regMergedRightD, regWork1D, regWork2D, regWork3D, regWork4D
+        MergeNineDiagonalElements \regCellsLeftD, \regMergedLeftD, \regCellsCenterD, \regMergedCenterD, \regCellsRightD, \regMergedRightD, \regRow1X, \regRow2X, \regRow3X, \regRow4X, \regRow5X, \regRow6X, \regRow7X, \regRow8X, \regRow9X, \regWork1D, \regWork2D, \regWork3D, \regWork4D
+        FindUnusedNineDiagonalElements \regRow1X, \regRow2X, \regRow3X, \regCellsLeftD, \regMergedCenterD, \regMergedRightD, 2, \regWork1D, \regWork2D, \regWork3D
+        FindUnusedNineDiagonalElements \regRow4X, \regRow5X, \regRow6X, \regCellsCenterD, \regMergedLeftD, \regMergedRightD, 1, \regWork1D, \regWork2D, \regWork3D
+        FindUnusedNineDiagonalElements \regRow7X, \regRow8X, \regRow9X, \regCellsRightD, \regMergedLeftD, \regMergedCenterD, 0, \regWork1D, \regWork2D, \regWork3D
+.endm
+
+.macro FindUnusedAllDiagonalElements regWork1D, regWork2D, regWork3D, regWork4D, regWork5D, regWork6D, regWork7D, regWork8D, regWork9D, regWork10D
+        FindUnusedDiagonalElements xRegRow1, xRegRow2, xRegRow3, xRegRow4, xRegRow5, xRegRow6, xRegRow7, xRegRow8, xRegRow9, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D
+        FindUnusedDiagonalElements xRegRow9, xRegRow8, xRegRow7, xRegRow6, xRegRow5, xRegRow4, xRegRow3, xRegRow2, xRegRow1, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D, \regWork6D, \regWork7D, \regWork8D, \regWork9D, \regWork10D
+.endm
+
 # ----------------------------------------------------------------------------------------------------
 # Labels in backtracking must have 3-digits number
 
@@ -1668,9 +1731,40 @@ testCheckSetBox:
         CheckSetBox  eax, r8d, r9d, r10d, r11d, r12d, r13d
         ret
 
+.macro CheckDiagonalThreeCells regMergedD, regSrc1X, regSrc2X, regSrc3X, outBoxShift, regWork1D
+        MacroPextrd \regMergedD, \regSrc1X, \outBoxShift
+        ShrNonZero  \regMergedD, (candidatesNum * 2)
+
+        MacroPextrd \regWork1D, \regSrc2X, \outBoxShift
+        ShrNonZero  \regWork1D, (candidatesNum * 1)
+        or          \regMergedD, \regWork1D
+
+        MacroPextrd \regWork1D, \regSrc3X, \outBoxShift
+        or          \regMergedD, \regWork1D
+        and         \regMergedD, gRegBitMaskD
+.endm
+
+.macro CheckDiagonalNineCells regResultD, regInvalidD, regSrc1X, regSrc2X, regSrc3X, regSrc4X, regSrc5X, regSrc6X, regSrc7X, regSrc8X, regSrc9X, regWork1D, regWork2D, regWork3D
+         CheckDiagonalThreeCells \regWork1D, \regSrc1X, \regSrc2X, \regSrc3X, 2, \regWork3D
+         CheckDiagonalThreeCells \regWork2D, \regSrc4X, \regSrc5X, \regSrc6X, 1, \regWork3D
+         or      \regWork1D, \regWork2D
+         CheckDiagonalThreeCells \regWork2D, \regSrc7X, \regSrc8X, \regSrc9X, 0, \regWork3D
+         or      \regWork1D, \regWork2D
+
+         popcnt  \regWork1D, \regWork1D
+         cmp     \regWork1D, candidatesNum
+         cmovnz  \regResultD, \regInvalidD
+.endm
+
 .macro CheckConsistency regResultD, regInvalidD, regWork1D, regWork2D, regWork3D, regWork4D, regWork5D
         xor  \regResultD, \regResultD
         mov  \regInvalidD, 1
+
+        CheckDiagonalNineCells \regResultD, \regInvalidD, xRegRow1, xRegRow2, xRegRow3, xRegRow4, xRegRow5, xRegRow6, xRegRow7, xRegRow8, xRegRow9, \regWork1D, \regWork2D, \regWork3D
+        CheckDiagonalNineCells \regResultD, \regInvalidD, xRegRow9, xRegRow8, xRegRow7, xRegRow6, xRegRow5, xRegRow4, xRegRow3, xRegRow2, xRegRow1, \regWork1D, \regWork2D, \regWork3D
+        cmp  \regResultD, \regInvalidD
+        jz   20001f
+
         CheckRowSet  \regResultD, \regInvalidD, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
         cmp  \regResultD, \regInvalidD
         jz   20001f
@@ -1705,6 +1799,9 @@ solveSudokuAsm:
         # c_n: 1 if n is a candidate of the cell c, 0 otherwise
 
 loopFilling:
+        # Find diagonal cells
+        FindUnusedAllDiagonalElements eax, ebx, ecx, edx, esi, edi, r8d, r9d, r10d, r11d
+
         # Find candidates per 3 rows
         CollectUniqueCandidatesInThreeLine xRegRow1to3, xRegRow1, xRegRow2, xRegRow3, rax, rbx, rcx, rdx, r8, r9, r10, eax, xRegWork1, xRegWork2
         CollectUniqueCandidatesInThreeLine xRegRow4to6, xRegRow4, xRegRow5, xRegRow6, rax, rbx, rcx, rdx, r8, r9, r10, eax, xRegWork1, xRegWork2

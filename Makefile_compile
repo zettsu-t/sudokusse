@@ -39,7 +39,7 @@ endif
 endif
 
 clean:
-	$(RM) $(TARGETS) $(OBJS) $(GENERATED_CODE) $(GENERATED_CODE_PYTHON) ./*.o
+	$(RM) $(TARGETS) $(OBJS) $(GENERATED_CODE) $(GENERATED_CODE_PYTHON) $(TEST_CASE_SOLUTION) ./*.o
 
 #Local Variables:
 #mode: Makefile
