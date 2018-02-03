@@ -64,8 +64,12 @@ class SudokuSseTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST(test_MergeTwoElements);
     CPPUNIT_TEST(test_FindElementCandidates);
     CPPUNIT_TEST(test_FindThreePartsCandidates);
-    CPPUNIT_TEST(test_FindRowPartCandidates);
     CPPUNIT_TEST(test_FillThreePartsUniqueCandidates);
+    CPPUNIT_TEST(test_FindRowPartCandidates);
+    CPPUNIT_TEST(test_MergeThreeDiagonalElements);
+    CPPUNIT_TEST(test_MergeNineDiagonalElements);
+    CPPUNIT_TEST(test_FindUnusedOneThreeDiagonalElements);
+    CPPUNIT_TEST(test_FindUnusedNineDiagonalElements);
     CPPUNIT_TEST(test_CountFilledElements);
     CPPUNIT_TEST(test_PopCountOrPowerOf2);
     CPPUNIT_TEST(test_CompareRegisterSet);
@@ -81,6 +85,8 @@ class SudokuSseTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST(test_CheckColumn);
     CPPUNIT_TEST(test_CheckBox);
     CPPUNIT_TEST(test_CheckSetBox);
+    CPPUNIT_TEST(test_CheckDiagonalThreeCells);
+    CPPUNIT_TEST(test_CheckDiagonalNineCells);
     CPPUNIT_TEST(test_CheckConsistency);
     CPPUNIT_TEST(test_FastCollectCandidatesAtRow);
     CPPUNIT_TEST(test_FastCollectCandidatesAtBox);
@@ -110,8 +116,12 @@ protected:
     void test_MergeTwoElements();
     void test_FindElementCandidates();
     void test_FindThreePartsCandidates();
-    void test_FindRowPartCandidates();
     void test_FillThreePartsUniqueCandidates();
+    void test_FindRowPartCandidates();
+    void test_MergeThreeDiagonalElements();
+    void test_MergeNineDiagonalElements();
+    void test_FindUnusedOneThreeDiagonalElements();
+    void test_FindUnusedNineDiagonalElements();
     void test_CountFilledElements();
     void test_PopCountOrPowerOf2();
     void test_CompareRegisterSet();
@@ -127,6 +137,8 @@ protected:
     void test_CheckColumn();
     void test_CheckBox();
     void test_CheckSetBox();
+    void test_CheckDiagonalThreeCells();
+    void test_CheckDiagonalNineCells();
     void test_CheckConsistency();
     void test_FastCollectCandidatesAtRow();
     void test_FastCollectCandidatesAtBox();
@@ -1779,7 +1791,6 @@ void SudokuSseTest::test_FindRowPartCandidates()
                     ::"D"(test.xarg),"a"(test.rowpartleft),"b"(test.candidatestarget),"c"(test.candidatesleft),"d"(test.candidatesother):
                      "rsi","r8","r9","r10","r11","r12","r13","r14","r15");
                 break;
-                break;
             case Shiftpos::SHIFT_POS2:
                 asm volatile (
                     "movdqa  xmm10, xmmword ptr [rdi]\n\t"
@@ -1787,7 +1798,6 @@ void SudokuSseTest::test_FindRowPartCandidates()
                     "call testFindRowPartCandidates2\n\t"
                     ::"D"(test.xarg),"a"(test.rowpartleft),"b"(test.candidatestarget),"c"(test.candidatesleft),"d"(test.candidatesother):
                      "rsi","r8","r9","r10","r11","r12","r13","r14","r15");
-                break;
                 break;
             default:
                 break;
@@ -1807,6 +1817,375 @@ void SudokuSseTest::test_FindRowPartCandidates()
     }
 
     return;
+}
+
+void SudokuSseTest::test_MergeThreeDiagonalElements()
+{
+    constexpr size_t SizeOfCells = Sudoku::SizeOfCellsOnBoxEdge;
+    constexpr auto RegIndexStep = sizeof(xmmRegister) / sizeof(uint32_t);
+    struct TestSet {
+        SudokuSseElement presetCells[SizeOfCells];
+        gRegister expectedCells;
+        gRegister expectedMerged;
+    };
+
+    constexpr TestSet testSet[] {
+        {{0x4000000,0x10000,0x40}, 0x4010040, 0x1c0},
+        {{0x800000,0x2000,8}, 0x802008, 0x38},
+        {{0x100000,0x400,1}, 0x100401, 7},
+        {{0x100000,0x400,0}, 0x100400, 6},
+        {{0x100000,0x400,0x101}, 0x100400, 6},
+        {{0x100000,0x20200,1}, 0x100001, 5},
+        {{0x4040000,0x400,1}, 0x401, 3},
+        {{0x40000,0x200,1}, 0x40201, 1}
+    };
+
+    for(const auto& test : testSet) {
+        union {
+            SudokuSseElement reg32s[SizeOfCells * RegIndexStep];
+            xmmRegister xargs[SizeOfCells];
+        } xRegSet;
+
+        for(Shiftpos e=Shiftpos::SHIFT_POSMIN; e<Shiftpos::SHIFT_POSCNT; e=static_cast<Shiftpos>(static_cast<int>(e)+1)) {
+            ::memset(&xRegSet, 0, sizeof(xRegSet));
+            size_t index = static_cast<decltype(index)>(e);
+            for (const auto cell : test.presetCells) {
+                xRegSet.reg32s[index] = cell;
+                index += RegIndexStep;
+            }
+
+            gRegister actualCells = 0;
+            gRegister actualMerged = 0;
+
+            switch(e) {
+            case Shiftpos::SHIFT_POS0:
+                asm volatile (
+                    "movdqa  xmm4, xmmword ptr [rdi]\n\t"
+                    "movdqa  xmm5, xmmword ptr [rdi+16]\n\t"
+                    "movdqa  xmm6, xmmword ptr [rdi+32]\n\t"
+                    "call testMergeThreeDiagonalElements0\n\t"
+                    :"=a"(actualCells),"=b"(actualMerged):"D"(&xRegSet):"r8","r9","r10","r11","r15");
+                break;
+            case Shiftpos::SHIFT_POS1:
+                asm volatile (
+                    "movdqa  xmm4, xmmword ptr [rdi]\n\t"
+                    "movdqa  xmm5, xmmword ptr [rdi+16]\n\t"
+                    "movdqa  xmm6, xmmword ptr [rdi+32]\n\t"
+                    "call testMergeThreeDiagonalElements1\n\t"
+                    :"=a"(actualCells),"=b"(actualMerged):"D"(&xRegSet):"r8","r9","r10","r11","r15");
+                break;
+            case Shiftpos::SHIFT_POS2:
+                asm volatile (
+                    "movdqa  xmm4, xmmword ptr [rdi]\n\t"
+                    "movdqa  xmm5, xmmword ptr [rdi+16]\n\t"
+                    "movdqa  xmm6, xmmword ptr [rdi+32]\n\t"
+                    "call testMergeThreeDiagonalElements2\n\t"
+                    :"=a"(actualCells),"=b"(actualMerged):"D"(&xRegSet):"r8","r9","r10","r11","r15");
+                break;
+            default:
+                break;
+            }
+
+            CPPUNIT_ASSERT_EQUAL(test.expectedCells, actualCells);
+            CPPUNIT_ASSERT_EQUAL(test.expectedMerged, actualMerged);
+        }
+    }
+}
+
+void SudokuSseTest::test_MergeNineDiagonalElements()
+{
+    constexpr size_t SizeOfCells = Sudoku::SizeOfCellsPerGroup;
+    struct TestSet {
+        SudokuSseElement presetCells[SizeOfCells];
+        gRegister expectedLeft;
+        gRegister expectedCenter;
+        gRegister expectedRight;
+    };
+
+    constexpr TestSet testSet[] {
+        {{0x4000000,0x10000,0x40,0x800000,0x2000,8,0x100000,0x400,1},
+                0x4010040000001c0ull, 0x80200800000038ull, 0x10040100000007ull},
+        {{0x4040000,0x10000,0x40,0x800000,0x20200,8,0x100000,0x400,0x101},
+                  0x10040000000c0ull, 0x80000800000028ull, 0x10040000000006ull},
+        {{0x4000000,0x20200,0x40,0x800000,0x2000,0x101,0x4040000,0x400,1},
+                0x400004000000140ull, 0x80200000000030ull,    0x40100000003ull},
+        {{0x4000000,0x10000,0x101,0x4040000,0x2000,8,0x100000,0x20200,1},
+                0x401000000000180ull,   0x200800000018ull, 0x10000100000005ull}
+    };
+
+    for(const auto& test : testSet) {
+        union {
+            SudokuSseElement reg32s[SizeOfCells * sizeof(xmmRegister) / sizeof(uint32_t)];
+            xmmRegister xargs[SizeOfCells];
+        } xRegSet;
+        ::memset(&xRegSet, 0, sizeof(xRegSet));
+
+        size_t cellIndex = 0;
+        for(SudokuIndex outboxShift = 0; outboxShift < Sudoku::SizeOfBoxesOnEdge; ++outboxShift) {
+            for(SudokuIndex inboxShift = 0; inboxShift < Sudoku::SizeOfCellsOnBoxEdge; ++inboxShift) {
+                size_t index = (cellIndex * sizeof(xmmRegister)) / sizeof(uint32_t) +
+                    Sudoku::SizeOfCellsOnBoxEdge - outboxShift - 1;
+                assert(index < arraySizeof(xRegSet.reg32s));
+                assert(cellIndex < arraySizeof(test.presetCells));
+                xRegSet.reg32s[index] = test.presetCells[cellIndex];
+                ++cellIndex;
+            }
+        }
+
+        gRegister actualLeft = 0;
+        gRegister actualCenter = 0;
+        gRegister actualRight = 0;
+
+        asm volatile (
+            "movdqa  xmm4, xmmword ptr [rdi]\n\t"
+            "movdqa  xmm5, xmmword ptr [rdi+16]\n\t"
+            "movdqa  xmm6, xmmword ptr [rdi+32]\n\t"
+            "movdqa  xmm7, xmmword ptr [rdi+48]\n\t"
+            "movdqa  xmm8, xmmword ptr [rdi+64]\n\t"
+            "movdqa  xmm9, xmmword ptr [rdi+80]\n\t"
+            "movdqa  xmm1, xmmword ptr [rdi+96]\n\t"
+            "movdqa  xmm2, xmmword ptr [rdi+112]\n\t"
+            "movdqa  xmm3, xmmword ptr [rdi+128]\n\t"
+            "call testMergeNineDiagonalElements\n\t"
+            :"=a"(actualLeft),"=b"(actualCenter),"=c"(actualRight):"D"(&xRegSet):"rdx","rsi","r8","r9","r10","r11","r12","r15");
+
+        CPPUNIT_ASSERT_EQUAL(test.expectedLeft, actualLeft);
+        CPPUNIT_ASSERT_EQUAL(test.expectedCenter, actualCenter);
+        CPPUNIT_ASSERT_EQUAL(test.expectedRight, actualRight);
+    }
+}
+
+void SudokuSseTest::test_FindUnusedOneThreeDiagonalElements()
+{
+    constexpr size_t SizeOfCells = Sudoku::SizeOfCellsOnBoxEdge;
+    constexpr auto RegIndexStep = sizeof(xmmRegister) / sizeof(uint32_t);
+    union CellSet {
+        SudokuSseElement reg32s[RegIndexStep * SizeOfCells];
+        xmmRegister xarg[SizeOfCells];
+    };
+
+    for(SudokuIndex outboxShift = 0; outboxShift < Sudoku::SizeOfBoxesOnEdge; ++outboxShift) {
+        gRegister srcCells = 0;
+        gRegister srcMerged1 = 0;
+        gRegister srcMerged2 = 0;
+        SudokuSseElement expected = 0;
+        SudokuSseElement expectedLeft = Sudoku::AllThreeCandidates;
+        SudokuSseElement expectedCenter = Sudoku::AllThreeCandidates;
+        SudokuSseElement expectedRight = Sudoku::AllThreeCandidates;
+        SudokuSseElement actualLeft = 0;
+        SudokuSseElement actualCenter = 0;
+        SudokuSseElement actualRight = 0;
+
+        const CellSet fulls = {{Sudoku::AllThreeCandidates, Sudoku::AllThreeCandidates, Sudoku::AllThreeCandidates, 0}};
+        CellSet cells = fulls;
+        static_assert(sizeof(fulls) == sizeof(cells), "");
+        const auto regIndex = RegIndexStep * outboxShift;
+
+        srcCells = 0;
+        switch(outboxShift) {
+        case 0:
+            asm volatile (
+                "movdqa  xmm2, xmmword ptr [rdi]\n\t"
+                "call testFindUnusedOneDiagonalElements01\n\t"
+                "movdqa  xmmword ptr [rdi], xmm2\n\t"
+                ::"a"(srcCells),"b"(srcMerged1),"c"(srcMerged2),"D"(&cells):"r8","r9","r15");
+            break;
+        case 1:
+            asm volatile (
+                "movdqa  xmm2, xmmword ptr [rdi]\n\t"
+                "call testFindUnusedOneDiagonalElements12\n\t"
+                "movdqa  xmmword ptr [rdi], xmm2\n\t"
+                ::"a"(srcCells),"b"(srcMerged1),"c"(srcMerged2),"D"(&cells):"r8","r9","r15");
+            break;
+        case 2:
+            asm volatile (
+                "movdqa  xmm2, xmmword ptr [rdi]\n\t"
+                "call testFindUnusedOneDiagonalElements20\n\t"
+                "movdqa  xmmword ptr [rdi], xmm2\n\t"
+                ::"a"(srcCells),"b"(srcMerged1),"c"(srcMerged2),"D"(&cells):"r8","r9","r15");
+            break;
+        default:
+            break;
+        }
+        auto actual = cells.reg32s[regIndex];
+        CPPUNIT_ASSERT_EQUAL(fulls.reg32s[regIndex], actual);
+
+        ::memmove(&cells, &fulls, sizeof(cells));
+        switch(outboxShift) {
+        case 0:
+            asm volatile (
+                "movdqa  xmm4, xmmword ptr [rdi]\n\t"
+                "movdqa  xmm5, xmmword ptr [rdi]\n\t"
+                "movdqa  xmm6, xmmword ptr [rdi]\n\t"
+                "call testFindUnusedThreeDiagonalElements0\n\t"
+                "movdqa  xmmword ptr [rdi], xmm4\n\t"
+                "movdqa  xmmword ptr [rdi+16], xmm5\n\t"
+                "movdqa  xmmword ptr [rdi+32], xmm6\n\t"
+                ::"a"(srcCells),"b"(srcMerged1),"c"(srcMerged2),"D"(&cells):"r8","r9","r10","r11","r15");
+            break;
+        case 1:
+            asm volatile (
+                "movdqa  xmm4, xmmword ptr [rdi]\n\t"
+                "movdqa  xmm5, xmmword ptr [rdi]\n\t"
+                "movdqa  xmm6, xmmword ptr [rdi]\n\t"
+                "call testFindUnusedThreeDiagonalElements1\n\t"
+                "movdqa  xmmword ptr [rdi], xmm4\n\t"
+                "movdqa  xmmword ptr [rdi+16], xmm5\n\t"
+                "movdqa  xmmword ptr [rdi+32], xmm6\n\t"
+                ::"a"(srcCells),"b"(srcMerged1),"c"(srcMerged2),"D"(&cells):"r8","r9","r10","r11","r15");
+            break;
+        case 2:
+            asm volatile (
+                "movdqa  xmm4, xmmword ptr [rdi]\n\t"
+                "movdqa  xmm5, xmmword ptr [rdi]\n\t"
+                "movdqa  xmm6, xmmword ptr [rdi]\n\t"
+                "call testFindUnusedThreeDiagonalElements2\n\t"
+                "movdqa  xmmword ptr [rdi], xmm4\n\t"
+                "movdqa  xmmword ptr [rdi+16], xmm5\n\t"
+                "movdqa  xmmword ptr [rdi+32], xmm6\n\t"
+                ::"a"(srcCells),"b"(srcMerged1),"c"(srcMerged2),"D"(&cells):"r8","r9","r10","r11","r15");
+            break;
+        default:
+            break;
+        }
+        actual = cells.reg32s[regIndex];
+        actualLeft = cells.reg32s[outboxShift];
+        actualCenter = cells.reg32s[RegIndexStep + outboxShift];
+        actualRight = cells.reg32s[RegIndexStep * 2 + outboxShift];
+        CPPUNIT_ASSERT_EQUAL(expectedLeft, actualLeft);
+        CPPUNIT_ASSERT_EQUAL(expectedCenter, actualCenter);
+        CPPUNIT_ASSERT_EQUAL(expectedRight, actualRight);
+
+        ::memmove(&cells, &fulls, sizeof(cells));
+        srcMerged1 = 0x70;
+        srcMerged2 = 0xf;
+        switch(outboxShift) {
+        case 0:
+            srcCells = 0x100;
+            asm volatile (
+                "movdqa  xmm2, xmmword ptr [rdi]\n\t"
+                "call testFindUnusedOneDiagonalElements01\n\t"
+                "movdqa  xmmword ptr [rdi], xmm2\n\t"
+                ::"a"(srcCells),"b"(srcMerged1),"c"(srcMerged2),"D"(&cells):"r8","r9","r15");
+            expected = 0x7fd01ff;
+            break;
+        case 1:
+            srcCells = 0x20000;
+            asm volatile (
+                "movdqa  xmm2, xmmword ptr [rdi]\n\t"
+                "call testFindUnusedOneDiagonalElements12\n\t"
+                "movdqa  xmmword ptr [rdi], xmm2\n\t"
+                ::"a"(srcCells),"b"(srcMerged1),"c"(srcMerged2),"D"(&cells):"r8","r9","r15");
+            expected = 0x203ffff;
+            break;
+        case 2:
+            srcCells = 0x4000000;
+            asm volatile (
+                "movdqa  xmm2, xmmword ptr [rdi]\n\t"
+                "call testFindUnusedOneDiagonalElements20\n\t"
+                "movdqa  xmmword ptr [rdi], xmm2\n\t"
+                ::"a"(srcCells),"b"(srcMerged1),"c"(srcMerged2),"D"(&cells):"r8","r9","r15");
+            expected = 0x7fffe80;
+            break;
+        default:
+            break;
+        }
+        actual = cells.reg32s[outboxShift];
+        CPPUNIT_ASSERT_EQUAL(expected, actual);
+
+        ::memmove(&cells, &fulls, sizeof(cells));
+        // 100 000 000, 010 000 000, 001 000 000 = 100 0000 0001 0000 0000 0100 0000
+        // 011 111 111, 101 111 111, 110 111 111 = 011 1111 1110 1111 1111 1011 1111
+        // 100 000 111, 010 000 111, 001 000 111 = 100 0001 1111 1111 1111 1111 1111
+        // 100 000 111, 010 000 111, 001 000 111 = 111 1111 1101 0000 1111 1111 1111
+        // 100 000 000, 010 000 000, 001 000 000 = 111 1111 1111 1111 1110 0100 0111
+
+        srcCells = 0x4010040; // {7,8,9}
+        srcMerged1 = 0x8;     // {4}
+        srcMerged2 = 0x30;    // {5,6}
+        expectedLeft = 0x41fffff;    // {1,2,3,9}, all, all
+        expectedCenter = 0x7fd0fff;  // all, {1,2,3,8}, all
+        expectedRight = 0x7fffe47;   // all, all, {1,2,3,7}
+        actualLeft = 0;
+        actualCenter = 0;
+        actualRight = 0;
+
+        switch(outboxShift) {
+        case 0:
+            asm volatile (
+                "movdqa  xmm4, xmmword ptr [rdi]\n\t"
+                "movdqa  xmm5, xmmword ptr [rdi]\n\t"
+                "movdqa  xmm6, xmmword ptr [rdi]\n\t"
+                "call testFindUnusedThreeDiagonalElements0\n\t"
+                "movdqa  xmmword ptr [rdi], xmm4\n\t"
+                "movdqa  xmmword ptr [rdi+16], xmm5\n\t"
+                "movdqa  xmmword ptr [rdi+32], xmm6\n\t"
+                ::"a"(srcCells),"b"(srcMerged1),"c"(srcMerged2),"D"(&cells):"r8","r9","r10","r11","r15");
+            break;
+        case 1:
+            asm volatile (
+                "movdqa  xmm4, xmmword ptr [rdi]\n\t"
+                "movdqa  xmm5, xmmword ptr [rdi]\n\t"
+                "movdqa  xmm6, xmmword ptr [rdi]\n\t"
+                "call testFindUnusedThreeDiagonalElements1\n\t"
+                "movdqa  xmmword ptr [rdi], xmm4\n\t"
+                "movdqa  xmmword ptr [rdi+16], xmm5\n\t"
+                "movdqa  xmmword ptr [rdi+32], xmm6\n\t"
+                ::"a"(srcCells),"b"(srcMerged1),"c"(srcMerged2),"D"(&cells):"r8","r9","r10","r11","r15");
+            break;
+        case 2:
+            asm volatile (
+                "movdqa  xmm4, xmmword ptr [rdi]\n\t"
+                "movdqa  xmm5, xmmword ptr [rdi]\n\t"
+                "movdqa  xmm6, xmmword ptr [rdi]\n\t"
+                "call testFindUnusedThreeDiagonalElements2\n\t"
+                "movdqa  xmmword ptr [rdi], xmm4\n\t"
+                "movdqa  xmmword ptr [rdi+16], xmm5\n\t"
+                "movdqa  xmmword ptr [rdi+32], xmm6\n\t"
+                ::"a"(srcCells),"b"(srcMerged1),"c"(srcMerged2),"D"(&cells):"r8","r9","r10","r11","r15");
+            break;
+        default:
+            break;
+        }
+
+        actualLeft = cells.reg32s[outboxShift];
+        actualCenter = cells.reg32s[RegIndexStep + outboxShift];
+        actualRight = cells.reg32s[RegIndexStep * 2 + outboxShift];
+        CPPUNIT_ASSERT_EQUAL(expectedLeft, actualLeft);
+        CPPUNIT_ASSERT_EQUAL(expectedCenter, actualCenter);
+        CPPUNIT_ASSERT_EQUAL(expectedRight, actualRight);
+    }
+}
+
+void SudokuSseTest::test_FindUnusedNineDiagonalElements()
+{
+    constexpr RowRegisterSet XmmRegSet = {
+        0x7fffe20, 0x7ffffff, 0x7ffff,   0x0,
+        0x7ffffff, 0x7ffffff, 0x7ffffff, 0x0,
+        0x103ffff, 0x7ffffff, 0x7fffe02, 0x0,
+        0x7ffffff, 0x7ffffff, 0x7ffffff, 0x0,
+        0x7ffffff, 0x7ffffff, 0x7ffffff, 0x0,
+        0x7ffffff, 0x7ffffff, 0x7ffffff, 0x0,
+         0x13ffff, 0x7ffffff, 0x7fffe80, 0x0,
+        0x7ffffff, 0x7ffffff, 0x7ffffff, 0x0,
+        0x7fffe08, 0x7ffffff, 0x403ffff, 0x0
+    };
+
+    SudokuSseElement actualCenterCell = 0;
+    SudokuSseElement expectedCenterCell = 0x7fc21ff;
+    asm volatile (
+        "movdqa  xmm1, xmmword ptr [rsi]\n\t"
+        "movdqa  xmm2, xmmword ptr [rsi+16]\n\t"
+        "movdqa  xmm3, xmmword ptr [rsi+32]\n\t"
+        "movdqa  xmm4, xmmword ptr [rsi+48]\n\t"
+        "movdqa  xmm5, xmmword ptr [rsi+64]\n\t"
+        "movdqa  xmm6, xmmword ptr [rsi+80]\n\t"
+        "movdqa  xmm7, xmmword ptr [rsi+96]\n\t"
+        "movdqa  xmm8, xmmword ptr [rsi+112]\n\t"
+        "movdqa  xmm9, xmmword ptr [rsi+128]\n\t"
+        "call testFindUnusedAllDiagonalElements\n\t"
+        :"=a"(actualCenterCell):"S"(&XmmRegSet):"rbx","rcx","rdx","r8","r9","r10","r11","r12","r13","r15");
+    CPPUNIT_ASSERT_EQUAL(expectedCenterCell, actualCenterCell);
 }
 
 void SudokuSseTest::test_CountFilledElements()
@@ -2511,6 +2890,98 @@ void SudokuSseTest::test_CheckSetBox() {
     }
 
     return;
+}
+
+void SudokuSseTest::test_CheckDiagonalThreeCells() {
+    constexpr RowRegisterSet XmmRegSet = {
+        0x100000, 0x800000, 0x4000000, 0x0,
+        0x400, 0x2000, 0x10000, 0x0,
+        0x1, 0x8, 0x40, 0x0};
+
+    SudokuSseElement actual = 0;
+    asm volatile (
+        "movdqa  xmm4, xmmword ptr [rdi]\n\t"
+        "movdqa  xmm5, xmmword ptr [rdi+16]\n\t"
+        "movdqa  xmm6, xmmword ptr [rdi+32]\n\t"
+        "call testCheckDiagonalThreeCells0\n\t"
+        :"=a"(actual):"D"(&XmmRegSet):"r8","r15");
+    SudokuSseElement expected = 0x7;
+    CPPUNIT_ASSERT_EQUAL(expected, actual);
+
+    actual = 0;
+    asm volatile (
+        "movdqa  xmm4, xmmword ptr [rdi]\n\t"
+        "movdqa  xmm5, xmmword ptr [rdi+16]\n\t"
+        "movdqa  xmm6, xmmword ptr [rdi+32]\n\t"
+        "call testCheckDiagonalThreeCells1\n\t"
+        :"=a"(actual):"D"(&XmmRegSet):"r8","r15");
+    expected = 0x38;
+    CPPUNIT_ASSERT_EQUAL(expected, actual);
+
+    actual = 0;
+    asm volatile (
+        "movdqa  xmm4, xmmword ptr [rdi]\n\t"
+        "movdqa  xmm5, xmmword ptr [rdi+16]\n\t"
+        "movdqa  xmm6, xmmword ptr [rdi+32]\n\t"
+        "call testCheckDiagonalThreeCells2\n\t"
+        :"=a"(actual):"D"(&XmmRegSet):"r8","r15");
+    expected = 0x1c0;
+    CPPUNIT_ASSERT_EQUAL(expected, actual);
+}
+
+void SudokuSseTest::test_CheckDiagonalNineCells() {
+    RowRegisterSet XmmRegSet = {
+        0x7fffe01, 0x7ffffff, 0x403ffff, 0x0,
+        0x7fc05ff, 0x7ffffff, 0x7fd01ff, 0x0,
+         0x13ffff, 0x7ffffff, 0x7fffe40, 0x0,
+        0x7ffffff,  0x23fe20, 0x7ffffff, 0x0,
+        0x7ffffff, 0x7ffffff, 0x7ffffff, 0x0,
+        0x7ffffff,  0x23fe20, 0x7ffffff, 0x0,
+         0x13ffff, 0x7ffffff, 0x7fffe40, 0x0,
+        0x7fc05ff, 0x7ffffff, 0x7fd01ff, 0x0,
+        0x7fffe01, 0x7ffffff, 0x403ffff, 0x0
+    };
+
+    SudokuSseElement expected = 0;
+    const SudokuSseElement centerSet [] = {0x7fc21ff, 0};
+    for(auto center : centerSet) {
+        XmmRegSet.regVal[17] = center;
+        SudokuSseElement actual = 0;
+
+        asm volatile (
+            "movdqa  xmm1,  xmmword ptr [rsi]\n\t"
+            "movdqa  xmm2,  xmmword ptr [rsi+16]\n\t"
+            "movdqa  xmm3,  xmmword ptr [rsi+32]\n\t"
+            "movdqa  xmm4,  xmmword ptr [rsi+48]\n\t"
+            "movdqa  xmm5,  xmmword ptr [rsi+64]\n\t"
+            "movdqa  xmm6,  xmmword ptr [rsi+80]\n\t"
+            "movdqa  xmm7,  xmmword ptr [rsi+96]\n\t"
+            "movdqa  xmm8,  xmmword ptr [rsi+112]\n\t"
+            "movdqa  xmm9,  xmmword ptr [rsi+128]\n\t"
+            "push rsi\n\t"
+            "call testCheckDiagonalNineCells\n\t"
+            "pop  rsi\n\t"
+            :"=a"(actual):"S"(&XmmRegSet):"r8","r9","r10","r11","r15");
+        CPPUNIT_ASSERT_EQUAL(expected, actual);
+
+        asm volatile (
+            "movdqa  xmm1,  xmmword ptr [rsi]\n\t"
+            "movdqa  xmm2,  xmmword ptr [rsi+16]\n\t"
+            "movdqa  xmm3,  xmmword ptr [rsi+32]\n\t"
+            "movdqa  xmm4,  xmmword ptr [rsi+48]\n\t"
+            "movdqa  xmm5,  xmmword ptr [rsi+64]\n\t"
+            "movdqa  xmm6,  xmmword ptr [rsi+80]\n\t"
+            "movdqa  xmm7,  xmmword ptr [rsi+96]\n\t"
+            "movdqa  xmm8,  xmmword ptr [rsi+112]\n\t"
+            "movdqa  xmm9,  xmmword ptr [rsi+128]\n\t"
+            "push rsi\n\t"
+            "call testCheckConsistency\n\t"
+            "pop  rsi\n\t"
+            :"=a"(actual):"S"(&XmmRegSet):"rdx", "rcx", "rdx", "r8", "r9", "r10");
+        CPPUNIT_ASSERT_EQUAL(expected, actual);
+
+        expected = 1;
+    }
 }
 
 void SudokuSseTest::test_CheckConsistency() {
