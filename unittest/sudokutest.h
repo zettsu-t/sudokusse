@@ -1,5 +1,5 @@
 // Testing Sudoku solver with SSE 4.2 / AVX
-// Copyright (C) 2012-2017 Zettsu Tatsuya
+// Copyright (C) 2012-2018 Zettsu Tatsuya
 
 #include <stdint.h>
 #include <cstdlib>
