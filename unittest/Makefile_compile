@@ -7,6 +7,9 @@ include $(THIS_DIR)Makefile_vars
 
 all: script $(TARGETS)
 
+$(CELLS_DIAGONAL_TARGET_AVX): $(CELLS_DIAGONAL_OBJS_AVX)
+	$(LD) $(LIBPATH) -o $@ $(LDFLAGS) $^ $(LIBS)
+
 $(CELLS_UNPACKED_TARGET_SSE): $(CELLS_UNPACKED_OBJS_SSE)
 	$(LD) $(LIBPATH) -o $@ $(LDFLAGS) $^ $(LIBS)
 
@@ -25,6 +28,9 @@ $(NO_PARALLEL_TARGET): $(NO_PARALLEL_OBJS)
 $(USE_BOOST_TARGET): $(USE_BOOST_OBJS)
 	$(LD) $(LIBPATH) -o $@ $(LDFLAGS) $^ $(LIBS_BOOST) $(LIBS)
 
+%$(POSTFIX_DIAGONAL).o : %.cpp $(HEADERS) $(GENERATED_CODE)
+	$(CXX) -c $(CPPFLAGS_AVX) $(CPPFLAGS_DIAGONAL) $(CPPFLAGS_INTEL_SYNTAX) $< -o $@
+
 %$(POSTFIX_SSE).o : %.cpp $(HEADERS) $(GENERATED_CODE)
 	$(CXX) -c $(CPPFLAGS_SSE) $(CPPFLAGS_INTEL_SYNTAX) $< -o $@
 
@@ -42,6 +48,9 @@ sudokuparalleltest$(POSTFIX_USE_BOOST).o : sudokuparalleltest.cpp $(HEADERS) $(G
 
 sudoku_boost$(POSTFIX_USE_BOOST).o : sudoku_boost.cpp $(HEADERS) $(GENERATED_CODE)
 	$(CXX) -c $(CPPFLAGS_USE_BOOST) $< -o $@
+
+sudokusse_cells$(POSTFIX_DIAGONAL).o : sudokusse.s
+	$(AS) $(ASFLAGS_DIAGONAL) -o $@ $<
 
 sudokusse_cells$(POSTFIX_UNPACKED)$(POSTFIX_SSE).o : sudokusse.s
 	$(AS) $(ASFLAGS_UNPACKED) $(ASFLAGS_SSE) -o $@ $<

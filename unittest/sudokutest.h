@@ -117,6 +117,22 @@ namespace SudokuTestPattern {
         {ConflictString,    ConflictPreset,    ConflictResult,    false},
     };
 
+    // http://logicmastersindia.com/BeginnersSudoku/Types/?test=B201312
+    const std::string DiagonalSudokuString1 = ".4....15.8....6..77...2.....5..1......68.25......9..7.....8...26..2....5.82....3.";
+    constexpr SudokuIndex DiagonalSudokuPreset1[] {0,4,0,0,0,0,1,5,0,8,0,0,0,0,6,0,0,7,7,0,0,0,2,0,0,0,0,0,5,0,0,1,0,0,0,0,0,0,6,8,0,2,5,0,0,0,0,0,0,9,0,0,7,0,0,0,0,0,8,0,0,0,2,6,0,0,2,0,0,0,0,5,0,8,2,0,0,0,0,3,0};
+    constexpr SudokuIndex DiagonalSudokuResult1[] {2,4,3,9,7,8,1,5,6,8,9,1,4,5,6,3,2,7,7,6,5,3,2,1,8,9,4,3,5,9,6,1,7,2,4,8,4,7,6,8,3,2,5,1,9,1,2,8,5,9,4,6,7,3,5,3,4,1,8,9,7,6,2,6,1,7,2,4,3,9,8,5,9,8,2,7,6,5,4,3,1};
+
+    // http://www.sudocue.net/minx.php
+    const std::string DiagonalSudokuString2 = "............................................1..2345...56.......1......7....8..23.";
+    constexpr SudokuIndex DiagonalSudokuPreset2[] {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,2,3,4,5,0,0,0,5,6,0,0,0,0,0,0,0,1,0,0,0,0,0,0,7,0,0,0,0,8,0,0,2,3,0};
+    constexpr SudokuIndex DiagonalSudokuResult2[] {8,7,1,9,2,6,3,4,5,2,3,6,5,8,4,9,1,7,9,5,4,1,7,3,6,8,2,6,8,9,2,1,7,4,5,3,3,4,5,6,9,8,7,2,1,7,1,2,3,4,5,8,6,9,5,6,8,7,3,2,1,9,4,1,2,3,4,6,9,5,7,8,4,9,7,8,5,1,2,3,6};
+
+    constexpr TestSet testSetDiagonal[] {
+        {DiagonalSudokuString1, DiagonalSudokuPreset1, DiagonalSudokuResult1, true},
+        {DiagonalSudokuString2, DiagonalSudokuPreset2, DiagonalSudokuResult2, true},
+        {NoBacktrackString, NoBacktrackPreset, NoBacktrackResult, false},
+    };
+
     struct TestArgs {
         int    argc;
         const char* argv[4];

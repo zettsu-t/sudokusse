@@ -18,10 +18,11 @@
 // Set this macro to use fast but complicated code
 #define FAST_MODE (true)
 
-// Set this macro to solve Sudoku-X (Set 1..0 to diagonal bars)
-#define SUDOKU_X_MODE (true)
-#if defined(UNITTEST)
-extern bool SudokuXmode;
+// Set 1 to solve diagonal Sudoku (Sudoku-X)
+#if defined(DIAGONAL_SUDOKU)
+constexpr bool DiagonalSudokuMode = static_cast<decltype(DiagonalSudokuMode)>(DIAGONAL_SUDOKU);
+#else
+constexpr bool DiagonalSudokuMode = false;
 #endif
 
 // if-constexpr {} in C++17

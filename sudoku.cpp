@@ -32,12 +32,6 @@
 // const SudokuCellLookUp SudokuCell::CellLookUp_[Sudoku::SizeOfLookUpCell];
 #include "sudokuConstAll.h"
 
-#if !defined(UNITTEST)
-static constexpr bool SudokuXmode = SUDOKU_X_MODE;
-#else
-bool SudokuXmode = false;
-#endif
-
 // Sudoku-X (diagonal Sudoku) table
 // bars (diagonal lines) to their cell indexes
 const SudokuIndex SudokuMap::DiagonalBarGroup_[Sudoku::SizeOfDiagonalBarsPerMap][Sudoku::SizeOfCellsPerGroup] = {
@@ -793,7 +787,7 @@ bool SudokuMap::IsConsistent(void) const {
         }
     }
 
-    if (SudokuXmode) {
+    if (DiagonalSudokuMode) {
         for(SudokuLoopIndex groupIndex=0; groupIndex<Sudoku::SizeOfDiagonalBarsPerMap; ++groupIndex) {
             auto allCandidates = SudokuCell::GetEmptyCandidates();
             for(SudokuLoopIndex i=0; i<Sudoku::SizeOfCellsPerGroup; ++i) {
@@ -876,7 +870,7 @@ bool SudokuMap::findUnusedCandidate(SudokuCell& targetCell) const {
     auto candidates = SudokuCell::GetEmptyCandidates();
     const auto targetCellIndex = targetCell.GetIndex();
 
-    if (SudokuXmode) {
+    if (DiagonalSudokuMode) {
         for(SudokuLoopIndex groupIndex=0; groupIndex<Sudoku::SizeOfDiagonalBarsPerMap; ++groupIndex) {
             const auto& group = DiagonalBarGroup_[groupIndex];
             // Run this fast if check (index mod 10 == 0) or (index mod 8 == 0 and index != 0)
@@ -1735,7 +1729,7 @@ bool SudokuChecker::checkBoxSet(const Grid& grid, std::ostream* pSudokuOutStream
 }
 
 bool SudokuChecker::checkDiagonal(const Grid& grid, std::ostream* pSudokuOutStream) {
-    if (SudokuXmode) {
+    if (DiagonalSudokuMode) {
         Group upToGroup {{0,0,0,0,0,0,0,0,0}};
         Group downToGroup {{0,0,0,0,0,0,0,0,0}};
 

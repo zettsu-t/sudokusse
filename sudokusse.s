@@ -1,9 +1,13 @@
 # Sudoku solver with SSE 4.2 / AVX
-# Copyright (C) 2012-2017 Zettsu Tatsuya
+# Copyright (C) 2012-2018 Zettsu Tatsuya
 
 .intel_syntax noprefix
 .file   "sudokusse.s"
         # Makefile designates these flags and they should not be hard-coded here.
+
+        # Set DiagonalSudoku to 1 for solving diagonal Sudoku (Sudoku-X), 0 for original Sudoku
+        # .set    DiagonalSudoku, 1
+
         # Set EnableAvx to 1 for using AVX, 0 for SSE
         # .set    EnableAvx, 1
 
@@ -1351,11 +1355,11 @@ testMergeThreeDiagonalElements2:
         .global testMergeNineDiagonalElements
 testMergeNineDiagonalElements:
         InitMaskRegister
-        MergeNineDiagonalElements eax, edx, ebx, esi, ecx, r8d, xRegRow4, xRegRow5, xRegRow6, xRegRow7, xRegRow8, xRegRow9, xRegRow1, xRegRow2, xRegRow3, r9d, r10d, r11d, r12d
+        MergeNineDiagonalElements eax, edx, ebx, edi, ecx, r8d, xRegRow4, xRegRow5, xRegRow6, xRegRow7, xRegRow8, xRegRow9, xRegRow1, xRegRow2, xRegRow3, r9d, r10d, r11d, r12d
         ShlNonZero rax, 32
         or         rax, rdx
         ShlNonZero rbx, 32
-        or         rbx, rsi
+        or         rbx, rdi
         ShlNonZero rcx, 32
         or         rcx, r8
         ret
@@ -1850,10 +1854,12 @@ testCheckDiagonalNineCells:
         xor  \regResultD, \regResultD
         mov  \regInvalidD, 1
 
+.if (DiagonalSudoku != 0)
         CheckDiagonalNineCells \regResultD, \regInvalidD, xRegRow1, xRegRow2, xRegRow3, xRegRow4, xRegRow5, xRegRow6, xRegRow7, xRegRow8, xRegRow9, \regWork1D, \regWork2D, \regWork3D
         CheckDiagonalNineCells \regResultD, \regInvalidD, xRegRow9, xRegRow8, xRegRow7, xRegRow6, xRegRow5, xRegRow4, xRegRow3, xRegRow2, xRegRow1, \regWork1D, \regWork2D, \regWork3D
         cmp  \regResultD, \regInvalidD
         jz   20001f
+.endif
 
         CheckRowSet  \regResultD, \regInvalidD, \regWork1D, \regWork2D, \regWork3D, \regWork4D, \regWork5D
         cmp  \regResultD, \regInvalidD
@@ -1890,7 +1896,9 @@ solveSudokuAsm:
 
 loopFilling:
         # Find diagonal cells
+.if (DiagonalSudoku != 0)
         FindUnusedAllDiagonalElements eax, ebx, ecx, edx, esi, edi, r8d, r9d, r10d, r11d
+.endif
 
         # Find candidates per 3 rows
         CollectUniqueCandidatesInThreeLine xRegRow1to3, xRegRow1, xRegRow2, xRegRow3, rax, rbx, rcx, rdx, r8, r9, r10, eax, xRegWork1, xRegWork2

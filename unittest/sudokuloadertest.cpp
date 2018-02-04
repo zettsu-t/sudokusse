@@ -76,7 +76,6 @@ void SudokuCheckerTest::setUp() {
 }
 
 void SudokuCheckerTest::tearDown() {
-    SudokuXmode = false;
     return;
 }
 
@@ -88,6 +87,11 @@ void SudokuCheckerTest::test_initializeGrid() {
 }
 
 void SudokuCheckerTest::test_parse() {
+    if (DiagonalSudokuMode) {
+        // Check this in testing for original Sudoku or solve_sudoku_x.py
+        return;
+    }
+
     constexpr SudokuSolverPrint printSet[] = {SudokuSolverPrint::DO_NOT_PRINT, SudokuSolverPrint::PRINT};
 
     for(auto solutionPrint : printSet) {
@@ -242,6 +246,11 @@ void SudokuCheckerTest::test_compare() {
 }
 
 void SudokuCheckerTest::test_checkRowSet() {
+    if (DiagonalSudokuMode) {
+        // Check this in testing for original Sudoku or solve_sudoku_x.py
+        return;
+    }
+
     SudokuOutStream os;
     SudokuChecker checker("", "", solutionPrint_, nullptr);
     CPPUNIT_ASSERT_EQUAL(true, checker.checkRowSet(grid_, &os));
@@ -282,7 +291,9 @@ void SudokuCheckerTest::test_checkRowSet() {
 }
 
 void SudokuCheckerTest::test_checkDiagonal() {
-    SudokuXmode = true;
+    if (!DiagonalSudokuMode) {
+        return;
+    }
 
     // Cited from http://logicmastersindia.com/BeginnersSudoku/Types/?test=B201312
     SudokuChecker::Group row1 {{2,4,3,9,7,8,1,5,6}};
@@ -317,8 +328,6 @@ void SudokuCheckerTest::test_checkDiagonal() {
             }
         }
     }
-
-    SudokuXmode = false;
 }
 
 void SudokuCheckerTest::test_checkColumnSet() {
@@ -508,6 +517,11 @@ void SudokuDispatcherTest::test_Constructor() {
 }
 
 void SudokuDispatcherTest::test_Exec() {
+    if (DiagonalSudokuMode) {
+        // Check this in testing for original Sudoku or solve_sudoku_x.py
+        return;
+    }
+
     struct Test {
         SudokuSolverCheck check;
         SudokuSolverPrint print;
@@ -543,6 +557,11 @@ void SudokuDispatcherTest::test_Exec() {
 }
 
 void SudokuDispatcherTest::test_exec() {
+    if (DiagonalSudokuMode) {
+        // Check this in testing for original Sudoku or solve_sudoku_x.py
+        return;
+    }
+
     struct Test {
         SudokuSolverCheck check;
         SudokuSolverPrint print;
@@ -678,6 +697,11 @@ void SudokuMultiDispatcherTest::test_AddPuzzle() {
 }
 
 void SudokuMultiDispatcherTest::test_ExecAll() {
+    if (DiagonalSudokuMode) {
+        // Check this in testing for original Sudoku or solve_sudoku_x.py
+        return;
+    }
+
     {
         SudokuMultiDispatcher inst(SudokuSolverType::SOLVER_GENERAL, SudokuSolverCheck::CHECK,
                                    SudokuSolverPrint::DO_NOT_PRINT, 0);
@@ -703,6 +727,11 @@ void SudokuMultiDispatcherTest::test_ExecAll() {
 }
 
 void SudokuMultiDispatcherTest::test_GetMessage() {
+    if (DiagonalSudokuMode) {
+        // Check this in testing for original Sudoku or solve_sudoku_x.py
+        return;
+    }
+
     struct Test {
         SudokuSolverCheck check;
         SudokuSolverPrint print;
@@ -1067,6 +1096,11 @@ void SudokuLoaderTest::test_execSingle() {
 }
 
 void SudokuLoaderTest::test_execMultiPassedCpp() {
+    if (DiagonalSudokuMode) {
+        // Check this in testing for original Sudoku or solve_sudoku_x.py
+        return;
+    }
+
     struct Test {
         SudokuSolverCheck check;
         const char* expected;
@@ -1096,6 +1130,11 @@ void SudokuLoaderTest::test_execMultiPassedCpp() {
 }
 
 void SudokuLoaderTest::test_execMultiPassedSse() {
+    if (DiagonalSudokuMode) {
+        // Check this in testing for original Sudoku or solve_sudoku_x.py
+        return;
+    }
+
     std::string pattern = SudokuTestPattern::NoBacktrackString;
     pattern += "\n" + SudokuTestPattern::BacktrackString;
     SudokuInStream is(pattern);
@@ -1194,6 +1233,11 @@ void SudokuLoaderTest::test_readLines() {
 }
 
 void SudokuLoaderTest::test_execAll() {
+    if (DiagonalSudokuMode) {
+        // Check this in testing for original Sudoku or solve_sudoku_x.py
+        return;
+    }
+
     const int resultSet[] = {SudokuLoader::ExitStatusPassed, SudokuLoader::ExitStatusFailed};
     for(auto result : resultSet) {
         constexpr SudokuPuzzleCount sizeOfPuzzles = 32;

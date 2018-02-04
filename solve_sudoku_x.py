@@ -16,6 +16,8 @@ import sys
 import subprocess
 from optparse import OptionParser
 
+EXECUTABLE_FILENAME='bin/sudokusse_diagonal'
+
 def check_solution(lines):
     status_code = 0
     rows = lines[-9:]
@@ -81,7 +83,7 @@ def main():
     else:
         for filename in sys.argv[1:]:
             with open(filename, 'r') as infile:
-                proc = subprocess.Popen(['bin/sudokusse', '-1'], stdin=infile, stdout=subprocess.PIPE)
+                proc = subprocess.Popen([EXECUTABLE_FILENAME, '-1'], stdin=infile, stdout=subprocess.PIPE)
                 stdout_data = proc.communicate()[0]
                 status_code = solve_puzzle(stdout_data)
                 if status_code == 0:

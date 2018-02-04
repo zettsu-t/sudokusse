@@ -208,7 +208,6 @@ void SudokuMapTest::setUp() {
 
 // Call after running a test
 void SudokuMapTest::tearDown() {
-    SudokuXmode = false;
     return;
 }
 
@@ -508,6 +507,10 @@ void SudokuMapTest::test_SelectBacktrackedCellIndex() {
 }
 
 void SudokuMapTest::test_IsConsistent() {
+    if (DiagonalSudokuMode) {
+        return;
+    }
+
     // First, all cells have all 1..9 candidates and are consistent.
     setAllCellsFullCandidates();
     CPPUNIT_ASSERT_EQUAL(true, pInstance_->IsConsistent());
@@ -529,7 +532,9 @@ void SudokuMapTest::test_IsConsistent() {
 }
 
 void SudokuMapTest::test_IsConsistentX() {
-    SudokuXmode = true;
+    if (!DiagonalSudokuMode) {
+        return;
+    }
 
     // First, all cells have all 1..9 candidates and are consistent.
     setAllCellsFullCandidates();
@@ -543,7 +548,6 @@ void SudokuMapTest::test_IsConsistentX() {
     pInstance_->cells_[SudokuTestPosition::Last].candidates_ = SudokuTestCandidates::OneOnly;
     CPPUNIT_ASSERT_EQUAL(false, pInstance_->IsConsistent());
 
-    SudokuXmode = false;
     return;
 }
 
@@ -627,7 +631,9 @@ void SudokuMapTest::test_findUnusedCandidate() {
 }
 
 void SudokuMapTest::test_findUnusedCandidateX() {
-    SudokuXmode = true;
+    if (!DiagonalSudokuMode) {
+        return;
+    }
 
     // top left to bottom right
     setAllCellsFullCandidates();
@@ -655,7 +661,6 @@ void SudokuMapTest::test_findUnusedCandidateX() {
     expected = indexToCandidate(1);
     CPPUNIT_ASSERT_EQUAL(expected, pInstance_->cells_[target].candidates_);
 
-    SudokuXmode = false;
     return;
 }
 

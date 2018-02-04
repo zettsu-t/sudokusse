@@ -7,6 +7,9 @@ include $(THIS_DIR)Makefile_vars
 
 all: $(TARGETS)
 
+$(CELLS_DIAGONAL_TARGET): $(CELLS_DIAGONAL_OBJS)
+	$(LD) -o $@ $(LDFLAGS) $^ $(LIBS)
+
 $(CELLS_UNPACKED_TARGET): $(CELLS_UNPACKED_OBJS)
 	$(LD) -o $@ $(LDFLAGS) $^ $(LIBS)
 
@@ -14,18 +17,27 @@ $(CELLS_PACKED_TARGET): $(CELLS_PACKED_OBJS)
 	$(LD) -o $@ $(LDFLAGS) $^ $(LIBS)
 
 # Using Intel syntax assembly
+%$(POSTFIX_DIAGONAL).o: %.cpp $(HEADERS) $(GENERATED_CODE)
+	$(CXX) -c $(CPPFLAGS) $(CPPFLAGS_DIAGONAL) $(CPPFLAGS_INTEL_SYNTAX) $< -o $@
+
 %.o: %.cpp $(HEADERS) $(GENERATED_CODE)
 	$(CXX) -c $(CPPFLAGS) $(CPPFLAGS_INTEL_SYNTAX) $< -o $@
 
 # Do not set -masm=intel for sources which include boost::thread
+sudoku_boost$(POSTFIX_DIAGONAL).o: sudoku_boost.cpp $(HEADERS) $(GENERATED_CODE)
+	$(CXX) -c $(CPPFLAGS) $(CPPFLAGS_DIAGONAL) $< -o $@
+
 sudoku_boost.o: sudoku_boost.cpp $(HEADERS) $(GENERATED_CODE)
 	$(CXX) -c $(CPPFLAGS) $< -o $@
 
+sudokusse_cells_unpacked$(POSTFIX_DIAGONAL).o : sudokusse.s
+	$(AS) -defsym CellsPacked=0 -defsym DiagonalSudoku=1 $(ASFLAGS_SSE_AVX) -o $@ $<
+
 sudokusse_cells_unpacked.o : sudokusse.s
-	$(AS) -defsym CellsPacked=0 $(ASFLAGS_SSE_AVX) -o $@ $<
+	$(AS) -defsym CellsPacked=0 -defsym DiagonalSudoku=0 $(ASFLAGS_SSE_AVX) -o $@ $<
 
 sudokusse_cells_packed.o : sudokusse.s
-	$(AS) -defsym CellsPacked=1 $(ASFLAGS_SSE_AVX) -o $@ $<
+	$(AS) -defsym CellsPacked=1 -defsym DiagonalSudoku=0 $(ASFLAGS_SSE_AVX) -o $@ $<
 
 $(HEADERS): ;
 
