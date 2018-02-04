@@ -540,11 +540,11 @@ void SudokuMapTest::test_IsConsistentX() {
     setAllCellsFullCandidates();
     CPPUNIT_ASSERT_EQUAL(true, pInstance_->IsConsistent());
 
-    // Set a candidate '1' to cells in each box.
+    // Set a candidate '1' to the top-left cell
     pInstance_->cells_[SudokuTestPosition::Head].candidates_ = SudokuTestCandidates::OneOnly;
     CPPUNIT_ASSERT_EQUAL(true, pInstance_->IsConsistent());
 
-    // Clear candidates in a cell.
+    // Set a candidate '1' to the bottom-right cell
     pInstance_->cells_[SudokuTestPosition::Last].candidates_ = SudokuTestCandidates::OneOnly;
     CPPUNIT_ASSERT_EQUAL(false, pInstance_->IsConsistent());
 

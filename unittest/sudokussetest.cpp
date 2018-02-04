@@ -2924,31 +2924,31 @@ void SudokuSseTest::test_CheckDiagonalThreeCells() {
 
     SudokuSseElement actual = 0;
     asm volatile (
-        "movdqa  xmm4, xmmword ptr [rdi]\n\t"
-        "movdqa  xmm5, xmmword ptr [rdi+16]\n\t"
-        "movdqa  xmm6, xmmword ptr [rdi+32]\n\t"
+        "movdqa  xmm4, xmmword ptr [rsi]\n\t"
+        "movdqa  xmm5, xmmword ptr [rsi+16]\n\t"
+        "movdqa  xmm6, xmmword ptr [rsi+32]\n\t"
         "call testCheckDiagonalThreeCells0\n\t"
-        :"=a"(actual):"D"(&XmmRegSet):"r8","r15");
+        :"=a"(actual):"S"(&XmmRegSet):"r8","r15");
     SudokuSseElement expected = 0x7;
     CPPUNIT_ASSERT_EQUAL(expected, actual);
 
     actual = 0;
     asm volatile (
-        "movdqa  xmm4, xmmword ptr [rdi]\n\t"
-        "movdqa  xmm5, xmmword ptr [rdi+16]\n\t"
-        "movdqa  xmm6, xmmword ptr [rdi+32]\n\t"
+        "movdqa  xmm4, xmmword ptr [rsi]\n\t"
+        "movdqa  xmm5, xmmword ptr [rsi+16]\n\t"
+        "movdqa  xmm6, xmmword ptr [rsi+32]\n\t"
         "call testCheckDiagonalThreeCells1\n\t"
-        :"=a"(actual):"D"(&XmmRegSet):"r8","r15");
+        :"=a"(actual):"S"(&XmmRegSet):"r8","r15");
     expected = 0x38;
     CPPUNIT_ASSERT_EQUAL(expected, actual);
 
     actual = 0;
     asm volatile (
-        "movdqa  xmm4, xmmword ptr [rdi]\n\t"
-        "movdqa  xmm5, xmmword ptr [rdi+16]\n\t"
-        "movdqa  xmm6, xmmword ptr [rdi+32]\n\t"
+        "movdqa  xmm4, xmmword ptr [rsi]\n\t"
+        "movdqa  xmm5, xmmword ptr [rsi+16]\n\t"
+        "movdqa  xmm6, xmmword ptr [rsi+32]\n\t"
         "call testCheckDiagonalThreeCells2\n\t"
-        :"=a"(actual):"D"(&XmmRegSet):"r8","r15");
+        :"=a"(actual):"S"(&XmmRegSet):"r8","r15");
     expected = 0x1c0;
     CPPUNIT_ASSERT_EQUAL(expected, actual);
 }
@@ -2984,9 +2984,7 @@ void SudokuSseTest::test_CheckDiagonalNineCells() {
             "movdqa  xmm7,  xmmword ptr [rsi+96]\n\t"
             "movdqa  xmm8,  xmmword ptr [rsi+112]\n\t"
             "movdqa  xmm9,  xmmword ptr [rsi+128]\n\t"
-            "push rsi\n\t"
             "call testCheckDiagonalNineCells\n\t"
-            "pop  rsi\n\t"
             :"=a"(actual):"S"(&XmmRegSet):"r8","r9","r10","r11","r15");
         CPPUNIT_ASSERT_EQUAL(expected, actual);
 

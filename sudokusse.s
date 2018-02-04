@@ -1371,10 +1371,9 @@ testMergeNineDiagonalElements:
         or   \regWork1D, \regSrcMerged2D
         and  \regWork1D, gRegBitMaskD
         ShlNonZero  \regWork1D, (candidatesNum * \inBoxShift)
-        not  \regWork1D
 
         MacroPextrd \regWork2D, \regDstX, \outBoxShift
-        and  \regWork2D, \regWork1D
+        andn  \regWork2D, \regWork1D, \regWork2D
         MacroPinsrd \regDstX, \regWork2D, \outBoxShift
 .endm
 

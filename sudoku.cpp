@@ -12,6 +12,10 @@
 //
 // To solve puzzles in file sudoku17 with multi-threading, execute the below
 // $ bin/sudokusse.exe sudoku17 -N
+//
+// If you set C++ macro __DIAGONAL_SUDOKU=1__ and assembly macro
+// __DiagonalSudoku=1__ , the executable solves diagonal Sudoku puzzles
+// instead of original Sudoku puzzles.
 
 #include <algorithm>
 #include <fstream>
@@ -787,7 +791,7 @@ bool SudokuMap::IsConsistent(void) const {
         }
     }
 
-    if (DiagonalSudokuMode) {
+    if CPP17_IF_CONSTEXPR (DiagonalSudokuMode) {
         for(SudokuLoopIndex groupIndex=0; groupIndex<Sudoku::SizeOfDiagonalBarsPerMap; ++groupIndex) {
             auto allCandidates = SudokuCell::GetEmptyCandidates();
             for(SudokuLoopIndex i=0; i<Sudoku::SizeOfCellsPerGroup; ++i) {
@@ -870,7 +874,7 @@ bool SudokuMap::findUnusedCandidate(SudokuCell& targetCell) const {
     auto candidates = SudokuCell::GetEmptyCandidates();
     const auto targetCellIndex = targetCell.GetIndex();
 
-    if (DiagonalSudokuMode) {
+    if CPP17_IF_CONSTEXPR (DiagonalSudokuMode) {
         for(SudokuLoopIndex groupIndex=0; groupIndex<Sudoku::SizeOfDiagonalBarsPerMap; ++groupIndex) {
             const auto& group = DiagonalBarGroup_[groupIndex];
             // Run this fast if check (index mod 10 == 0) or (index mod 8 == 0 and index != 0)
