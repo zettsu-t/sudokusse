@@ -536,17 +536,67 @@ void SudokuMapTest::test_IsConsistentX() {
         return;
     }
 
-    // First, all cells have all 1..9 candidates and are consistent.
-    setAllCellsFullCandidates();
-    CPPUNIT_ASSERT_EQUAL(true, pInstance_->IsConsistent());
+    struct TestSet {
+        SudokuIndex indexFirst;
+        SudokuIndex indexSecond;
+    };
 
-    // Set a candidate '1' to the top-left cell
-    pInstance_->cells_[SudokuTestPosition::Head].candidates_ = SudokuTestCandidates::OneOnly;
-    CPPUNIT_ASSERT_EQUAL(true, pInstance_->IsConsistent());
+    constexpr TestSet testSet[] = {
+        {SudokuTestPosition::Head, SudokuTestPosition::Last},
+        {Sudoku::SizeOfCellsPerGroup - 1, SudokuTestPosition::Last - Sudoku::SizeOfCellsPerGroup + 1},
+        {SudokuTestPosition::Head, SudokuTestPosition::Center},
+        {SudokuTestPosition::Center, SudokuTestPosition::Last - Sudoku::SizeOfCellsPerGroup + 1},
+    };
 
-    // Set a candidate '1' to the bottom-right cell
-    pInstance_->cells_[SudokuTestPosition::Last].candidates_ = SudokuTestCandidates::OneOnly;
-    CPPUNIT_ASSERT_EQUAL(false, pInstance_->IsConsistent());
+    for (const auto& test : testSet) {
+        SudokuIndex indexFirst = test.indexFirst;
+        SudokuIndex indexSecond = test.indexSecond;
+
+        for(int i=0; i<2; ++i) {
+            assert(indexFirst < Sudoku::SizeOfAllCells);
+            assert(indexSecond < Sudoku::SizeOfAllCells);
+
+            // First, all cells have all 1..9 candidates and are consistent.
+            setAllCellsFullCandidates();
+            CPPUNIT_ASSERT_EQUAL(true, pInstance_->IsConsistent());
+
+            // Set a candidate '1' to a cell
+            pInstance_->cells_[indexFirst].candidates_ = SudokuTestCandidates::OneOnly;
+            CPPUNIT_ASSERT_EQUAL(true, pInstance_->IsConsistent());
+            CPPUNIT_ASSERT_EQUAL(true, pInstance_->areDiagonalBarsConsistent());
+
+            // Set a candidate '1' to a cell in the same bar
+            pInstance_->cells_[indexSecond].candidates_ = SudokuTestCandidates::OneOnly;
+            CPPUNIT_ASSERT_EQUAL(false, pInstance_->IsConsistent());
+            CPPUNIT_ASSERT_EQUAL(false, pInstance_->areDiagonalBarsConsistent());
+
+            std::swap(indexFirst, indexSecond);
+        }
+    }
+
+    for(SudokuIndex i=0; i<Sudoku::SizeOfCellsPerGroup / 2; ++i) {
+        SudokuIndex indexFirst = i * (Sudoku::SizeOfCellsPerGroup + 1);
+
+        for(int i=0; i<2; ++i) {
+            SudokuIndex indexSecond = Sudoku::SizeOfAllCells - 1 - indexFirst;
+            assert(indexFirst < Sudoku::SizeOfAllCells);
+            assert(indexSecond < Sudoku::SizeOfAllCells);
+
+            // First, all cells have all 1..9 candidates and are consistent.
+            setAllCellsFullCandidates();
+            CPPUNIT_ASSERT_EQUAL(true, pInstance_->IsConsistent());
+
+            pInstance_->cells_[indexFirst].candidates_ = SudokuTestCandidates::NineOnly;
+            CPPUNIT_ASSERT_EQUAL(true, pInstance_->IsConsistent());
+            CPPUNIT_ASSERT_EQUAL(true, pInstance_->areDiagonalBarsConsistent());
+
+            pInstance_->cells_[indexSecond].candidates_ = SudokuTestCandidates::NineOnly;
+            CPPUNIT_ASSERT_EQUAL(false, pInstance_->IsConsistent());
+            CPPUNIT_ASSERT_EQUAL(false, pInstance_->areDiagonalBarsConsistent());
+
+            indexFirst = (i + 1) * (Sudoku::SizeOfCellsPerGroup - 1);
+        }
+    }
 
     return;
 }

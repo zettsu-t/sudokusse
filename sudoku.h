@@ -283,6 +283,7 @@ public:
 private:
     bool findUnusedCandidate(SudokuCell& targetCell) const;
     bool findUniqueCandidate(SudokuCell& targetCell) const;
+    bool areDiagonalBarsConsistent(void) const;
     // All cells in a puzzle
     SudokuCell cells_[Sudoku::SizeOfAllCells];
     // determines which cell in columns, rows, or boxes do we select in backtracking.
@@ -303,6 +304,8 @@ private:
     // Use inlining and unrolling to solve puzzles faster.
     template <SudokuIndex index> INLINE SudokuIndex unrolledCountFilledCells
         (SudokuIndex accumCount) const;
+    template <SudokuIndex columnIndex> INLINE bool unrolledAreDiagonalBarsConsistentInner
+        (SudokuCellCandidates allCandidatesToLeft, SudokuCellCandidates allCandidatesToRight) const;
     template <SudokuIndex innerIndex> INLINE SudokuCellCandidates unrolledFindUnusedCandidateInner
         (SudokuIndex targetCellIndex, SudokuIndex outerIndex, SudokuIndex groupIndex, SudokuCellCandidates candidates) const;
     template <SudokuIndex outerIndex> INLINE SudokuCellCandidates unrolledFindUnusedCandidateOuter

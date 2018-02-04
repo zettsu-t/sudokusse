@@ -792,17 +792,8 @@ bool SudokuMap::IsConsistent(void) const {
     }
 
     if CPP17_IF_CONSTEXPR (DiagonalSudokuMode) {
-        for(SudokuLoopIndex groupIndex=0; groupIndex<Sudoku::SizeOfDiagonalBarsPerMap; ++groupIndex) {
-            auto allCandidates = SudokuCell::GetEmptyCandidates();
-            for(SudokuLoopIndex i=0; i<Sudoku::SizeOfCellsPerGroup; ++i) {
-                const auto cellIndex = DiagonalBarGroup_[groupIndex][i];
-                const auto& cell = cells_[cellIndex];
-                if (cell.IsConsistent(allCandidates) == false) {
-                    return false;
-                }
-                const auto candidates = cell.GetUniqueCandidate();
-                allCandidates = cell.MergeCandidates(allCandidates, candidates);
-            }
+        if (!SudokuMap::areDiagonalBarsConsistent()) {
+            return false;
         }
     }
 
@@ -1005,6 +996,35 @@ bool SudokuMap::findUniqueCandidate(SudokuCell& targetCell) const {
     }
 
     return false;
+}
+
+template <SudokuIndex columnIndex>
+INLINE bool SudokuMap::unrolledAreDiagonalBarsConsistentInner(SudokuCellCandidates allCandidatesToLeft,
+                                                              SudokuCellCandidates allCandidatesToRight) const {
+    const auto& cellToLeft = cells_[(columnIndex + 1) * (Sudoku::SizeOfCellsPerGroup - 1)];
+    const auto& cellToRight = cells_[columnIndex * (Sudoku::SizeOfCellsPerGroup + 1)];
+    const auto candidatesToLeft = cellToLeft.GetUniqueCandidate();
+    const auto candidatesToRight = cellToRight.GetUniqueCandidate();
+
+    return cellToLeft.IsConsistent(allCandidatesToLeft) &
+        cellToRight.IsConsistent(allCandidatesToRight) &
+        unrolledAreDiagonalBarsConsistentInner<columnIndex - 1>(
+            cellToLeft.MergeCandidates(allCandidatesToLeft, candidatesToLeft),
+            cellToRight.MergeCandidates(allCandidatesToRight, candidatesToRight));
+}
+
+template <>
+INLINE bool SudokuMap::unrolledAreDiagonalBarsConsistentInner<0>(SudokuCellCandidates allCandidatesToLeft,
+                                                                 SudokuCellCandidates allCandidatesToRight) const {
+    const auto& cellToLeft = cells_[Sudoku::SizeOfCellsPerGroup - 1];
+    const auto& cellToRight = cells_[0];
+    return cellToLeft.IsConsistent(allCandidatesToLeft) & cellToRight.IsConsistent(allCandidatesToRight);
+}
+
+bool SudokuMap::areDiagonalBarsConsistent(void) const {
+    const auto allCandidates = SudokuCell::GetEmptyCandidates();
+    return unrolledAreDiagonalBarsConsistentInner<Sudoku::SizeOfCellsPerGroup - 1>(
+        allCandidates, allCandidates);
 }
 
 SudokuSseEnumeratorMap* SudokuSseEnumeratorMap::pInstance_ = nullptr;
