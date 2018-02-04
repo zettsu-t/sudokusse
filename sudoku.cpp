@@ -12,6 +12,10 @@
 //
 // To solve puzzles in file sudoku17 with multi-threading, execute the below
 // $ bin/sudokusse.exe sudoku17 -N
+//
+// If you set C++ macro __DIAGONAL_SUDOKU=1__ and assembly macro
+// __DiagonalSudoku=1__ , the executable solves diagonal Sudoku puzzles
+// instead of original Sudoku puzzles.
 
 #include <algorithm>
 #include <fstream>
@@ -31,6 +35,13 @@
 // const SudokuIndex SudokuMap::ReverseGroup_[Sudoku::SizeOfAllCells][Sudoku::SizeOfGroupsPerCell];
 // const SudokuCellLookUp SudokuCell::CellLookUp_[Sudoku::SizeOfLookUpCell];
 #include "sudokuConstAll.h"
+
+// Sudoku-X (diagonal Sudoku) table
+// bars (diagonal lines) to their cell indexes
+const SudokuIndex SudokuMap::DiagonalBarGroup_[Sudoku::SizeOfDiagonalBarsPerMap][Sudoku::SizeOfCellsPerGroup] = {
+    {0,10,20,30,40,50,60,70,80},
+    {8,16,24,32,40,48,56,64,72}
+};
 
 namespace {
     constexpr bool FastMode = FAST_MODE;
@@ -780,6 +791,21 @@ bool SudokuMap::IsConsistent(void) const {
         }
     }
 
+    if CPP17_IF_CONSTEXPR (DiagonalSudokuMode) {
+        for(SudokuLoopIndex groupIndex=0; groupIndex<Sudoku::SizeOfDiagonalBarsPerMap; ++groupIndex) {
+            auto allCandidates = SudokuCell::GetEmptyCandidates();
+            for(SudokuLoopIndex i=0; i<Sudoku::SizeOfCellsPerGroup; ++i) {
+                const auto cellIndex = DiagonalBarGroup_[groupIndex][i];
+                const auto& cell = cells_[cellIndex];
+                if (cell.IsConsistent(allCandidates) == false) {
+                    return false;
+                }
+                const auto candidates = cell.GetUniqueCandidate();
+                allCandidates = cell.MergeCandidates(allCandidates, candidates);
+            }
+        }
+    }
+
     return true;
 }
 
@@ -847,6 +873,25 @@ bool SudokuMap::findUnusedCandidate(SudokuCell& targetCell) const {
     // Returns true if finding a cell that cannot be filled.
     auto candidates = SudokuCell::GetEmptyCandidates();
     const auto targetCellIndex = targetCell.GetIndex();
+
+    if CPP17_IF_CONSTEXPR (DiagonalSudokuMode) {
+        for(SudokuLoopIndex groupIndex=0; groupIndex<Sudoku::SizeOfDiagonalBarsPerMap; ++groupIndex) {
+            const auto& group = DiagonalBarGroup_[groupIndex];
+            // Run this fast if check (index mod 10 == 0) or (index mod 8 == 0 and index != 0)
+            if (std::find(std::begin(group), std::end(group), targetCellIndex) ==
+                std::end(DiagonalBarGroup_[groupIndex])) {
+                continue;
+            }
+
+            for(SudokuLoopIndex i=0; i<Sudoku::SizeOfCellsPerGroup; ++i) {
+                const auto cellIndex = group[i];
+                if (cellIndex != targetCellIndex) {
+                    const auto cellCandidates = cells_[cellIndex].GetUniqueCandidate();
+                    candidates = SudokuCell::MergeCandidates(candidates, cellCandidates);
+                }
+            }
+        }
+    }
 
     if CPP17_IF_CONSTEXPR (FastMode == false) {
         for(SudokuLoopIndex i=0;i<Sudoku::SizeOfGroupsPerCell;++i) {
@@ -1158,6 +1203,7 @@ void SudokuSolver::PrintType(void) {
 bool SudokuSolver::solve(SudokuMap& map, bool topLevel, bool verbose) {
     auto oldCount = map.CountFilledCells();
 
+    // Start backtracking before filling cells for Sudoku-X puzzles
     for(;;) {
         if (fillCells(map, topLevel, verbose) == false) {
             return false;
@@ -1615,7 +1661,8 @@ bool SudokuChecker::compare(const std::string& puzzle, const std::string& soluti
 bool SudokuChecker::check(const Grid& grid, std::ostream* pSudokuOutStream) {
     return checkRowSet(grid, pSudokuOutStream) &&
         checkColumnSet(grid, pSudokuOutStream) &&
-        checkBoxSet(grid, pSudokuOutStream);
+        checkBoxSet(grid, pSudokuOutStream) &&
+        checkDiagonal(grid, pSudokuOutStream);
 }
 
 bool SudokuChecker::checkRowSet(const Grid& grid, std::ostream* pSudokuOutStream) {
@@ -1679,6 +1726,35 @@ bool SudokuChecker::checkBoxSet(const Grid& grid, std::ostream* pSudokuOutStream
                 }
                 return false;
             }
+        }
+    }
+
+    return true;
+}
+
+bool SudokuChecker::checkDiagonal(const Grid& grid, std::ostream* pSudokuOutStream) {
+    if (DiagonalSudokuMode) {
+        Group upToGroup {{0,0,0,0,0,0,0,0,0}};
+        Group downToGroup {{0,0,0,0,0,0,0,0,0}};
+
+        for(SudokuIndex index = 0; index < Sudoku::SizeOfCellsPerGroup; ++index) {
+            upToGroup.at(index) = grid.at(Sudoku::SizeOfCellsPerGroup - 1 - index).at(index);
+            downToGroup.at(index) = grid.at(index).at(index);
+        }
+
+        // Report an error in downToGroup for the center cell
+        if (!checkUnique(downToGroup)) {
+            if (pSudokuOutStream) {
+                *pSudokuOutStream << "Error in the top-left to bottom-right bar\n";
+            }
+            return false;
+        }
+
+        if (!checkUnique(upToGroup)) {
+            if (pSudokuOutStream) {
+                *pSudokuOutStream << "Error in the bottom-left to top-right bar\n";
+            }
+            return false;
         }
     }
 
@@ -1931,6 +2007,8 @@ SudokuLoader::ExitStatusCode SudokuLoader::execSingle(void) {
     if (measureCount_) {
         measureTimeToSolve(SudokuSolverType::SOLVER_GENERAL);
     }
+
+    // The SSE code does not solve Sudoku-X puzzles
     measureTimeToSolve(SudokuSolverType::SOLVER_SSE_4_2);
     return ExitStatusPassed;
 }

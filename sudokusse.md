@@ -265,6 +265,27 @@ lines from its top to bottom ordered by
 1. filled cell(s) followed by blank cell(s) (none or one line)
 1. blank nine cells (0 or more lines)
 
+### Solve Sudoku-X puzzles
+
+If you set C++ macro __DIAGONAL_SUDOKU=1__ and assembly macro
+__DiagonalSudoku=1__ , the executable solves diagonal Sudoku puzzles
+instead of original Sudoku puzzles.
+
+It is hard-coded whether executables solve original or diagonal Sudoku
+puzzles to run fast.
+
+Its usage is same as the solver for original Sudoku. You can check
+whether the solutions are correct with script __solve_sudoku_x.py__.
+
+```bash
+# Solve a puzzle
+bin/sudokusse_diagonal 10000 < data/sudoku_x_example1.txt
+# Solve puzzles in one file
+bin/sudokusse_diagonal data/sudoku-x-7193.sdm sse print > solutions.txt
+# Check whether solutions are correct
+python3 solve_sudoku_x.py --log ./solutions.txt
+```
+
 ### Helper scripts
 
 #### Measure time to solve puzzles

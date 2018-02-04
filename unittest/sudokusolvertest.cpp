@@ -1,5 +1,5 @@
 // Testing class SudokuSolver
-// Copyright (C) 2012-2017 Zettsu Tatsuya
+// Copyright (C) 2012-2018 Zettsu Tatsuya
 //
 // I use CppUnit code on the website.
 // http://www.atmarkit.co.jp/fdotnet/cpptest/cpptest02/cpptest02_02.html
@@ -25,6 +25,9 @@ public:
     void CheckCells(SudokuSolver *pInst, const SudokuIndex* expectedIndexes);
 
 private:
+    void exec(const SudokuTestPattern::TestSet& test);
+    void solve(const SudokuTestPattern::TestSet& test);
+    void fillCells(const SudokuTestPattern::TestSet& test);
     void checkCells(TestedT *pInst, const SudokuIndex* expectedIndexes);
     bool filterRetvalFillCells(bool original);
 
@@ -104,7 +107,7 @@ void SudokuSolverTest::verifyTestVector(void) {
     return;
 }
 
-// Confirms candidates of cells are set collect
+// Confirms candidates of cells are set
 template <>
 void SudokuSolverCommonTest<SudokuSolver, SudokuCellCandidates>::checkCells(SudokuSolver *pInst, const SudokuIndex* expectedIndexes) {
     for(size_t i=0;i<arraySizeof(pInst->map_.cells_);++i) {
@@ -197,15 +200,29 @@ SudokuSolverCommonTest<TestedT, CandidatesT>::~SudokuSolverCommonTest() {
 }
 
 template <class TestedT, class CandidatesT>
-void SudokuSolverCommonTest<TestedT, CandidatesT>::test_Exec() {
-    for(const auto& test : SudokuTestPattern::testSet) {
-        // Destroy after destructing an instance which uses 'sudokuOutStream'
-        SudokuOutStream sudokuOutStream;
-        {
-            TestedT inst(test.presetStr, 0, &sudokuOutStream, 0);
-            CPPUNIT_ASSERT_EQUAL(test.result, inst.Exec(true, false));
+void SudokuSolverCommonTest<TestedT, CandidatesT>::exec(const SudokuTestPattern::TestSet& test) {
+    // Destroy after destructing an instance which uses 'sudokuOutStream'
+    SudokuOutStream sudokuOutStream;
+    {
+        TestedT inst(test.presetStr, 0, &sudokuOutStream, 0);
+        CPPUNIT_ASSERT_EQUAL(test.result, inst.Exec(true, false));
+
+        if (DiagonalSudokuMode && test.result) {
             checkCells(&inst, test.resultNum);
             CPPUNIT_ASSERT(inst.count_>=1);
+        }
+    }
+}
+
+template <class TestedT, class CandidatesT>
+void SudokuSolverCommonTest<TestedT, CandidatesT>::test_Exec() {
+    if (DiagonalSudokuMode) {
+        for(const auto& test : SudokuTestPattern::testSetDiagonal) {
+            exec(test);
+        }
+    } else {
+        for(const auto& test : SudokuTestPattern::testSet) {
+            exec(test);
         }
     }
 
@@ -226,14 +243,26 @@ void SudokuSolverCommonTest<TestedT, CandidatesT>::test_PrintType(const char *pE
 }
 
 template <class TestedT, class CandidatesT>
+void SudokuSolverCommonTest<TestedT, CandidatesT>::solve(const SudokuTestPattern::TestSet& test) {
+    // Destroy after destructing an instance which uses 'sudokuOutStream'
+    SudokuOutStream sudokuOutStream;
+    {
+        TestedT inst(test.presetStr, 0, &sudokuOutStream, 0);
+        CPPUNIT_ASSERT_EQUAL(test.result, inst.solve(inst.map_, true, false));
+        CPPUNIT_ASSERT(inst.count_>=1);
+    }
+    return;
+}
+
+template <class TestedT, class CandidatesT>
 void SudokuSolverCommonTest<TestedT, CandidatesT>::test_solve() {
-    for(const auto& test : SudokuTestPattern::testSet) {
-        // Destroy after destructing an instance which uses 'sudokuOutStream'
-        SudokuOutStream sudokuOutStream;
-        {
-            TestedT inst(test.presetStr, 0, &sudokuOutStream, 0);
-            CPPUNIT_ASSERT_EQUAL(test.result, inst.solve(inst.map_, true, false));
-            CPPUNIT_ASSERT(inst.count_>=1);
+    if (DiagonalSudokuMode) {
+        for(const auto& test : SudokuTestPattern::testSetDiagonal) {
+            solve(test);
+        }
+    } else {
+        for(const auto& test : SudokuTestPattern::testSet) {
+            solve(test);
         }
     }
     return;
@@ -263,17 +292,27 @@ bool SudokuSolverCommonTest<TestedT, CandidatesT>::call_fillCells(SudokuSseSolve
 }
 
 template <class TestedT, class CandidatesT>
+void SudokuSolverCommonTest<TestedT, CandidatesT>::fillCells(const SudokuTestPattern::TestSet& test) {
+    // Destroy after destructing an instance which uses 'sudokuOutStream'
+    SudokuOutStream sudokuOutStream;
+    {
+        TestedT inst(test.presetStr, 0, &sudokuOutStream, 0);
+        CPPUNIT_ASSERT_EQUAL(filterRetvalFillCells(test.result), call_fillCells(inst));
+        CPPUNIT_ASSERT_EQUAL(static_cast<int>(1), inst.count_);
+    }
+}
+
+template <class TestedT, class CandidatesT>
 void SudokuSolverCommonTest<TestedT, CandidatesT>::test_fillCells() {
-    for(const auto& test : SudokuTestPattern::testSet) {
-        // Destroy after destructing an instance which uses 'sudokuOutStream'
-        SudokuOutStream sudokuOutStream;
-        {
-            TestedT inst(test.presetStr, 0, &sudokuOutStream, 0);
-            CPPUNIT_ASSERT_EQUAL(filterRetvalFillCells(test.result), call_fillCells(inst));
-            CPPUNIT_ASSERT_EQUAL(static_cast<int>(1), inst.count_);
+    if (DiagonalSudokuMode) {
+        for(const auto& test : SudokuTestPattern::testSetDiagonal) {
+            fillCells(test);
+        }
+    } else {
+        for(const auto& test : SudokuTestPattern::testSet) {
+            fillCells(test);
         }
     }
-
     return;
 }
 

@@ -1,5 +1,5 @@
 // Testing class Sudokumap
-// Copyright (C) 2012-2017 Zettsu Tatsuya
+// Copyright (C) 2012-2018 Zettsu Tatsuya
 //
 // I use CppUnit code on the website.
 // http://www.atmarkit.co.jp/fdotnet/cpptest/cpptest02/cpptest02_02.html
@@ -48,7 +48,9 @@ class SudokuMapTest : public CPPUNIT_NS::TestFixture {
     CPPUNIT_TEST(test_CountFilledCells);
     CPPUNIT_TEST(test_SelectBacktrackedCellIndex);
     CPPUNIT_TEST(test_IsConsistent);
+    CPPUNIT_TEST(test_IsConsistentX);
     CPPUNIT_TEST(test_findUnusedCandidate);
+    CPPUNIT_TEST(test_findUnusedCandidateX);
     CPPUNIT_TEST(test_findUniqueCandidate);
     CPPUNIT_TEST_SUITE_END();
 
@@ -65,7 +67,9 @@ protected:
     void test_CountFilledCells();
     void test_SelectBacktrackedCellIndex();
     void test_IsConsistent();
+    void test_IsConsistentX();
     void test_findUnusedCandidate();
+    void test_findUnusedCandidateX();
     void test_findUniqueCandidate();
 private:
     void checkConstructor(void);
@@ -503,6 +507,10 @@ void SudokuMapTest::test_SelectBacktrackedCellIndex() {
 }
 
 void SudokuMapTest::test_IsConsistent() {
+    if (DiagonalSudokuMode) {
+        return;
+    }
+
     // First, all cells have all 1..9 candidates and are consistent.
     setAllCellsFullCandidates();
     CPPUNIT_ASSERT_EQUAL(true, pInstance_->IsConsistent());
@@ -518,6 +526,26 @@ void SudokuMapTest::test_IsConsistent() {
     // Set a candidate '1' to cells and it makes the map inconsistent.
     setConsistentCells(SudokuTestCandidates::OneOnly);
     pInstance_->cells_[SudokuTestPosition::Conflict].candidates_ = SudokuTestCandidates::OneOnly;
+    CPPUNIT_ASSERT_EQUAL(false, pInstance_->IsConsistent());
+
+    return;
+}
+
+void SudokuMapTest::test_IsConsistentX() {
+    if (!DiagonalSudokuMode) {
+        return;
+    }
+
+    // First, all cells have all 1..9 candidates and are consistent.
+    setAllCellsFullCandidates();
+    CPPUNIT_ASSERT_EQUAL(true, pInstance_->IsConsistent());
+
+    // Set a candidate '1' to the top-left cell
+    pInstance_->cells_[SudokuTestPosition::Head].candidates_ = SudokuTestCandidates::OneOnly;
+    CPPUNIT_ASSERT_EQUAL(true, pInstance_->IsConsistent());
+
+    // Set a candidate '1' to the bottom-right cell
+    pInstance_->cells_[SudokuTestPosition::Last].candidates_ = SudokuTestCandidates::OneOnly;
     CPPUNIT_ASSERT_EQUAL(false, pInstance_->IsConsistent());
 
     return;
@@ -597,6 +625,40 @@ void SudokuMapTest::test_findUnusedCandidate() {
     target = SudokuTestPosition::Head;
     CPPUNIT_ASSERT_EQUAL(false, pInstance_->findUnusedCandidate(pInstance_->cells_[target]));
     expected = SudokuTestCandidates::FourAndSix;
+    CPPUNIT_ASSERT_EQUAL(expected, pInstance_->cells_[target].candidates_);
+
+    return;
+}
+
+void SudokuMapTest::test_findUnusedCandidateX() {
+    if (!DiagonalSudokuMode) {
+        return;
+    }
+
+    // top left to bottom right
+    setAllCellsFullCandidates();
+    for(SudokuIndex i=0; i<Sudoku::SizeOfCellsPerGroup-1; ++i) {
+        auto index = i * (Sudoku::SizeOfCellsPerGroup + 1);
+        CPPUNIT_ASSERT(index <= SudokuTestPosition::Last);
+        pInstance_->cells_[index].candidates_ = indexToCandidate(i + 1);
+    }
+
+    auto target = SudokuTestPosition::Last;
+    CPPUNIT_ASSERT_EQUAL(false, pInstance_->findUnusedCandidate(pInstance_->cells_[target]));
+    auto expected = indexToCandidate(Sudoku::SizeOfCellsPerGroup);
+    CPPUNIT_ASSERT_EQUAL(expected, pInstance_->cells_[target].candidates_);
+
+    // top right to bottom left
+    setAllCellsFullCandidates();
+    for(SudokuIndex i=Sudoku::SizeOfCellsPerGroup-1; i>0; --i) {
+        auto index = (i + 1) * (Sudoku::SizeOfCellsPerGroup - 1);
+        CPPUNIT_ASSERT(index <= SudokuTestPosition::Last);
+        pInstance_->cells_[index].candidates_ = indexToCandidate(i + 1);
+    }
+
+    target = Sudoku::SizeOfCellsPerGroup - 1;
+    CPPUNIT_ASSERT_EQUAL(false, pInstance_->findUnusedCandidate(pInstance_->cells_[target]));
+    expected = indexToCandidate(1);
     CPPUNIT_ASSERT_EQUAL(expected, pInstance_->cells_[target].candidates_);
 
     return;
