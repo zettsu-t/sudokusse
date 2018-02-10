@@ -36,13 +36,6 @@
 // const SudokuCellLookUp SudokuCell::CellLookUp_[Sudoku::SizeOfLookUpCell];
 #include "sudokuConstAll.h"
 
-// Sudoku-X (diagonal Sudoku) table
-// bars (diagonal lines) to their cell indexes
-const SudokuIndex SudokuMap::DiagonalBarGroup_[Sudoku::SizeOfDiagonalBarsPerMap][Sudoku::SizeOfCellsPerGroup] = {
-    {0,10,20,30,40,50,60,70,80},
-    {8,16,24,32,40,48,56,64,72}
-};
-
 namespace {
     constexpr bool FastMode = FAST_MODE;
 }
@@ -866,20 +859,26 @@ bool SudokuMap::findUnusedCandidate(SudokuCell& targetCell) const {
     const auto targetCellIndex = targetCell.GetIndex();
 
     if CPP17_IF_CONSTEXPR (DiagonalSudokuMode) {
-        for(SudokuLoopIndex groupIndex=0; groupIndex<Sudoku::SizeOfDiagonalBarsPerMap; ++groupIndex) {
-            const auto& group = DiagonalBarGroup_[groupIndex];
-            // Run this fast if check (index mod 10 == 0) or (index mod 8 == 0 and index != 0)
-            if (std::find(std::begin(group), std::end(group), targetCellIndex) ==
-                std::end(DiagonalBarGroup_[groupIndex])) {
-                continue;
-            }
-
+        if ((targetCellIndex % (Sudoku::SizeOfCellsPerGroup + 1)) == 0) {
+            // 0,10,20,30,40,50,60,70,80
+            SudokuIndex cellIndex = 0;
             for(SudokuLoopIndex i=0; i<Sudoku::SizeOfCellsPerGroup; ++i) {
-                const auto cellIndex = group[i];
-                if (cellIndex != targetCellIndex) {
-                    const auto cellCandidates = cells_[cellIndex].GetUniqueCandidate();
-                    candidates = SudokuCell::MergeCandidates(candidates, cellCandidates);
-                }
+                const auto cellCandidates = (cellIndex != targetCellIndex) ?
+                    cells_[cellIndex].GetUniqueCandidate() : Sudoku::EmptyCandidates;
+                candidates = SudokuCell::MergeCandidates(candidates, cellCandidates);
+                cellIndex += Sudoku::SizeOfCellsPerGroup + 1;
+            }
+        }
+
+        // Include 8,16,24,32,40,48,56,64,72, exclude 0 and 80
+        if ((targetCellIndex > 0) && (targetCellIndex < (Sudoku::SizeOfAllCells - 1)) &&
+            ((targetCellIndex % (Sudoku::SizeOfCellsPerGroup - 1)) == 0)) {
+            SudokuIndex cellIndex = Sudoku::SizeOfCellsPerGroup - 1;
+            for(SudokuLoopIndex i=0; i<Sudoku::SizeOfCellsPerGroup; ++i) {
+                const auto cellCandidates = (cellIndex != targetCellIndex) ?
+                    cells_[cellIndex].GetUniqueCandidate() : Sudoku::EmptyCandidates;
+                candidates = SudokuCell::MergeCandidates(candidates, cellCandidates);
+                cellIndex += Sudoku::SizeOfCellsPerGroup - 1;
             }
         }
     }

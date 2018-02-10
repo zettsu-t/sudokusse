@@ -772,6 +772,12 @@ $ python3 sudoku_numpy.py puzzle_text_filename
 
   http://staffhome.ecm.uwa.edu.au/~00013890/sudoku17
 
+  http://logicmastersindia.com/BeginnersSudoku/Types/?test=B201312
+
+  http://www.sudocue.net/minx.php
+
+  http://www.sudocue.net/files/sudoku-x-12-7193.sdm
+
 6. I posted a question for assembly and received some useful advice.
 
   http://stackoverflow.com/questions/41107642/how-to-convert-x86-64-64-bit-register-names-to-their-corresponding-32-bit-regist

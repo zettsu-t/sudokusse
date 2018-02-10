@@ -688,28 +688,46 @@ void SudokuMapTest::test_findUnusedCandidateX() {
     // top left to bottom right
     setAllCellsFullCandidates();
     for(SudokuIndex i=0; i<Sudoku::SizeOfCellsPerGroup-1; ++i) {
-        auto index = i * (Sudoku::SizeOfCellsPerGroup + 1);
-        CPPUNIT_ASSERT(index <= SudokuTestPosition::Last);
-        pInstance_->cells_[index].candidates_ = indexToCandidate(i + 1);
+        const auto cellIndex = i * (Sudoku::SizeOfCellsPerGroup + 1);
+        CPPUNIT_ASSERT(cellIndex <= SudokuTestPosition::Last);
+        pInstance_->cells_[cellIndex].candidates_ = indexToCandidate(i + 1);
     }
 
-    auto target = SudokuTestPosition::Last;
+    const auto target = SudokuTestPosition::Last;
     CPPUNIT_ASSERT_EQUAL(false, pInstance_->findUnusedCandidate(pInstance_->cells_[target]));
-    auto expected = indexToCandidate(Sudoku::SizeOfCellsPerGroup);
+    const auto expected = indexToCandidate(Sudoku::SizeOfCellsPerGroup);
     CPPUNIT_ASSERT_EQUAL(expected, pInstance_->cells_[target].candidates_);
 
     // top right to bottom left
-    setAllCellsFullCandidates();
-    for(SudokuIndex i=Sudoku::SizeOfCellsPerGroup-1; i>0; --i) {
-        auto index = (i + 1) * (Sudoku::SizeOfCellsPerGroup - 1);
-        CPPUNIT_ASSERT(index <= SudokuTestPosition::Last);
-        pInstance_->cells_[index].candidates_ = indexToCandidate(i + 1);
-    }
+    for(int trial = 0; trial < 3; ++trial) {
+        setAllCellsFullCandidates();
+        for(SudokuIndex i=Sudoku::SizeOfCellsPerGroup-1; i>0; --i) {
+            const auto candidateIndex = i + 1;
+            const auto candidate = indexToCandidate(candidateIndex);
+            const auto cellIndex = candidateIndex * (Sudoku::SizeOfCellsPerGroup - 1);
+            CPPUNIT_ASSERT(cellIndex <= SudokuTestPosition::Last);
+            pInstance_->cells_[cellIndex].candidates_ = candidate;
+        }
 
-    target = Sudoku::SizeOfCellsPerGroup - 1;
-    CPPUNIT_ASSERT_EQUAL(false, pInstance_->findUnusedCandidate(pInstance_->cells_[target]));
-    expected = indexToCandidate(1);
-    CPPUNIT_ASSERT_EQUAL(expected, pInstance_->cells_[target].candidates_);
+        // top left and bottom right are not relevant
+        const auto altCandidate = indexToCandidate(3);
+        switch(trial) {
+        case 1:
+            pInstance_->cells_[SudokuTestPosition::Head].candidates_ = altCandidate;
+            break;
+        case 2:
+            pInstance_->cells_[SudokuTestPosition::Last].candidates_ = altCandidate;
+            break;
+        default:
+            break;
+        }
+
+        // top right
+        const auto target = Sudoku::SizeOfCellsPerGroup - 1;
+        const auto expected = indexToCandidate(1);
+        CPPUNIT_ASSERT_EQUAL(false, pInstance_->findUnusedCandidate(pInstance_->cells_[target]));
+        CPPUNIT_ASSERT_EQUAL(expected, pInstance_->cells_[target].candidates_);
+    }
 
     return;
 }

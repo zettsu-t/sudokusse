@@ -119,7 +119,6 @@ union XmmRegisterSet {
 namespace Sudoku {
     constexpr SudokuIndex SizeOfCellsPerGroup = 9;    // the number of cells in a column, row, and box (square)
     constexpr SudokuIndex SizeOfGroupsPerMap = 9;     // the number of columns, rows, and boxes in a puzzle
-    constexpr SudokuIndex SizeOfDiagonalBarsPerMap = 2;  // the number of diagonal bars in a puzzle
     constexpr SudokuIndex SizeOfAllCells = 81;        // the number of cells in a puzzle
     constexpr SudokuIndex SizeOfCandidates = 9;       // the maximum number of candidates in a cell
     constexpr SudokuIndex SizeOfUniqueCandidate = 1;  // the minimum number of candidates in a cell
@@ -294,9 +293,6 @@ private:
 
     // Columns, rows, and boxes which all cells belong to
     static const SudokuIndex ReverseGroup_[Sudoku::SizeOfAllCells][Sudoku::SizeOfGroupsPerCell];
-
-    // Cells in diagonal bars
-    static const SudokuIndex DiagonalBarGroup_[Sudoku::SizeOfDiagonalBarsPerMap][Sudoku::SizeOfCellsPerGroup];
 
     // The serial number of a box in 9-cells groups {rows:0, columns:1, box:3}.
     static constexpr SudokuIndex SudokuBoxGroupId = 2;
