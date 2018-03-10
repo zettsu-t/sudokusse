@@ -11,11 +11,11 @@ shown below are required.
 
 |Tool|Cygwin 64bit|Bash on Ubuntu on Windows|MinGW-w64|
 |:------|:------|:------|:------|
-|GCC (g++)|6.4.0|4.8.4|7.2.0|
-|LLVM (clang++)|5.0.1|-|5.0.1|
-|GNU assembler (as)|2.29.51|2.24|2.29|
+|GCC (g++)|6.4.0|4.8.4|7.3.0|
+|LLVM (clang++)|5.0.1|-|6.0.0|
+|GNU assembler (as)|2.29.51|2.24|2.29.1|
 |GNU Make|4.2.1|3.81|4.2.1|
-|Ruby|2.3.3p222|1.9.3p484|ActiveScriptRuby 2.4.0p0|
+|Ruby|2.3.3p222|1.9.3p484|2.5.0p0|
 |Perl|5.26.4|5.18.2|Cygwin perl|
 |CppUnit|1.13.2|1.13.0|-|
 
