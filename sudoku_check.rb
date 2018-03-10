@@ -9,7 +9,7 @@
 require 'rbconfig'
 
 # Detect MinGW
-RUN_ON_MINGW = RbConfig::CONFIG['host_os'].include?("mswin")
+RUN_ON_MINGW = RbConfig::CONFIG['host_os'].include?("mswin") || RbConfig::CONFIG['host_os'].include?("mingw")
 
 # Arguments, their descriptions and stdout messages
 # Solve by C++ or SSE/AVX

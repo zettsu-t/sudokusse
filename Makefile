@@ -22,7 +22,10 @@ clean:
 rebuild: clean all
 
 check: $(TARGETS)
+# Cygwin perl works on Cygwin shells, not on CMD
+ifneq ($(BUILD_ON_MINGW),yes)
 	perl sudoku_solve_all.pl
+endif
 	ruby sudoku_check.rb
 
 test: $(TARGETS)

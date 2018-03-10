@@ -127,8 +127,8 @@ sub checkResult {
 sub solve {
     my ($count) = @_;
 
-    # Collects input files
-    my @outstr = `find data -name "*.txt"`;
+    # Collects input files except diagonal puzzles
+    my @outstr = `find data -name "*.txt" | grep -v "[_\-]x"`;
     my @files;
 
     my $outstrline;
