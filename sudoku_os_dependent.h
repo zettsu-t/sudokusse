@@ -65,6 +65,7 @@ namespace Sudoku {
         // unit tests
         friend class ::SudokuTimerTest;
         friend class ::SudokuWindowsTimerTest;
+        friend class ::SudokuLinuxTimerTest;
     protected:
         BaseTimer(void) = default;
     public:

@@ -20,13 +20,10 @@ CPPFLAGS_INTEL_SYNTAX=-masm=intel
 ifneq ($(OS),Windows_NT)
 # Workaround for GCC 4.8 and std::thread
 GCC_MAJOR_VERSION:=$(shell export LC_ALL=C ; gcc -v 2>&1 | tail -1 | cut -d " " -f 3 | cut -d "." -f1)
-ifeq ($(GCC_MAJOR_VERSION),4)
-LDFLAGS=-Wl,--no-as-needed
-LIBS=-lpthread
-else
+PYTHON=python3
+#LDFLAGS=-Wl,--no-as-needed
 LDFLAGS=
-LIBS=
-endif
+LIBS=-lpthread
 CPPFLAGS_PARALLEL=
 
 else
@@ -130,14 +127,20 @@ SOLUTION_CHECKER_SCRIPT=solve_sudoku_x.py
 
 # To run testing by 'make test',
 # download the hardest Sudoku puzzles from
-#   http://staffhome.ecm.uwa.edu.au/~00013890/sudoku17
+#   http://staffhome.ecm.uwa.edu.au/~00013890/
+# (Web browsers may save it as sudoku17.txt and you have to
+#  rename it to sudoku17 after download it)
 # and save as data/sudoku17, and
 # download the hardest Sudoku-X puzzles from
 #   http://www.sudocue.net/minx.php
-# and save as data/sudoku-x-7193.sdm
+# and save as data/sudoku-x-12-7193.sdm
 # (These files are not included in this repository)
+ifneq (,$(wildcard ./data/sudoku17.txt))
+TEST_CASE_ORIGINAL_PUZZLE=data/sudoku17.txt
+else
 TEST_CASE_ORIGINAL_PUZZLE=data/sudoku17
-TEST_CASE_DIAGONAL_PUZZLE=data/sudoku-x-7193.sdm
+endif
+TEST_CASE_DIAGONAL_PUZZLE=data/sudoku-x-12-7193.sdm
 TEST_CASE_SOLUTION=./sudoku_solution.txt
 
 ALL_UPDATED_VARIABLES= \

@@ -4,7 +4,7 @@
 
 #ifdef SOLVE_PARALLEL_WITH_BOOST_THREAD
 
-#include <boost/thread/future.hpp>
+#include "sudoku_boost_future.h"
 #include "sudoku_os_dependent.h"
 
 namespace Sudoku {

@@ -11,7 +11,8 @@
 // for threading and we switch them by macros.
 #ifdef SOLVE_PARALLEL_WITH_BOOST_THREAD
 #include <boost/atomic.hpp>
-#include <boost/thread/future.hpp>
+#include "sudoku_boost_future.h"
+
 #define SUDOKU_TEST_ATOMIC boost::atomic
 #define SUDOKU_TEST_THREAD_FUTURE boost::unique_future
 #define SUDOKU_TEST_THREAD_ASYNC  boost::async

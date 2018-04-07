@@ -31,10 +31,14 @@ NUMBER_OF_LINES=2
 
 # Download and save this file to test
 # http://staffhome.ecm.uwa.edu.au/~00013890/sudoku17
-DEFAULT_PUZZLE_FILENAME="data/sudoku17"
+# (Web browsers may save it as sudoku17.txt and you have to
+#  rename it to sudoku17 after download it)
+
+PRIMARY_DEFAULT_PUZZLE_FILENAME = "data/sudoku17.txt"
+ALT_DEFAULT_PUZZLE_FILENAME = "data/sudoku17"
 
 # SudokuSSE executable name
-DEFAULT_EXEC_FILENAME=RUN_ON_MINGW ? "bin\\sudokusse.exe" : "bin/sudokusse"
+DEFAULT_EXEC_FILENAME = RUN_ON_MINGW ? "bin\\sudokusse.exe" : "bin/sudokusse"
 
 # Log file name for each execution
 TEMPORARY_LOGFILE_NAME="./_sudoku_temp_log.txt"
@@ -129,7 +133,8 @@ class ParameterSet
   end
 end
 
-puzzleFilename = DEFAULT_PUZZLE_FILENAME
+puzzleFilename = File.exist?(PRIMARY_DEFAULT_PUZZLE_FILENAME) ?
+                   PRIMARY_DEFAULT_PUZZLE_FILENAME : ALT_DEFAULT_PUZZLE_FILENAME
 execFilename   = DEFAULT_EXEC_FILENAME
 puzzleFilename = ARGV[0] if ARGV.size > 0
 execFilename   = ARGV[1] if ARGV.size > 1

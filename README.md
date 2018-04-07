@@ -76,7 +76,7 @@ puzzles. I tested with puzzles cited from these websites (these
 puzzles are not included in this repository).
 
 * http://logicmastersindia.com/BeginnersSudoku/Types/?test=B201312 (I cite this puzzle in my unit tests.)
-* [The hardest Sudoku-X puzzle](http://www.sudocue.net/minx.php) (I passed all of these 7193 puzzles in [sudoku-x-7193.sdm](http://www.sudocue.net/files/sudoku-x-12-7193.sdm).)
+* [The hardest Sudoku-X puzzle](http://www.sudocue.net/minx.php) (I passed all of these 7193 puzzles in [sudoku-x-12-7193.sdm](http://www.sudocue.net/files/sudoku-x-12-7193.sdm).)
 
 Execute the generated binary as the solver for original Sudoku.
 
@@ -84,7 +84,7 @@ Execute the generated binary as the solver for original Sudoku.
 # Solve a puzzle
 bin/sudokusse_diagonal 10000 < data/sudoku_x_example1.txt
 # Solve puzzles in one file
-bin/sudokusse_diagonal data/sudoku-x-7193.sdm sse print > solutions.txt
+bin/sudokusse_diagonal data/sudoku-x-12-7193.sdm sse print > solutions.txt
 ```
 
 You can check whether the solutions are correct as below.
