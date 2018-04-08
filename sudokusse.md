@@ -735,9 +735,10 @@ like to share your solution on
 
 ## Solving Sudoku puzzles with NumPy
 
-I write a Python script to solve Sudoku puzzles with NumPy.
-This script accepts files in the format 2 (81 characters in one line).
-Notice that its backtracking is very slow.
+I write a Python script to solve 9x9 and 16x16 Sudoku puzzles with
+NumPy. This script accepts files in the format 1 (one row in one
+line) and guess whether input puzzles are 9x9 or 16x16.  Notice that
+its backtracking is very slow.
 
 ```bash
 $ python3 sudoku_numpy.py puzzle_text_filename
