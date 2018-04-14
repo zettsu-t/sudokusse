@@ -690,7 +690,7 @@ INLINE SudokuIndex SudokuMap::CountFilledCells(void) const {
             }
         }
     } else {
-        count = unrolledCountFilledCells<80>(count);
+        count = unrolledCountFilledCells<Sudoku::SizeOfAllCells - 1>(count);
     }
 
     return count;

@@ -64,7 +64,7 @@ class SudokuSolver(object):
         # Rows, columns, and cell candidates
         size = min(len(sudoku_lines), max([len(line) for line in sudoku_lines]))
         sqrt_size = int(np.floor(np.sqrt(size)))
-        # Treats tailing lines as comments
+        # Treats trailing lines as comments
         size = sqrt_size * sqrt_size
         if size < 2:
             raise ValueError("The input puzzle must be a N * N matrix but size = {}".format(size))
@@ -94,7 +94,7 @@ class SudokuSolver(object):
         '''
 
         line = []
-        # Permits redundant tailing ,s
+        # Permits redundant trailing ,s
         line_str = sudoku_str
         matched = self.split_line_regex.match(sudoku_str)
         if matched is not None:
@@ -248,7 +248,14 @@ class SudokuSolver(object):
         :sqrt_size int : sqrt(length(width and height of a puzzle))
         '''
 
-        # Locked candidates
+        n_row = sudoku_map.shape[0]
+        for row in range(0, sudoku_map.shape[0]):
+            for column in range(0, sudoku_map.shape[1]):
+                self.filter_candidates_cell(sudoku_map, sqrt_size, row, column)
+                if np.sum(sudoku_map[row, column]) == 0:
+                    return sudoku_map, False
+
+        # Locked candidates 1
         for row in range(0, sudoku_map.shape[0], sqrt_size):
             for column in range(0, sudoku_map.shape[1], sqrt_size):
                 box = sudoku_map[row:row+sqrt_size, column:column+sqrt_size, :]
@@ -265,11 +272,40 @@ class SudokuSolver(object):
                     sudoku_map[target_row, 0:column, candidate] = False
                     sudoku_map[target_row, column+sqrt_size:sudoku_map.shape[1], candidate] = False
 
-        for row in range(0, sudoku_map.shape[0]):
-            for column in range(0, sudoku_map.shape[1]):
-                self.filter_candidates_cell(sudoku_map, sqrt_size, row, column)
-                if np.sum(sudoku_map[row, column]) == 0:
-                    return sudoku_map, False
+        # Locked candidates 2
+        for axis in range(2):
+            # indicates a row if axis = 0; column if axis = 1
+            for box_row_column in range(sudoku_map.shape[axis] // sqrt_size):
+                reduced_sum = np.full((sqrt_size, sqrt_size, sudoku_map.shape[2]), 0, dtype=int)
+                start_row_column = box_row_column * sqrt_size
+                # indicates a row if axis = 1; column if axis = 0
+                for box_column_row in range(sudoku_map.shape[1 - axis] // sqrt_size):
+                    start_column_row = box_column_row * sqrt_size
+                    if axis == 0:
+                        box = sudoku_map[start_row_column:start_row_column + sqrt_size, start_column_row:start_column_row + sqrt_size, :]
+                        reduced_sum[:, box_column_row, :] = np.sum(box, axis=(1 - axis))
+                    elif axis == 1:
+                        box = sudoku_map[start_column_row:start_column_row + sqrt_size, start_row_column:start_row_column + sqrt_size, :]
+                        reduced_sum[box_column_row, :, :] = np.sum(box, axis=(1 - axis))
+
+                for sub_box_row_column in range(sqrt_size):
+                    target_row_column = box_row_column * sqrt_size + sub_box_row_column
+                    for candidate in range(sudoku_map.shape[2]):
+                        if axis == 0:
+                            columns_rows = np.where(reduced_sum[sub_box_row_column, :, candidate] > 0)[0]
+                        elif axis == 1:
+                            columns_rows = np.where(reduced_sum[:, sub_box_row_column, candidate] > 0)[0]
+                        if len(columns_rows) != 1:
+                            continue
+
+                        target_column_row = columns_rows[0] * sqrt_size
+                        for excluded_row_column in range(box_row_column * sqrt_size, box_row_column * (sqrt_size + 1)):
+                            if excluded_row_column == target_row_column:
+                                continue
+                            if axis == 0:
+                                sudoku_map[excluded_row_column, target_column_row:target_column_row + sqrt_size, candidate] = False
+                            elif axis == 1:
+                                sudoku_map[target_column_row:target_column_row + sqrt_size, excluded_row_column, candidate] = False
 
         return sudoku_map, True
 
