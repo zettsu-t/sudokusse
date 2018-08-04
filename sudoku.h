@@ -179,6 +179,7 @@ enum class SudokuSolverPrint {
 // A base sudoku solver class
 class SudokuBaseSolver {
 public:
+    virtual ~SudokuBaseSolver() = default;
     virtual bool Exec(bool silent, bool verbose) = 0;
     virtual void PrintType(void) = 0;
 protected:
