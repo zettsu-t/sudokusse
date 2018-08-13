@@ -9,6 +9,7 @@ const SUDOKU_GROUP_SIZE: usize = 9;
 const SUDOKU_CELL_SIZE: usize = 81;
 const SUDOKU_ALL_CANDIDATES: SudokuCandidate = ((1 << SUDOKU_CANDIDATE_SIZE) - 1);
 
+// Sudoku cell that contains candidates as a bitboard
 #[derive(Clone, Copy)]
 struct SudokuCell {
     candidates: SudokuCandidate
@@ -17,27 +18,6 @@ struct SudokuCell {
 impl SudokuCell {
     fn new() -> SudokuCell {
         SudokuCell { candidates: SUDOKU_ALL_CANDIDATES }
-    }
-
-    // '1'..'9'
-    fn preset_candidate(&mut self, ch: char) {
-        let code_digit_base = '1'.to_digit(SUDOKU_DIGIT_BASE).unwrap();
-        match ch {
-            '1'...'9' => {
-                let number = (ch.to_digit(SUDOKU_DIGIT_BASE).unwrap() - code_digit_base) as SudokuCandidate;
-                self.candidates = self.digit_to_candidate(&number);
-                ()
-            }
-            _ => {()}
-        }
-    }
-
-    fn digit_to_candidate(&self, candidate: &SudokuCandidate) -> SudokuCandidate {
-        (1 as SudokuCandidate) << candidate
-    }
-
-    fn has_candidate(&self, candidate: &SudokuCandidate) -> bool {
-        (self.candidates & self.digit_to_candidate(&candidate)) != 0
     }
 
     fn to_string(&self) -> String {
@@ -50,18 +30,62 @@ impl SudokuCell {
         line
     }
 
+    // Input '1'..'9'
+    fn preset_candidate(&mut self, ch: char) {
+        let code_digit_base = '1'.to_digit(SUDOKU_DIGIT_BASE).unwrap();
+        match ch {
+            '1'...'9' => {
+                let number = (ch.to_digit(SUDOKU_DIGIT_BASE).unwrap() - code_digit_base) as SudokuCandidate;
+                self.candidates = self.digit_to_candidate(&number);
+            }
+            _ => {}
+        }
+    }
+
     fn clear_candidate(&mut self) {
-        self.candidates = 0
+        self.candidates = 0;
+    }
+
+    // Input 0..8
+    fn overwrite_candidate(&mut self, candidate: SudokuCandidate) {
+        if self.count_candidates() > 1 {
+            self.candidates = self.digit_to_candidate(&candidate);
+        }
+    }
+
+    fn count_candidates(&self) -> usize {
+        let f = |candidate| {
+            if (self.candidates & self.digit_to_candidate(&candidate))
+                != 0 { 1 } else { 0 } };
+        (0..SUDOKU_CANDIDATE_SIZE as SudokuCandidate).fold(
+            0, |sum, candidates| sum + f(candidates))
     }
 
     fn has_unique_candidate(&self) -> bool {
+        // Check whether only one bit is set
         (self.candidates & (self.candidates - 1)) == 0
     }
 
-    fn can_merge(&mut self, candidates: SudokuCandidate) -> bool {
+    fn has_all_candidates(&self) -> bool {
+        self.candidates == SUDOKU_ALL_CANDIDATES
+    }
+
+    // Input 0..8
+    fn can_mask(&mut self, candidates: SudokuCandidate) -> bool {
         (self.candidates & self.digit_to_candidate(&candidates)) != 0
     }
 
+    fn mask_candidate(&mut self, rhs: &SudokuCell) {
+        if rhs.count_candidates() == 1 {
+            self.candidates &= !rhs.candidates;
+        }
+    }
+
+    fn merge_candidate(&mut self, rhs: &SudokuCell) {
+        self.candidates |= rhs.candidates;
+    }
+
+    // Returns whether no candidates are merged
     fn merge_unique_candidate(&mut self, rhs: &SudokuCell) -> bool {
         if rhs.has_unique_candidate() {
             if (self.candidates & rhs.candidates) != 0 {
@@ -72,37 +96,19 @@ impl SudokuCell {
         false
     }
 
-    fn merge_candidate(&mut self, rhs: &SudokuCell) {
-        self.candidates |= rhs.candidates;
+    // Inner methods
+    // Input 0..8
+    fn digit_to_candidate(&self, candidate: &SudokuCandidate) -> SudokuCandidate {
+        (1 as SudokuCandidate) << candidate
     }
 
-    fn mask_candidate(&mut self, rhs: &SudokuCell) {
-        if rhs.count_candidates() == 1 && (self.candidates & rhs.candidates) != 0 {
-            self.candidates -= rhs.candidates;
-        }
-    }
-
-    fn has_all_candidates(&self) -> bool {
-        self.candidates == SUDOKU_ALL_CANDIDATES
-    }
-
-    fn overwrite_candidate(&mut self, candidate: SudokuCandidate) {
-        if self.count_candidates() > 1 {
-            self.candidates = self.digit_to_candidate(&candidate);
-        }
-    }
-
-    fn count_candidates(&self) -> usize {
-        let mut count = 0;
-        for candidate in 0..(SUDOKU_CANDIDATE_SIZE as SudokuCandidate) {
-            if (self.candidates & self.digit_to_candidate(&candidate)) != 0 {
-                count += 1;
-            }
-        }
-        count
+    // Input 0..8
+    fn has_candidate(&self, candidate: &SudokuCandidate) -> bool {
+        (self.candidates & self.digit_to_candidate(&candidate)) != 0
     }
 }
 
+// Generator for sudoku cellgroups
 struct SudokuGroupGen {
     index: usize
 }
@@ -138,6 +144,7 @@ impl SudokuGroupGen {
     }
 }
 
+// Sudoku cell map
 struct SudokuMap {
     cells : Vec<SudokuCell>
 }
@@ -172,6 +179,37 @@ impl SudokuMap {
         self.solve_from(0)
     }
 
+    fn solve_from(&mut self, start_pos : usize) -> bool {
+        self.filter_unique_candidates();
+        if !self.is_consistent() {
+            return false;
+        }
+
+        for i in start_pos..SUDOKU_CELL_SIZE {
+            let count = self.cells[i].count_candidates();
+            match count {
+                0 => return false,
+                1 => continue,
+                _ => (),
+            }
+
+            for candidate in 0..(SUDOKU_CANDIDATE_SIZE as SudokuCandidate) {
+                let mut target_cell = self.cells[i].clone();
+                if target_cell.can_mask(candidate) {
+                    let mut new_map = SudokuMap::new("");
+                    new_map.cells = self.cells.clone();
+                    new_map.cells[i].overwrite_candidate(candidate);
+                    if new_map.solve_from(start_pos + 1) {
+                        self.cells = new_map.cells;
+                        return true;
+                    }
+                }
+            }
+        }
+
+        self.is_solved()
+    }
+
     fn filter_unique_candidates(&mut self) {
         let mut group_gen = SudokuGroupGen::new();
         while let Some(indexes) = group_gen.next() {
@@ -186,36 +224,6 @@ impl SudokuMap {
                 }
             }
         }
-    }
-
-    fn solve_from(&mut self, start_pos : usize) -> bool {
-        self.filter_unique_candidates();
-        if !self.is_consistent() {
-            return false;
-        }
-
-        for i in start_pos..SUDOKU_CELL_SIZE {
-            let count = self.cells[i].count_candidates();
-            if count == 0 {
-                return false;
-            } else if count == 1 {
-                continue;
-            }
-            for candidate in 0..(SUDOKU_CANDIDATE_SIZE as SudokuCandidate) {
-                let mut target_cell = self.cells[i].clone();
-                if target_cell.can_merge(candidate) {
-                    let mut new_map = SudokuMap::new("");
-                    new_map.cells = self.cells.clone();
-                    new_map.cells[i].overwrite_candidate(candidate);
-                    if new_map.solve_from(start_pos + 1) {
-                        self.cells = new_map.cells;
-                        return true;
-                    }
-                }
-            }
-        }
-
-        self.is_solved()
     }
 
     fn is_solved(&self) -> bool {
