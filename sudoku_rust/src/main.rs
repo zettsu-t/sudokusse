@@ -63,7 +63,7 @@ impl SudokuCell {
 
     fn has_unique_candidate(&self) -> bool {
         // Check whether only one bit is set
-        (self.candidates & (self.candidates - 1)) == 0
+        self.candidates > 0 && (self.candidates & (self.candidates - 1)) == 0
     }
 
     fn has_all_candidates(&self) -> bool {
