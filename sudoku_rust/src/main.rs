@@ -1,5 +1,6 @@
 use std::io;
 use std::io::prelude::*;
+use std::collections::HashMap;
 
 type SudokuCandidate = u64;
 const SUDOKU_DIGIT_BASE: u32 = 10;
@@ -75,12 +76,6 @@ impl SudokuCell {
         (self.candidates & self.digit_to_candidate(&candidates)) != 0
     }
 
-    fn mask_candidate(&mut self, rhs: &SudokuCell) {
-        if rhs.count_candidates() == 1 {
-            self.candidates &= !rhs.candidates;
-        }
-    }
-
     fn merge_candidate(&mut self, rhs: &SudokuCell) {
         self.candidates |= rhs.candidates;
     }
@@ -94,6 +89,12 @@ impl SudokuCell {
             self.candidates |= rhs.candidates;
         }
         false
+    }
+
+    fn filter_by_candidates(&mut self, rhs: &SudokuCell) {
+        if !self.has_unique_candidate() {
+            self.candidates &= !rhs.candidates;
+        }
     }
 
     // Inner methods
@@ -146,16 +147,46 @@ impl SudokuGroupGen {
 
 // Sudoku cell map
 struct SudokuMap {
-    cells : Vec<SudokuCell>
+    cells : Vec<SudokuCell>,
+    groups : HashMap<usize, Vec<Vec<usize>>>
 }
 
 impl SudokuMap {
     fn new(line: &str) -> SudokuMap {
         let mut cells = vec![SudokuCell::new(); SUDOKU_CELL_SIZE];
+        let groups = SudokuMap::create_group_index_set();
         for (index, ch) in line.chars().enumerate() {
             cells[index].preset_candidate(ch);
+        };
+        SudokuMap { cells:cells, groups:groups }
+    }
+
+    // Set of sudoku cellgroups
+    fn create_group_index_set() -> HashMap<usize, Vec<Vec<usize>>> {
+        let mut groups = HashMap::new();
+        for cell_index in 0..SUDOKU_CELL_SIZE {
+            let mut group_candidates = Vec::new();
+            let row_number = cell_index / SUDOKU_GROUP_SIZE;
+            let row_lower = row_number * SUDOKU_GROUP_SIZE;
+            let row_upper = (row_number + 1) * SUDOKU_GROUP_SIZE;
+            let row = (row_lower..row_upper).collect::<Vec<_>>();
+            group_candidates.push(row);
+
+            let column_number = cell_index % SUDOKU_GROUP_SIZE;
+            let column = (0..SUDOKU_GROUP_SIZE).map(|i| column_number + i * SUDOKU_GROUP_SIZE).collect::<Vec<_>>();
+            group_candidates.push(column);
+
+            let box_offset = (row_number / SUDOKU_BOX_SIZE) * SUDOKU_BOX_SIZE * SUDOKU_GROUP_SIZE +
+                (column_number / SUDOKU_BOX_SIZE) * SUDOKU_BOX_SIZE;
+            let mut cell_box = Vec::new();
+            for row_offset in 0..SUDOKU_BOX_SIZE {
+                let x = (0..SUDOKU_BOX_SIZE).map(|column_offset| row_offset * SUDOKU_GROUP_SIZE + column_offset + box_offset);
+                cell_box.extend(x);
+            }
+            group_candidates.push(cell_box);
+            groups.insert(cell_index, group_candidates);
         }
-        SudokuMap { cells:cells }
+        groups
     }
 
     fn to_string(&self) -> String {
@@ -181,6 +212,9 @@ impl SudokuMap {
 
     fn solve_from(&mut self, start_pos : usize) -> bool {
         self.filter_unique_candidates();
+        if self.is_solved() {
+            return true;
+        }
         if !self.is_consistent() {
             return false;
         }
@@ -211,18 +245,17 @@ impl SudokuMap {
     }
 
     fn filter_unique_candidates(&mut self) {
-        let mut group_gen = SudokuGroupGen::new();
-        while let Some(indexes) = group_gen.next() {
-            let froms = indexes.clone();
-            for index in froms {
-                let cell = self.cells[index];
-                let targets = indexes.clone();
-                for target in targets {
-                    if target != index {
-                        self.cells[target].mask_candidate(&cell);
+        for target_index in 0..SUDOKU_CELL_SIZE {
+            let mut sum = SudokuCell::new();
+            sum.clear_candidate();
+            for group in self.groups[&target_index].iter() {
+                for cell_index in group.iter() {
+                    if *cell_index != target_index {
+                        sum.merge_unique_candidate(&self.cells[*cell_index]);
                     }
                 }
             }
+            self.cells[target_index].filter_by_candidates(&sum);
         }
     }
 
