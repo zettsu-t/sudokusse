@@ -1,8 +1,9 @@
+use std::collections::HashMap;
 use std::io;
 use std::io::prelude::*;
-use std::collections::HashMap;
 
 type SudokuCandidate = u64;
+type SudokuCellGroups = HashMap<usize, Vec<Vec<usize>>>;
 const SUDOKU_DIGIT_BASE: u32 = 10;
 const SUDOKU_CANDIDATE_SIZE: usize = 9;
 const SUDOKU_BOX_SIZE: usize = 3;
@@ -18,7 +19,7 @@ struct SudokuCell {
 
 impl SudokuCell {
     fn new() -> SudokuCell {
-        SudokuCell { candidates: SUDOKU_ALL_CANDIDATES }
+        SudokuCell { candidates: 0 }
     }
 
     fn to_string(&self) -> String {
@@ -31,6 +32,10 @@ impl SudokuCell {
         line
     }
 
+    fn preset_full_candidate(&mut self) {
+        self.candidates = SUDOKU_ALL_CANDIDATES;
+    }
+
     // Input '1'..'9'
     fn preset_candidate(&mut self, ch: char) {
         let code_digit_base = '1'.to_digit(SUDOKU_DIGIT_BASE).unwrap();
@@ -41,10 +46,6 @@ impl SudokuCell {
             }
             _ => {}
         }
-    }
-
-    fn clear_candidate(&mut self) {
-        self.candidates = 0;
     }
 
     // Input 0..8
@@ -159,47 +160,22 @@ impl SudokuGroupGen {
 }
 
 // Sudoku cell map
-struct SudokuMap {
+struct SudokuMap<'a> {
     cells : Vec<SudokuCell>,
-    groups : HashMap<usize, Vec<Vec<usize>>>
+    groups : &'a SudokuCellGroups,
 }
 
-impl SudokuMap {
-    fn new(line: &str) -> SudokuMap {
+impl<'a> SudokuMap<'a> {
+    fn new(line: &str, cell_groups: &'a SudokuCellGroups) -> SudokuMap<'a> {
         let mut cells = vec![SudokuCell::new(); SUDOKU_CELL_SIZE];
-        let groups = SudokuMap::create_group_index_set();
+        for cell in &mut cells {
+            cell.preset_full_candidate();
+        }
+
         for (index, ch) in line.chars().enumerate() {
             cells[index].preset_candidate(ch);
         };
-        SudokuMap { cells:cells, groups:groups }
-    }
-
-    // Set of sudoku cellgroups
-    fn create_group_index_set() -> HashMap<usize, Vec<Vec<usize>>> {
-        let mut groups = HashMap::new();
-        for cell_index in 0..SUDOKU_CELL_SIZE {
-            let mut group_candidates = Vec::new();
-            let row_number = cell_index / SUDOKU_GROUP_SIZE;
-            let row_lower = row_number * SUDOKU_GROUP_SIZE;
-            let row_upper = (row_number + 1) * SUDOKU_GROUP_SIZE;
-            let row = (row_lower..row_upper).collect::<Vec<_>>();
-            group_candidates.push(row);
-
-            let column_number = cell_index % SUDOKU_GROUP_SIZE;
-            let column = (0..SUDOKU_GROUP_SIZE).map(|i| column_number + i * SUDOKU_GROUP_SIZE).collect::<Vec<_>>();
-            group_candidates.push(column);
-
-            let box_offset = (row_number / SUDOKU_BOX_SIZE) * SUDOKU_BOX_SIZE * SUDOKU_GROUP_SIZE +
-                (column_number / SUDOKU_BOX_SIZE) * SUDOKU_BOX_SIZE;
-            let mut cell_box = Vec::new();
-            for row_offset in 0..SUDOKU_BOX_SIZE {
-                let x = (0..SUDOKU_BOX_SIZE).map(|column_offset| row_offset * SUDOKU_GROUP_SIZE + column_offset + box_offset);
-                cell_box.extend(x);
-            }
-            group_candidates.push(cell_box);
-            groups.insert(cell_index, group_candidates);
-        }
-        groups
+        SudokuMap { cells:cells, groups: cell_groups }
     }
 
     fn to_string(&self, one_line: bool) -> String {
@@ -224,36 +200,23 @@ impl SudokuMap {
     }
 
     fn solve(&mut self) -> bool {
-        if !self.is_consistent() {
-            return false;
-        }
         self.filter_unique_candidates();
         self.find_unused_candidates();
         if self.is_solved() {
             return true;
         }
-
-        let mut index_min_count = 0;
-        let mut min_count = SUDOKU_CANDIDATE_SIZE;
-        for index in 0..SUDOKU_CELL_SIZE {
-            let count = self.cells[index].count_candidates();
-            if count > 1 && count < min_count {
-                index_min_count = index;
-                min_count = count;
-            }
-            if count == 2 {
-                break;
-            }
+        if !self.is_consistent() {
+           return false;
         }
 
+        let index_min_count = self.find_backtracking_target();
         if self.cells[index_min_count].count_candidates() <= 1 {
             return false;
         }
 
         for candidate in 0..(SUDOKU_CANDIDATE_SIZE as SudokuCandidate) {
-            let mut target_cell = self.cells[index_min_count].clone();
-            if target_cell.can_mask(candidate) {
-                let mut new_map = SudokuMap::new("");
+            if self.cells[index_min_count].can_mask(candidate) {
+                let mut new_map = SudokuMap::new("", self.groups);
                 new_map.cells = self.cells.clone();
                 new_map.cells[index_min_count].overwrite_candidate(candidate);
                 if new_map.solve() {
@@ -269,7 +232,6 @@ impl SudokuMap {
     fn filter_unique_candidates(&mut self) {
         for target_index in 0..SUDOKU_CELL_SIZE {
             let mut sum = SudokuCell::new();
-            sum.clear_candidate();
             for group in self.groups[&target_index].iter() {
                 for cell_index in group.iter() {
                     if *cell_index != target_index {
@@ -285,7 +247,6 @@ impl SudokuMap {
         for target_index in 0..SUDOKU_CELL_SIZE {
             for group in self.groups[&target_index].iter() {
                 let mut sum = SudokuCell::new();
-                sum.clear_candidate();
                 for cell_index in group.iter() {
                     if *cell_index != target_index {
                         sum.merge_candidate(&self.cells[*cell_index]);
@@ -294,6 +255,33 @@ impl SudokuMap {
                 self.cells[target_index].fill_unused_candidate(&sum);
             }
         }
+    }
+
+    fn find_backtracking_target(&self) -> usize {
+        // SUDOKU_CELL_SIZE = a large enough number
+        let mut min_count = SUDOKU_CELL_SIZE;
+        let mut cell_counts = Vec::new();
+
+        for row_index in 0..SUDOKU_GROUP_SIZE {
+            let mut row_counts = vec![SUDOKU_CELL_SIZE; SUDOKU_GROUP_SIZE];
+            for column_index in 0..SUDOKU_GROUP_SIZE {
+                let cell_count = self.cells[row_index * SUDOKU_GROUP_SIZE + column_index].count_candidates();
+                if cell_count > 1 {
+                    row_counts[column_index] = cell_count;
+                    if cell_count < min_count {
+                        min_count = cell_count;
+                    }
+                }
+            }
+            cell_counts.push(row_counts);
+        }
+
+        let row_counts = cell_counts.iter().map(
+            |row| row.iter().fold(0, |sum, &count| sum + if count == min_count { 1 } else { 0 })).collect::<Vec<usize>>();
+        let max_row_count = row_counts.iter().max().unwrap();
+        let target_row = row_counts.iter().position(|&count| count == *max_row_count).unwrap();
+        let target_column = cell_counts[target_row].iter().position(|&count| count == min_count).unwrap();
+        target_row * SUDOKU_GROUP_SIZE + target_column
     }
 
     fn is_solved(&self) -> bool {
@@ -309,7 +297,6 @@ impl SudokuMap {
     fn is_group_solved(&self, cell_indexes: Vec<usize>) -> bool {
         let mut sum = SudokuCell::new();
         let mut conflict = false;
-        sum.clear_candidate();
         for cell_index in cell_indexes {
             conflict |= sum.merge_unique_candidate(&self.cells[cell_index]);
         }
@@ -330,8 +317,6 @@ impl SudokuMap {
         let mut all_candidates = SudokuCell::new();
         let mut unique_candidates = SudokuCell::new();
         let mut conflict = false;
-        all_candidates.clear_candidate();
-        unique_candidates.clear_candidate();
 
         for cell_index in cell_indexes {
             all_candidates.merge_candidate(&self.cells[cell_index]);
@@ -341,19 +326,53 @@ impl SudokuMap {
     }
 }
 
-fn main() {
-    let stdin = io::stdin();
+// Set of sudoku cellgroups
+fn create_group_index_set() -> SudokuCellGroups {
+    let mut groups = HashMap::new();
+    for cell_index in 0..SUDOKU_CELL_SIZE {
+        let mut group_candidates = Vec::new();
+        let row_number = cell_index / SUDOKU_GROUP_SIZE;
+        let row_lower = row_number * SUDOKU_GROUP_SIZE;
+        let row_upper = (row_number + 1) * SUDOKU_GROUP_SIZE;
+        let row = (row_lower..row_upper).collect::<Vec<_>>();
+        group_candidates.push(row);
 
+        let column_number = cell_index % SUDOKU_GROUP_SIZE;
+        let column = (0..SUDOKU_GROUP_SIZE).map(|i| column_number + i * SUDOKU_GROUP_SIZE).collect::<Vec<_>>();
+        group_candidates.push(column);
+
+        let box_offset = (row_number / SUDOKU_BOX_SIZE) * SUDOKU_BOX_SIZE * SUDOKU_GROUP_SIZE +
+            (column_number / SUDOKU_BOX_SIZE) * SUDOKU_BOX_SIZE;
+        let mut cell_box = Vec::new();
+        for row_offset in 0..SUDOKU_BOX_SIZE {
+            let x = (0..SUDOKU_BOX_SIZE).map(|column_offset| row_offset * SUDOKU_GROUP_SIZE + column_offset + box_offset);
+            cell_box.extend(x);
+        }
+        group_candidates.push(cell_box);
+        groups.insert(cell_index, group_candidates);
+    }
+    groups
+}
+
+fn main() {
+    // Shares cell groups between all questions
+    let cell_groups = create_group_index_set();
+    println!("Solving in Rust");
+
+    let stdin = io::stdin();
+    let mut lines = Vec::new();
     for line in stdin.lock().lines() {
         let line = line.unwrap();
-        let mut sudoku_map = SudokuMap::new(&line);
-        let result = sudoku_map.solve();
-        let answer = sudoku_map.to_string(true);
-        println!("{}", answer);
-        if result {
-//            println!("Solved\n{}", answer);
-        } else {
-//            println!("Not solved\n{}", answer);
-        }
+        lines.push(line);
     }
+
+    let mut answers = String::new();
+    for line in lines {
+        let mut sudoku_map = SudokuMap::new(&line, &cell_groups);
+        sudoku_map.solve();
+        let s = sudoku_map.to_string(true);
+        answers.push_str(&s);
+        answers.push_str("\n");
+    }
+    println!("{}", answers);
 }
