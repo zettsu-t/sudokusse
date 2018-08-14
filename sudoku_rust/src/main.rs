@@ -102,9 +102,11 @@ impl SudokuCell {
     }
 
     fn fill_unused_candidate(&mut self, rhs: &SudokuCell) {
-        let candidates = SUDOKU_ALL_CANDIDATES & !rhs.candidates;
-        if SudokuCell::is_unique_candidate(candidates) {
-            self.candidates = candidates;
+        if !self.has_unique_candidate() {
+            let candidates = SUDOKU_ALL_CANDIDATES & !rhs.candidates;
+            if SudokuCell::is_unique_candidate(candidates) {
+                self.candidates = candidates;
+            }
         }
     }
 
@@ -200,7 +202,7 @@ impl SudokuMap {
         groups
     }
 
-    fn to_string(&self) -> String {
+    fn to_string(&self, one_line: bool) -> String {
         let mut full_text = String::new();
 
         for row in 0..SUDOKU_GROUP_SIZE {
@@ -209,51 +211,59 @@ impl SudokuMap {
                 let index = row * SUDOKU_GROUP_SIZE + column;
                 let cell_str = self.cells[index].to_string();
                 line.push_str(&cell_str);
-                line.push_str(":");
+                if !one_line {
+                    line.push_str(":");
+                }
             }
-            line.push_str("\n");
+            if !one_line {
+                line.push_str("\n");
+            }
             full_text.push_str(&line);
         }
         full_text
     }
 
     fn solve(&mut self) -> bool {
-        self.solve_from(0)
-    }
-
-    fn solve_from(&mut self, start_pos : usize) -> bool {
+        if !self.is_consistent() {
+            return false;
+        }
         self.filter_unique_candidates();
         self.find_unused_candidates();
         if self.is_solved() {
             return true;
         }
-        if !self.is_consistent() {
+
+        let mut index_min_count = 0;
+        let mut min_count = SUDOKU_CANDIDATE_SIZE;
+        for index in 0..SUDOKU_CELL_SIZE {
+            let count = self.cells[index].count_candidates();
+            if count > 1 && count < min_count {
+                index_min_count = index;
+                min_count = count;
+            }
+            if count == 2 {
+                break;
+            }
+        }
+
+        if self.cells[index_min_count].count_candidates() <= 1 {
             return false;
         }
 
-        for i in start_pos..SUDOKU_CELL_SIZE {
-            let count = self.cells[i].count_candidates();
-            match count {
-                0 => return false,
-                1 => continue,
-                _ => (),
-            }
-
-            for candidate in 0..(SUDOKU_CANDIDATE_SIZE as SudokuCandidate) {
-                let mut target_cell = self.cells[i].clone();
-                if target_cell.can_mask(candidate) {
-                    let mut new_map = SudokuMap::new("");
-                    new_map.cells = self.cells.clone();
-                    new_map.cells[i].overwrite_candidate(candidate);
-                    if new_map.solve_from(start_pos + 1) {
-                        self.cells = new_map.cells;
-                        return true;
-                    }
+        for candidate in 0..(SUDOKU_CANDIDATE_SIZE as SudokuCandidate) {
+            let mut target_cell = self.cells[index_min_count].clone();
+            if target_cell.can_mask(candidate) {
+                let mut new_map = SudokuMap::new("");
+                new_map.cells = self.cells.clone();
+                new_map.cells[index_min_count].overwrite_candidate(candidate);
+                if new_map.solve() {
+                    self.cells = new_map.cells;
+                    return self.is_solved();
                 }
             }
         }
 
-        self.is_solved()
+        false
     }
 
     fn filter_unique_candidates(&mut self) {
@@ -338,11 +348,12 @@ fn main() {
         let line = line.unwrap();
         let mut sudoku_map = SudokuMap::new(&line);
         let result = sudoku_map.solve();
-        let answer = sudoku_map.to_string();
+        let answer = sudoku_map.to_string(true);
+        println!("{}", answer);
         if result {
-            println!("Solved\n{}", answer);
+//            println!("Solved\n{}", answer);
         } else {
-            println!("Not solved\n{}", answer);
+//            println!("Not solved\n{}", answer);
         }
     }
 }
