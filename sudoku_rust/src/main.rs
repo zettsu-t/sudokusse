@@ -63,8 +63,12 @@ impl SudokuCell {
     }
 
     fn has_unique_candidate(&self) -> bool {
+        SudokuCell::is_unique_candidate(self.candidates)
+    }
+
+    fn is_unique_candidate(candidates: SudokuCandidate) -> bool {
         // Check whether only one bit is set
-        self.candidates > 0 && (self.candidates & (self.candidates - 1)) == 0
+        candidates > 0 && (candidates & (candidates - 1)) == 0
     }
 
     fn has_all_candidates(&self) -> bool {
@@ -94,6 +98,13 @@ impl SudokuCell {
     fn filter_by_candidates(&mut self, rhs: &SudokuCell) {
         if !self.has_unique_candidate() {
             self.candidates &= !rhs.candidates;
+        }
+    }
+
+    fn fill_unused_candidate(&mut self, rhs: &SudokuCell) {
+        let candidates = SUDOKU_ALL_CANDIDATES & !rhs.candidates;
+        if SudokuCell::is_unique_candidate(candidates) {
+            self.candidates = candidates;
         }
     }
 
@@ -212,6 +223,7 @@ impl SudokuMap {
 
     fn solve_from(&mut self, start_pos : usize) -> bool {
         self.filter_unique_candidates();
+        self.find_unused_candidates();
         if self.is_solved() {
             return true;
         }
@@ -256,6 +268,21 @@ impl SudokuMap {
                 }
             }
             self.cells[target_index].filter_by_candidates(&sum);
+        }
+    }
+
+    fn find_unused_candidates(&mut self) {
+        for target_index in 0..SUDOKU_CELL_SIZE {
+            for group in self.groups[&target_index].iter() {
+                let mut sum = SudokuCell::new();
+                sum.clear_candidate();
+                for cell_index in group.iter() {
+                    if *cell_index != target_index {
+                        sum.merge_candidate(&self.cells[*cell_index]);
+                    }
+                }
+                self.cells[target_index].fill_unused_candidate(&sum);
+            }
         }
     }
 
