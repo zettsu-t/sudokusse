@@ -5,6 +5,7 @@ use std::io::prelude::*;
 type SudokuCandidate = u64;  // or u32
 type SudokuCellGroups = HashMap<usize, Vec<Vec<usize>>>;
 
+const SUDOKU_MAX_THREADS: usize = 4;
 const SUDOKU_DIGIT_BASE: u32 = 10;
 const SUDOKU_BOX_SIZE: usize = 3;
 const SUDOKU_NO_CANDIDATES: SudokuCandidate = 0;
@@ -390,32 +391,63 @@ fn create_group_index_set() -> SudokuCellGroups {
     groups
 }
 
-fn main() {
+fn exec_threads(count:usize, lines: Vec<String>) {
     // Shares cell groups between all questions
-    let cell_groups = create_group_index_set();
-    println!("Solving in Rust");
+    let n_cores = std::cmp::min(SUDOKU_MAX_THREADS, count);
+    let lines_per_core = count / n_cores;
+    let mut start_pos = 0;
+    let mut children = vec![];
 
+    for core_index in 0..n_cores {
+        let cell_groups = create_group_index_set();
+        let end_pos = std::cmp::min(count, start_pos + lines_per_core);
+        let mut lines_part = Vec::new();
+        if core_index + 1 >= n_cores {
+            for i in start_pos..count {
+                lines_part.push(lines[i].clone());
+            }
+        } else {
+            for i in start_pos..end_pos {
+                lines_part.push(lines[i].clone());
+            }
+        }
+        start_pos = end_pos;
+        children.push(std::thread::spawn(move || {
+            let mut result = true;
+            let mut answers = String::new();
+            for line in lines_part {
+                let mut sudoku_map = SudokuMap::new(&line, &cell_groups);
+                result &= sudoku_map.solve();
+                let s = sudoku_map.to_string(true);
+                answers.push_str(&s);
+                answers.push_str("\n");
+            }
+            (result, answers)
+        }))
+    }
+
+    let mut total_result = true;
+    for child in children {
+        let (result, answers) = child.join().unwrap() as (bool, String);
+        total_result &= result;
+        print!("{}", answers);
+    }
+
+    if total_result {
+        println!("All {} cases passed.", count);
+    }
+}
+
+fn main() {
+    println!("Solving in Rust");
     let stdin = io::stdin();
     let mut lines = Vec::new();
-    let mut count = 0;
+    let mut count : usize = 0;
     for line in stdin.lock().lines() {
         let line = line.unwrap();
         lines.push(line);
         count += 1;
     }
 
-    let mut result = true;
-    let mut answers = String::new();
-    for line in lines {
-        let mut sudoku_map = SudokuMap::new(&line, &cell_groups);
-        result &= sudoku_map.solve();
-        let s = sudoku_map.to_string(true);
-        answers.push_str(&s);
-        answers.push_str("\n");
-    }
-
-    print!("{}", answers);
-    if result {
-        println!("All {} cases passed.", count);
-    }
+    exec_threads(count, lines);
 }
