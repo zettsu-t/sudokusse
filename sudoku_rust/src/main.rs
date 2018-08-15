@@ -298,14 +298,25 @@ impl<'a> SudokuMap<'a> {
         }
 
         let row_counts = cell_counts.iter().map(
-            |row| row.iter().fold(0, |sum, &count| sum + if count == min_count { 1 } else { 0 })).collect::<Vec<usize>>();
+            |row| row.iter().fold(
+                0, |sum, &count| sum + if count == min_count { 1 } else { 0 })).
+            collect::<Vec<usize>>();
+
         let max_row_count = row_counts.iter().max().unwrap();
         let target_row = row_counts.iter().position(|&count| count == *max_row_count).unwrap();
-        let target_column = cell_counts[target_row].iter().position(|&count| count == min_count).unwrap();
+        let target_column = cell_counts[target_row].iter().position(
+            |&count| count == min_count).unwrap();
+
         target_row * SUDOKU_GROUP_SIZE + target_column
     }
 
     fn is_solved(&self) -> bool {
+        for cell_index in 0..SUDOKU_CELL_SIZE {
+            if !self.cells[cell_index].has_unique_candidate() {
+                return false;
+            }
+        }
+
         let mut group_gen = SudokuGroupGen::new();
         while let Some(indexes) = group_gen.next() {
             if !self.is_group_solved(indexes) {
@@ -343,6 +354,9 @@ impl<'a> SudokuMap<'a> {
         for cell_index in cell_indexes {
             all_candidates.merge_candidate(&self.cells[cell_index]);
             conflict |= unique_candidates.merge_unique_candidate(&self.cells[cell_index]);
+            if conflict {
+                return false;
+            }
         }
         all_candidates.has_all_candidates() && !conflict
     }
