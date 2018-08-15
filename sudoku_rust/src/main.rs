@@ -2,14 +2,17 @@ use std::collections::HashMap;
 use std::io;
 use std::io::prelude::*;
 
-type SudokuCandidate = u64;
+type SudokuCandidate = u64;  // or u32
 type SudokuCellGroups = HashMap<usize, Vec<Vec<usize>>>;
+
 const SUDOKU_DIGIT_BASE: u32 = 10;
-const SUDOKU_CANDIDATE_SIZE: usize = 9;
 const SUDOKU_BOX_SIZE: usize = 3;
-const SUDOKU_GROUP_SIZE: usize = 9;
-const SUDOKU_CELL_SIZE: usize = 81;
+const SUDOKU_NO_CANDIDATES: SudokuCandidate = 0;
 const SUDOKU_ALL_CANDIDATES: SudokuCandidate = ((1 << SUDOKU_CANDIDATE_SIZE) - 1);
+
+const SUDOKU_GROUP_SIZE: usize = SUDOKU_BOX_SIZE * SUDOKU_BOX_SIZE;
+const SUDOKU_CANDIDATE_SIZE: usize = SUDOKU_GROUP_SIZE;
+const SUDOKU_CELL_SIZE: usize = SUDOKU_GROUP_SIZE * SUDOKU_GROUP_SIZE;
 
 // Sudoku cell that contains candidates as a bitboard
 #[derive(Clone, Copy)]
@@ -19,7 +22,7 @@ struct SudokuCell {
 
 impl SudokuCell {
     fn new() -> SudokuCell {
-        SudokuCell { candidates: 0 }
+        SudokuCell { candidates: SUDOKU_NO_CANDIDATES }
     }
 
     fn to_string(&self) -> String {
@@ -56,11 +59,7 @@ impl SudokuCell {
     }
 
     fn count_candidates(&self) -> usize {
-        let f = |candidate| {
-            if (self.candidates & self.digit_to_candidate(&candidate))
-                != 0 { 1 } else { 0 } };
-        (0..SUDOKU_CANDIDATE_SIZE as SudokuCandidate).fold(
-            0, |sum, candidates| sum + f(candidates))
+        (self.candidates & SUDOKU_ALL_CANDIDATES).count_ones() as usize
     }
 
     fn has_unique_candidate(&self) -> bool {
@@ -111,7 +110,6 @@ impl SudokuCell {
         }
     }
 
-    // Inner methods
     // Input 0..8
     fn digit_to_candidate(&self, candidate: &SudokuCandidate) -> SudokuCandidate {
         (1 as SudokuCandidate) << candidate
@@ -142,13 +140,15 @@ impl SudokuGroupGen {
         } else if self.index < (SUDOKU_GROUP_SIZE * 2) {
             let column = self.index - SUDOKU_GROUP_SIZE;
             self.index += 1;
-            Some((0..SUDOKU_GROUP_SIZE).map(|i| column + i * SUDOKU_GROUP_SIZE).collect::<Vec<_>>())
+            Some((0..SUDOKU_GROUP_SIZE).map(
+                |row| column + row * SUDOKU_GROUP_SIZE).collect::<Vec<_>>())
         } else if self.index < (SUDOKU_GROUP_SIZE * 3) {
             let box_index = self.index - SUDOKU_GROUP_SIZE * 2;
             let offset = (box_index % 3) * 3  + (box_index / 3) * SUDOKU_GROUP_SIZE * 3;
             let mut indexes : Vec<usize> = Vec::new();
             for row in 0..SUDOKU_BOX_SIZE {
-                let x = (0..SUDOKU_BOX_SIZE).map(|column| row * SUDOKU_GROUP_SIZE + column + offset).collect::<Vec<_>>();
+                let x = (0..SUDOKU_BOX_SIZE).map(
+                    |column| row * SUDOKU_GROUP_SIZE + column + offset).collect::<Vec<_>>();
                 indexes.extend(x);
             }
             self.index += 1;
@@ -172,6 +172,7 @@ impl<'a> SudokuMap<'a> {
             cell.preset_full_candidate();
         }
 
+        // Leave tail cells if the line is shorter than the number of cells.
         for (index, ch) in line.chars().enumerate() {
             cells[index].preset_candidate(ch);
         };
@@ -208,11 +209,13 @@ impl<'a> SudokuMap<'a> {
             if self.is_solved() {
                 return true;
             }
+
             if !self.is_consistent() {
                 return false;
             }
 
-            let count = (0..SUDOKU_CELL_SIZE).fold(0, |sum, index| sum + self.cells[index].count_candidates());
+            let count = (0..SUDOKU_CELL_SIZE).fold(
+                0, |sum, index| sum + self.cells[index].count_candidates());
             if prev_count == count {
                 break;
             }
@@ -241,6 +244,10 @@ impl<'a> SudokuMap<'a> {
 
     fn filter_unique_candidates(&mut self) {
         for target_index in 0..SUDOKU_CELL_SIZE {
+            if self.cells[target_index].has_unique_candidate() {
+                continue;
+            }
+
             let mut sum = SudokuCell::new();
             for group in self.groups[&target_index].iter() {
                 for cell_index in group.iter() {
@@ -255,6 +262,10 @@ impl<'a> SudokuMap<'a> {
 
     fn find_unused_candidates(&mut self) {
         for target_index in 0..SUDOKU_CELL_SIZE {
+            if self.cells[target_index].has_unique_candidate() {
+                continue;
+            }
+
             for group in self.groups[&target_index].iter() {
                 let mut sum = SudokuCell::new();
                 for cell_index in group.iter() {
@@ -308,7 +319,8 @@ impl<'a> SudokuMap<'a> {
         let mut sum = SudokuCell::new();
         let mut conflict = false;
         for cell_index in cell_indexes {
-            conflict |= sum.merge_unique_candidate(&self.cells[cell_index]);
+            let cell = &self.cells[cell_index];
+            conflict |= sum.merge_unique_candidate(&cell);
         }
         sum.has_all_candidates() && !conflict
     }
