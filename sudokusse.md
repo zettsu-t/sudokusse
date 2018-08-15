@@ -744,6 +744,15 @@ its backtracking is very slow.
 $ python3 sudoku_numpy.py puzzle_text_filename
 ```
 
+## Solving Sudoku puzzles with Rust
+
+You can build a Rust Sudoku solver, measure how long it takes to solve
+puzzles, and check whether their solutions are correct.
+
+```bash
+$ make rust
+```
+
 ## Bibliography and acknowledgments
 
 1. I cite the sudoku solver algorithm and puzzle examples from the

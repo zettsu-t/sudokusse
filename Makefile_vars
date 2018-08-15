@@ -4,6 +4,10 @@ LD=g++
 CXX?=g++
 AS=as
 RUBY=ruby
+CARGO=cargo
+
+# Rust
+CARGO_RELEASE_OPTIONS=--release
 
 # Set 0 to use SSE and 1 to AVX
 USE_AVX_VALUE=1
@@ -104,6 +108,9 @@ CELLS_UNPACKED_TARGET=bin/sudokusse
 CELLS_PACKED_TARGET=bin/sudokusse_cells_packed
 CELLS_DIAGONAL_TARGET=bin/sudokusse_diagonal
 TARGETS=$(CELLS_UNPACKED_TARGET) $(CELLS_PACKED_TARGET) $(CELLS_DIAGONAL_TARGET)
+RUST_DIR=sudoku_rust
+SOURCE_RUST=$(RUST_DIR)/src/main.rs
+TARGET_RUST=$(RUST_DIR)/target/release/sudoku_rust
 
 ifneq (,$(findstring linux,$(shell gcc -dumpmachine)))
 OS_DEPENDENT_OBJ=sudoku_linux.o
@@ -142,6 +149,7 @@ TEST_CASE_ORIGINAL_PUZZLE=data/sudoku17
 endif
 TEST_CASE_DIAGONAL_PUZZLE=data/sudoku-x-12-7193.sdm
 TEST_CASE_SOLUTION=./sudoku_solution.txt
+TEST_CASE_SOLUTION_RUST=./sudoku_solution_rust.txt
 
 ALL_UPDATED_VARIABLES= \
 	LD CXX AS RUBY PYTHON \

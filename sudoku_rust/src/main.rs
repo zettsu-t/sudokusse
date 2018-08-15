@@ -200,13 +200,23 @@ impl<'a> SudokuMap<'a> {
     }
 
     fn solve(&mut self) -> bool {
-        self.filter_unique_candidates();
-        self.find_unused_candidates();
-        if self.is_solved() {
-            return true;
-        }
-        if !self.is_consistent() {
-           return false;
+        let mut prev_count = SUDOKU_CELL_SIZE * SUDOKU_CANDIDATE_SIZE;
+        loop {
+            self.filter_unique_candidates();
+            self.find_unused_candidates();
+
+            if self.is_solved() {
+                return true;
+            }
+            if !self.is_consistent() {
+                return false;
+            }
+
+            let count = (0..SUDOKU_CELL_SIZE).fold(0, |sum, index| sum + self.cells[index].count_candidates());
+            if prev_count == count {
+                break;
+            }
+            prev_count = count;
         }
 
         let index_min_count = self.find_backtracking_target();
@@ -361,18 +371,25 @@ fn main() {
 
     let stdin = io::stdin();
     let mut lines = Vec::new();
+    let mut count = 0;
     for line in stdin.lock().lines() {
         let line = line.unwrap();
         lines.push(line);
+        count += 1;
     }
 
+    let mut result = true;
     let mut answers = String::new();
     for line in lines {
         let mut sudoku_map = SudokuMap::new(&line, &cell_groups);
-        sudoku_map.solve();
+        result &= sudoku_map.solve();
         let s = sudoku_map.to_string(true);
         answers.push_str(&s);
         answers.push_str("\n");
     }
-    println!("{}", answers);
+
+    print!("{}", answers);
+    if result {
+        println!("All {} cases passed.", count);
+    }
 }

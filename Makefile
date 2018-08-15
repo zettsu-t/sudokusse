@@ -8,7 +8,7 @@ MAKEFILE_PARALLEL=-j 5
 
 ALL_UPDATED_VARIABLES+= THIS_DIR MAKEFILE_SUB_COMPILE MAKEFILE_PARALLEL
 
-.PHONY: all clean rebuild check time test show FORCE
+.PHONY: all clean rebuild check rust time test show FORCE
 
 all: $(TARGETS)
 
@@ -27,6 +27,12 @@ ifneq ($(BUILD_ON_MINGW),yes)
 	perl sudoku_solve_all.pl
 endif
 	ruby sudoku_check.rb
+
+rust: $(CELLS_UNPACKED_TARGET)
+	$(MAKE) -f $(MAKEFILE_SUB_COMPILE) rust
+	$(CELLS_UNPACKED_TARGET) $(TEST_CASE_ORIGINAL_PUZZLE) sse print > $(TEST_CASE_SOLUTION)
+	time $(TARGET_RUST) < $(TEST_CASE_ORIGINAL_PUZZLE) > $(TEST_CASE_SOLUTION_RUST)
+	bash -c "diff --strip-trailing-cr <(tail -n +2 $(TEST_CASE_SOLUTION)) <(tail -n +2 $(TEST_CASE_SOLUTION_RUST))"
 
 test: $(TARGETS)
 	time $(CELLS_UNPACKED_TARGET) $(TEST_CASE_ORIGINAL_PUZZLE) sse print > $(TEST_CASE_SOLUTION)

@@ -3,7 +3,7 @@ THIS_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(THIS_DIR)Makefile_vars
 
 .SUFFIXES: .o .cpp .h .s
-.PHONY: all clean
+.PHONY: all clean rust
 
 all: $(TARGETS)
 
@@ -51,7 +51,12 @@ endif
 endif
 
 clean:
-	$(RM) $(TARGETS) $(OBJS) $(GENERATED_CODE) $(GENERATED_CODE_PYTHON) $(TEST_CASE_SOLUTION) ./*.o
+	$(RM) $(TARGETS) $(TARGET_RUST) $(OBJS) $(GENERATED_CODE) $(GENERATED_CODE_PYTHON) $(TEST_CASE_SOLUTION) $(TEST_CASE_SOLUTION_RUST) ./*.o
+
+rust: $(TARGET_RUST)
+
+$(TARGET_RUST): $(SOURCE_RUST)
+	cd $(RUST_DIR); $(CARGO) build $(CARGO_RELEASE_OPTIONS)
 
 #Local Variables:
 #mode: Makefile
