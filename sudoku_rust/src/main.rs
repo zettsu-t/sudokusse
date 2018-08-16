@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::io;
 use std::io::prelude::*;
+use std::sync::atomic::{AtomicBool, Ordering};
+extern crate crossbeam;
 
 type SudokuCandidate = u64;  // or u32
 type SudokuCellGroups = HashMap<usize, Vec<Vec<usize>>>;
@@ -397,43 +399,46 @@ fn exec_threads(count:usize, lines: Vec<String>) {
     let lines_per_core = count / n_cores;
     let mut start_pos = 0;
     let mut children = vec![];
+    let total_result = AtomicBool::new(true);
 
-    for core_index in 0..n_cores {
-        let cell_groups = create_group_index_set();
-        let end_pos = std::cmp::min(count, start_pos + lines_per_core);
-        let mut lines_part = Vec::new();
-        if core_index + 1 >= n_cores {
-            for i in start_pos..count {
-                lines_part.push(lines[i].clone());
+    crossbeam::scope(|scope| {
+        for core_index in 0..n_cores {
+            let cell_groups = create_group_index_set();
+            let end_pos = std::cmp::min(count, start_pos + lines_per_core);
+            let mut lines_part = Vec::new();
+            if core_index + 1 >= n_cores {
+                for i in start_pos..count {
+                    lines_part.push(lines[i].clone());
+                }
+            } else {
+                for i in start_pos..end_pos {
+                    lines_part.push(lines[i].clone());
+                }
             }
-        } else {
-            for i in start_pos..end_pos {
-                lines_part.push(lines[i].clone());
-            }
+
+            start_pos = end_pos;
+            children.push(scope.spawn(move || {
+                let mut result = true;
+                let mut answers = String::new();
+                for line in lines_part {
+                    let mut sudoku_map = SudokuMap::new(&line, &cell_groups);
+                    result &= sudoku_map.solve();
+                    let s = sudoku_map.to_string(true);
+                    answers.push_str(&s);
+                    answers.push_str("\n");
+                }
+                (result, answers)
+            }))
         }
-        start_pos = end_pos;
-        children.push(std::thread::spawn(move || {
-            let mut result = true;
-            let mut answers = String::new();
-            for line in lines_part {
-                let mut sudoku_map = SudokuMap::new(&line, &cell_groups);
-                result &= sudoku_map.solve();
-                let s = sudoku_map.to_string(true);
-                answers.push_str(&s);
-                answers.push_str("\n");
-            }
-            (result, answers)
-        }))
-    }
 
-    let mut total_result = true;
-    for child in children {
-        let (result, answers) = child.join().unwrap() as (bool, String);
-        total_result &= result;
-        print!("{}", answers);
-    }
+        for child in children {
+            let (result, answers) = child.join().unwrap() as (bool, String);
+            total_result.fetch_and(result, Ordering::SeqCst);
+            print!("{}", answers);
+        }
+    });
 
-    if total_result {
+    if total_result.load(Ordering::SeqCst) {
         println!("All {} cases passed.", count);
     }
 }
@@ -448,6 +453,5 @@ fn main() {
         lines.push(line);
         count += 1;
     }
-
     exec_threads(count, lines);
 }
