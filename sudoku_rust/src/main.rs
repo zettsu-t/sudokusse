@@ -393,35 +393,28 @@ fn create_group_index_set() -> SudokuCellGroups {
     groups
 }
 
-fn exec_threads(count:usize, lines: Vec<String>) {
+fn exec_threads(count:usize, lines: &Vec<String>) {
     // Shares cell groups between all questions
     let n_cores = std::cmp::min(SUDOKU_MAX_THREADS, count);
     let lines_per_core = count / n_cores;
-    let mut start_pos = 0;
     let mut children = vec![];
     let total_result = AtomicBool::new(true);
 
     crossbeam::scope(|scope| {
         for core_index in 0..n_cores {
             let cell_groups = create_group_index_set();
-            let end_pos = std::cmp::min(count, start_pos + lines_per_core);
-            let mut lines_part = Vec::new();
-            if core_index + 1 >= n_cores {
-                for i in start_pos..count {
-                    lines_part.push(lines[i].clone());
-                }
+            let start_pos = core_index * lines_per_core;
+            let end_pos = if (core_index + 1) == n_cores {
+                count
             } else {
-                for i in start_pos..end_pos {
-                    lines_part.push(lines[i].clone());
-                }
-            }
+                start_pos + lines_per_core
+            };
 
-            start_pos = end_pos;
             children.push(scope.spawn(move || {
                 let mut result = true;
                 let mut answers = String::new();
-                for line in lines_part {
-                    let mut sudoku_map = SudokuMap::new(&line, &cell_groups);
+                for line_index in start_pos..end_pos {
+                    let mut sudoku_map = SudokuMap::new(&lines[line_index], &cell_groups);
                     result &= sudoku_map.solve();
                     let s = sudoku_map.to_string(true);
                     answers.push_str(&s);
@@ -453,5 +446,5 @@ fn main() {
         lines.push(line);
         count += 1;
     }
-    exec_threads(count, lines);
+    exec_threads(count, &lines);
 }
