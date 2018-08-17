@@ -1,3 +1,20 @@
+//! A Sudoku solver written in the Rust programming language
+//! # How to Build
+//!
+//! ```bash
+//! $ cd sudoku_rust
+//! $ cargo build
+//! ```
+//!
+//! # Solving 9x9 Sudoku puzzles
+//! ```bash
+//! $ target/{debug|release}/sudoku_rust < sudoku_puzzle.txt
+//! ```
+//! The input file __sudoku_puzzle.txt__ is a text file that contains
+//! 9x9 sudoku puzzles.  In the text file, each line represents a puzzle
+//! and has 81 preset numbers ('1'..'9') or blanks.  See more details in
+//! [the author's repository](https://github.com/zettsu-t/sudokusse/blob/master/sudokusse.md).
+
 use std::collections::HashMap;
 use std::io;
 use std::io::prelude::*;
@@ -16,7 +33,7 @@ const SUDOKU_CELL_SIZE: usize = SUDOKU_GROUP_SIZE * SUDOKU_GROUP_SIZE;
 const SUDOKU_NO_CANDIDATES: SudokuCandidate = 0;
 const SUDOKU_ALL_CANDIDATES: SudokuCandidate = ((1 << SUDOKU_CANDIDATE_SIZE) - 1);
 
-// Sudoku cell that contains candidates as a bitboard
+/// Sudoku cell that contains candidates as a bitboard
 #[derive(Clone, Copy)]
 struct SudokuCell {
     candidates: SudokuCandidate
@@ -27,6 +44,7 @@ impl SudokuCell {
         SudokuCell { candidates: SUDOKU_NO_CANDIDATES }
     }
 
+    /// Returns a string representation
     fn to_string(&self) -> String {
         let mut line = String::new();
         for candidate in 0..(SUDOKU_CANDIDATE_SIZE as SudokuCandidate) {
@@ -329,7 +347,7 @@ fn test_sudokucell_has_unique_all_candidatex() {
    }
 }
 
-// Generator for sudoku cellgroups
+/// Generator for sudoku cellgroups
 struct SudokuGroupGen {
     index: usize
 }
@@ -399,7 +417,7 @@ fn test_sudokugroupgen_next() {
     assert!(group.next() == None);
 }
 
-// Sudoku cell map
+/// Sudoku cell map
 struct SudokuMap<'a> {
     cells : Vec<SudokuCell>,
     groups : &'a SudokuCellGroups,
