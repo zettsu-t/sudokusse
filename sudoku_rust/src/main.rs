@@ -16,11 +16,12 @@
 //! [the author's repository](https://github.com/zettsu-t/sudokusse/blob/master/sudokusse.md).
 
 use std::collections::HashMap;
+use std::env;
 use std::io;
 use std::io::prelude::*;
 use std::sync::atomic::{AtomicBool, Ordering};
-extern crate crossbeam;
 extern crate num_cpus;
+extern crate crossbeam;
 
 type SudokuCandidate = u64;  // or u32
 type SudokuCellGroups = HashMap<usize, Vec<Vec<usize>>>;
@@ -691,6 +692,24 @@ fn exec_threads(count:usize, lines: &Vec<String>) {
     }
 }
 
+fn exec_single_threads(count:usize, lines: &Vec<String>) {
+    let cell_groups = create_group_index_set();
+    let mut result = true;
+    let mut answers = String::new();
+
+    for line in lines {
+        let mut sudoku_map = SudokuMap::new(&line, &cell_groups);
+        result &= sudoku_map.solve();
+        answers.push_str(&sudoku_map.to_string(true));
+        answers.push_str("\n");
+    }
+
+    print!("{}", answers);
+    if result {
+        println!("All {} cases passed.", count);
+    }
+}
+
 fn main() {
     println!("Solving in Rust");
     let stdin = io::stdin();
@@ -701,5 +720,9 @@ fn main() {
         lines.push(line);
         count += 1;
     }
-    exec_threads(count, &lines);
+
+    match env::var("SUDOKU_SINGLE_THREAD") {
+        Ok(_) => exec_single_threads(count, &lines),
+        Err(_) => exec_threads(count, &lines)
+    }
 }
