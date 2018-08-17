@@ -10,12 +10,11 @@ type SudokuCellGroups = HashMap<usize, Vec<Vec<usize>>>;
 const SUDOKU_MAX_THREADS: usize = 4;
 const SUDOKU_DIGIT_BASE: u32 = 10;
 const SUDOKU_BOX_SIZE: usize = 3;
-const SUDOKU_NO_CANDIDATES: SudokuCandidate = 0;
-const SUDOKU_ALL_CANDIDATES: SudokuCandidate = ((1 << SUDOKU_CANDIDATE_SIZE) - 1);
-
 const SUDOKU_GROUP_SIZE: usize = SUDOKU_BOX_SIZE * SUDOKU_BOX_SIZE;
 const SUDOKU_CANDIDATE_SIZE: usize = SUDOKU_GROUP_SIZE;
 const SUDOKU_CELL_SIZE: usize = SUDOKU_GROUP_SIZE * SUDOKU_GROUP_SIZE;
+const SUDOKU_NO_CANDIDATES: SudokuCandidate = 0;
+const SUDOKU_ALL_CANDIDATES: SudokuCandidate = ((1 << SUDOKU_CANDIDATE_SIZE) - 1);
 
 // Sudoku cell that contains candidates as a bitboard
 #[derive(Clone, Copy)]
@@ -48,7 +47,7 @@ impl SudokuCell {
         match ch {
             '1'...'9' => {
                 let number = (ch.to_digit(SUDOKU_DIGIT_BASE).unwrap() - code_digit_base) as SudokuCandidate;
-                self.candidates = self.digit_to_candidate(&number);
+                self.candidates = SudokuCell::digit_to_candidate(&number);
             }
             _ => {}
         }
@@ -57,7 +56,7 @@ impl SudokuCell {
     // Input 0..8
     fn overwrite_candidate(&mut self, candidate: SudokuCandidate) {
         if self.count_candidates() > 1 {
-            self.candidates = self.digit_to_candidate(&candidate);
+            self.candidates = SudokuCell::digit_to_candidate(&candidate);
         }
     }
 
@@ -80,7 +79,7 @@ impl SudokuCell {
 
     // Input 0..8
     fn can_mask(&mut self, candidates: SudokuCandidate) -> bool {
-        (self.candidates & self.digit_to_candidate(&candidates)) != 0
+        (self.candidates & SudokuCell::digit_to_candidate(&candidates)) != 0
     }
 
     fn merge_candidate(&mut self, rhs: &SudokuCell) {
@@ -114,14 +113,202 @@ impl SudokuCell {
     }
 
     // Input 0..8
-    fn digit_to_candidate(&self, candidate: &SudokuCandidate) -> SudokuCandidate {
+    fn digit_to_candidate(candidate: &SudokuCandidate) -> SudokuCandidate {
         (1 as SudokuCandidate) << candidate
     }
 
     // Input 0..8
     fn has_candidate(&self, candidate: &SudokuCandidate) -> bool {
-        (self.candidates & self.digit_to_candidate(&candidate)) != 0
+        (self.candidates & SudokuCell::digit_to_candidate(&candidate)) != 0
     }
+}
+
+#[test]
+fn test_sudokucell_new() {
+    assert!(SudokuCell::new().candidates == SUDOKU_NO_CANDIDATES);
+}
+
+#[test]
+fn test_sudokucell_to_string() {
+    let test_cases = [(1 as SudokuCandidate, "1"), (2, "2"), (4, "3"), (8, "4"), (16, "5"),
+                      (32, "6"), (64, "7"), (128, "8"), (256, "9"),
+                      (0b111, "123"), (0b111000, "456"), (0b111000000, "789"),
+                      (0x101, "19"), (0xfe, "2345678"), (0x1ff, "123456789")];
+    for (candidates, expected) in test_cases.iter() {
+        let mut cell = SudokuCell::new();
+        cell.candidates = *candidates;
+        assert!(cell.to_string() == expected.to_string());
+    }
+}
+
+#[test]
+fn test_sudokucell_preset_full_candidate() {
+    let mut cell = SudokuCell::new();
+    cell.preset_full_candidate();
+    assert!(cell.candidates != SUDOKU_NO_CANDIDATES);
+    assert!(cell.candidates == SUDOKU_ALL_CANDIDATES);
+}
+
+#[test]
+fn test_sudokucell_preset_candidate() {
+    let test_cases = [('1', 1 as SudokuCandidate), ('2', 2), ('3', 4), ('4', 8), ('5', 16),
+                      ('6', 32), ('7', 64), ('8', 128), ('9', 256)];
+    for (ch, expected) in test_cases.iter() {
+        let mut cell = SudokuCell::new();
+        cell.preset_candidate(*ch);
+        assert!(cell.candidates == *expected);
+    }
+}
+
+#[test]
+fn test_sudokucell_preset_non_candidate() {
+    let test_cases = ['0', 'a', '.', '_'];
+    for ch in test_cases.iter() {
+        let mut cell = SudokuCell::new();
+        cell.preset_candidate(*ch);
+        assert!(cell.candidates == SUDOKU_NO_CANDIDATES);
+    }
+}
+
+#[test]
+fn test_sudokucell_overwrite_candidate() {
+    for candidate in 0..(SUDOKU_CANDIDATE_SIZE as SudokuCandidate) {
+        let mut cell = SudokuCell::new();
+        cell.preset_full_candidate();
+        cell.overwrite_candidate(candidate);
+        assert!(cell.candidates == (1 << candidate));
+    }
+}
+
+#[test]
+fn test_sudokucell_no_overwrite_candidate() {
+    for candidate in 0..(SUDOKU_CANDIDATE_SIZE as SudokuCandidate) {
+        let mut cell = SudokuCell::new();
+        let current_candidates = 1 << (8 - candidate);
+        assert!(current_candidates != candidate);
+        cell.candidates = current_candidates;
+        cell.overwrite_candidate(candidate);
+        assert!(cell.candidates == current_candidates);
+    }
+}
+
+#[test]
+fn test_sudokucell_count_candidates() {
+    let test_cases = [(1 as SudokuCandidate, 1 as usize), (256, 1),
+                      (0, 0), (0b11, 2), (0b111000000, 3), (0b111_111_111, 9)];
+    for (candidates, expected) in test_cases.iter() {
+        let mut cell = SudokuCell::new();
+        cell.candidates = *candidates;
+        assert!(cell.count_candidates() == *expected);
+    }
+}
+
+#[test]
+fn test_sudokucell_has_unique_all_candidate() {
+    for candidates in 0..(SUDOKU_ALL_CANDIDATES + 1) {
+        let mut cell = SudokuCell::new();
+        let expected = candidates.count_ones() == 1;
+        assert!(SudokuCell::is_unique_candidate(candidates) == expected);
+        cell.candidates = candidates;
+        assert!(cell.has_unique_candidate() == expected);
+        assert!(cell.has_all_candidates() == (candidates == SUDOKU_ALL_CANDIDATES));
+    }
+}
+
+#[test]
+fn test_sudokucell_can_mask() {
+    let test_cases = [(1 as SudokuCandidate, 0 as SudokuCandidate, true),
+                      (1, 1, false), (3, 0, true), (3, 1, true), (3, 2, false)];
+    for (candidates, other, expected) in test_cases.iter() {
+        let mut cell = SudokuCell::new();
+        cell.candidates = *candidates;
+        assert!(cell.can_mask(*other) == *expected);
+    }
+}
+
+#[test]
+fn test_sudokucell_merge_candidate() {
+    let test_cases = [(1 as SudokuCandidate, 1 as SudokuCandidate, 1 as SudokuCandidate),
+                      (1, 0b10, 0b11), (0b10, 1, 0b11), (0b11, 1, 0b11), (1, 0b11, 0b11)];
+    for (candidates, other, expected) in test_cases.iter() {
+        let mut left = SudokuCell::new();
+        let mut right = SudokuCell::new();
+        left.candidates = *candidates;
+        right.candidates = *other;
+        left.merge_candidate(&right);
+        assert!(left.candidates == *expected);
+    }
+}
+
+#[test]
+fn test_sudokucell_merge_unique_candidate() {
+    let test_cases = [(1 as SudokuCandidate, 1 as SudokuCandidate, 1 as SudokuCandidate, true),
+                      (1, 0b10, 0b11, false), (0b10, 1, 0b11, false),
+                      (0b11, 1, 0b11, true), (1, 0b11, 1, false)];
+    for (candidates, other, expected, conflict) in test_cases.iter() {
+        let mut left = SudokuCell::new();
+        let mut right = SudokuCell::new();
+        left.candidates = *candidates;
+        right.candidates = *other;
+        let actual = left.merge_unique_candidate(&right);
+        assert!(left.candidates == *expected);
+        assert!(actual == *conflict);
+    }
+}
+
+#[test]
+fn test_sudokucell_filter_by_candidates() {
+    let test_cases = [(1 as SudokuCandidate, 1 as SudokuCandidate, 1 as SudokuCandidate),
+                      (1, 0b10, 1), (0b10, 0b11, 0b10),
+                      (0b11, 1, 0b10), (0b11, 0b110, 1)];
+    for (candidates, other, expected) in test_cases.iter() {
+        let mut left = SudokuCell::new();
+        let mut right = SudokuCell::new();
+        left.candidates = *candidates;
+        right.candidates = *other;
+        left.filter_by_candidates(&right);
+        assert!(left.candidates == *expected);
+    }
+}
+
+#[test]
+fn test_sudokucell_fill_unused_candidate() {
+    let test_cases = [(1 as SudokuCandidate, 1 as SudokuCandidate, 1 as SudokuCandidate),
+                      (1, 0b111_111_101, 1), (0x100, 0b111_111_101, 0x100),
+                      (0b11, 0b111_111_101, 0b10), (0x1f0, 0b11_111_111, 0x100),
+                      (SUDOKU_ALL_CANDIDATES, !0x100, 0x100),
+                      (SUDOKU_ALL_CANDIDATES, !1, 1)];
+    for (candidates, other, expected) in test_cases.iter() {
+        let mut left = SudokuCell::new();
+        let mut right = SudokuCell::new();
+        left.candidates = *candidates;
+        right.candidates = *other;
+        left.fill_unused_candidate(&right);
+        assert!(left.candidates == *expected);
+    }
+}
+
+#[test]
+fn test_sudokucell_digit_to_candidate() {
+    let test_cases = [(0, 1 as SudokuCandidate), (1, 2), (2, 4), (3, 8), (4, 16),
+                      (5, 32), (6, 64), (7, 128), (8, 256)];
+    for (candidate, expected) in test_cases.iter() {
+        let actual = SudokuCell::digit_to_candidate(candidate);
+        assert!(actual == *expected);
+    }
+}
+
+#[test]
+fn test_sudokucell_has_unique_all_candidatex() {
+    for preset_candidates in 0..(SUDOKU_ALL_CANDIDATES + 1) {
+        let mut cell = SudokuCell::new();
+        cell.candidates = preset_candidates;
+        for candidate in 0..(SUDOKU_CANDIDATE_SIZE as SudokuCandidate) {
+            let expected = preset_candidates & (1 << candidate) != 0;
+            let actual = cell.has_candidate(&candidate);
+            assert!(actual == expected);
+        }
+   }
 }
 
 // Generator for sudoku cellgroups
