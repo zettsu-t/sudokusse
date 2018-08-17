@@ -3,15 +3,15 @@ use std::io;
 use std::io::prelude::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 extern crate crossbeam;
+extern crate num_cpus;
 
 type SudokuCandidate = u64;  // or u32
 type SudokuCellGroups = HashMap<usize, Vec<Vec<usize>>>;
 
-const SUDOKU_MAX_THREADS: usize = 4;
 const SUDOKU_DIGIT_BASE: u32 = 10;
 const SUDOKU_BOX_SIZE: usize = 3;
-const SUDOKU_GROUP_SIZE: usize = SUDOKU_BOX_SIZE * SUDOKU_BOX_SIZE;
 const SUDOKU_CANDIDATE_SIZE: usize = SUDOKU_GROUP_SIZE;
+const SUDOKU_GROUP_SIZE: usize = SUDOKU_BOX_SIZE * SUDOKU_BOX_SIZE;
 const SUDOKU_CELL_SIZE: usize = SUDOKU_GROUP_SIZE * SUDOKU_GROUP_SIZE;
 const SUDOKU_NO_CANDIDATES: SudokuCandidate = 0;
 const SUDOKU_ALL_CANDIDATES: SudokuCandidate = ((1 << SUDOKU_CANDIDATE_SIZE) - 1);
@@ -338,6 +338,10 @@ impl SudokuGroupGen {
     fn new() -> SudokuGroupGen {
         SudokuGroupGen { index:0 }
     }
+}
+
+impl Iterator for SudokuGroupGen {
+    type Item = Vec<usize>;
 
     fn next(&mut self) -> Option<Vec<usize>> {
         if self.index < SUDOKU_GROUP_SIZE {
@@ -365,6 +369,34 @@ impl SudokuGroupGen {
             None
         }
     }
+}
+
+#[test]
+fn test_sudokugroupgen_next() {
+    let number_of_group_type: usize = 3;
+    let mut group = SudokuGroupGen::new();
+    let mut count = 0;
+
+    for i in 0..(SUDOKU_GROUP_SIZE * number_of_group_type) {
+        let mut expected: Vec<usize> = Vec::new();
+        match i {
+            0 => {expected.extend([0, 1, 2, 3, 4, 5, 6, 7, 8].to_vec()); () },
+            8 => {expected.extend([72, 73, 74, 75, 76, 77, 78, 79, 80].to_vec()); () },
+            9 => {expected.extend([0, 9, 18, 27, 36, 45, 54, 63, 72].to_vec()); () },
+            17 => {expected.extend([8, 17, 26, 35, 44, 53, 62, 71, 80].to_vec()); () },
+            23 => {expected.extend([33, 34, 35, 42, 43, 44, 51, 52, 53].to_vec()); () },
+            _ => {}
+        }
+
+        let actual = group.next().unwrap();
+        if expected.len() > 0 {
+            assert!(actual == expected);
+            count += 1;
+        }
+    }
+
+    assert!(count == 5);
+    assert!(group.next() == None);
 }
 
 // Sudoku cell map
@@ -600,7 +632,7 @@ fn create_group_index_set() -> SudokuCellGroups {
 
 fn exec_threads(count:usize, lines: &Vec<String>) {
     // Shares cell groups between all questions
-    let n_cores = std::cmp::min(SUDOKU_MAX_THREADS, count);
+    let n_cores = std::cmp::min(num_cpus::get(), count);
     let lines_per_core = count / n_cores;
     let mut children = vec![];
     let total_result = AtomicBool::new(true);
