@@ -34,6 +34,7 @@ impl SudokuCell {
                 line.push_str(&(candidate+1).to_string());
             }
         }
+        debug_assert!(line.len() <= SUDOKU_CANDIDATE_SIZE);
         line
     }
 
@@ -57,11 +58,14 @@ impl SudokuCell {
     fn overwrite_candidate(&mut self, candidate: SudokuCandidate) {
         if self.count_candidates() > 1 {
             self.candidates = SudokuCell::digit_to_candidate(&candidate);
+            debug_assert!(self.candidates <= SUDOKU_ALL_CANDIDATES);
         }
     }
 
     fn count_candidates(&self) -> usize {
-        (self.candidates & SUDOKU_ALL_CANDIDATES).count_ones() as usize
+        let result = (self.candidates & SUDOKU_ALL_CANDIDATES).count_ones() as usize;
+        debug_assert!(result <= SUDOKU_CANDIDATE_SIZE);
+        result
     }
 
     fn has_unique_candidate(&self) -> bool {
@@ -84,28 +88,38 @@ impl SudokuCell {
 
     fn merge_candidate(&mut self, rhs: &SudokuCell) {
         self.candidates |= rhs.candidates;
+        debug_assert!(self.candidates <= SUDOKU_ALL_CANDIDATES);
     }
 
     // Returns whether no candidates are merged
     fn merge_unique_candidate(&mut self, rhs: &SudokuCell) -> bool {
+        debug_assert!(rhs.candidates <= SUDOKU_ALL_CANDIDATES);
+
         if rhs.has_unique_candidate() {
             if (self.candidates & rhs.candidates) != 0 {
                 return true;
             }
             self.candidates |= rhs.candidates;
+            debug_assert!(self.candidates <= SUDOKU_ALL_CANDIDATES);
         }
         false
     }
 
     fn filter_by_candidates(&mut self, rhs: &SudokuCell) {
+        debug_assert!(rhs.candidates <= SUDOKU_ALL_CANDIDATES);
+
         if !self.has_unique_candidate() {
             self.candidates &= !rhs.candidates;
+            debug_assert!(self.candidates <= SUDOKU_ALL_CANDIDATES);
         }
     }
 
     fn fill_unused_candidate(&mut self, rhs: &SudokuCell) {
+        debug_assert!(rhs.candidates <= SUDOKU_ALL_CANDIDATES);
+
         if !self.has_unique_candidate() {
             let candidates = SUDOKU_ALL_CANDIDATES & !rhs.candidates;
+            debug_assert!(candidates <= SUDOKU_ALL_CANDIDATES);
             if SudokuCell::is_unique_candidate(candidates) {
                 self.candidates = candidates;
             }
@@ -114,11 +128,15 @@ impl SudokuCell {
 
     // Input 0..8
     fn digit_to_candidate(candidate: &SudokuCandidate) -> SudokuCandidate {
-        (1 as SudokuCandidate) << candidate
+        debug_assert!(((*candidate) as usize) < SUDOKU_CANDIDATE_SIZE);
+        let value = (1 as SudokuCandidate) << candidate;
+        debug_assert!(value <= SUDOKU_ALL_CANDIDATES);
+        value
     }
 
     // Input 0..8
     fn has_candidate(&self, candidate: &SudokuCandidate) -> bool {
+        debug_assert!(((*candidate) as usize) < SUDOKU_CANDIDATE_SIZE);
         (self.candidates & SudokuCell::digit_to_candidate(&candidate)) != 0
     }
 }
@@ -282,7 +300,7 @@ fn test_sudokucell_fill_unused_candidate() {
         let mut left = SudokuCell::new();
         let mut right = SudokuCell::new();
         left.candidates = *candidates;
-        right.candidates = *other;
+        right.candidates = *other & SUDOKU_ALL_CANDIDATES;
         left.fill_unused_candidate(&right);
         assert!(left.candidates == *expected);
     }

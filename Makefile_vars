@@ -7,6 +7,7 @@ RUBY=ruby
 CARGO=cargo
 
 # Rust
+CARGO_DEBUG_OPTIONS=
 CARGO_RELEASE_OPTIONS=--release
 
 # Set 0 to use SSE and 1 to AVX
@@ -111,6 +112,8 @@ TARGETS=$(CELLS_UNPACKED_TARGET) $(CELLS_PACKED_TARGET) $(CELLS_DIAGONAL_TARGET)
 RUST_DIR=sudoku_rust
 SOURCE_RUST=$(RUST_DIR)/src/main.rs
 TARGET_RUST=$(RUST_DIR)/target/release/sudoku_rust
+TARGET_RUST_DEBUG=$(RUST_DIR)/target/debug/sudoku_rust
+TARGETS_RUST=$(TARGET_RUST) $(TARGET_RUST_DEBUG)
 
 ifneq (,$(findstring linux,$(shell gcc -dumpmachine)))
 OS_DEPENDENT_OBJ=sudoku_linux.o
