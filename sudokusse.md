@@ -771,6 +771,7 @@ C++/SSE based solvers.
 * -n Number : solve only the head Number of puzzles (equivalent to ```head -n Number ../data/sudoku_example.txt | sudoku_rust```)
 * -s : do not print solutions to save time to writing them into stdout
 * -1 : run on a single thread instead of multi-threads
+* -v : verify solutions and panic if it finds a wrong solution
 
 The cargo profiler works with __sudoku_rust__ in some platforms. If it
 does not take command line arguments followed by --, its workaround is

@@ -117,6 +117,15 @@ impl SudokuCell {
         (self.candidates & SudokuCell::digit_to_candidate(&candidates)) != 0
     }
 
+    // Checks if a preset candidate in rhs is kept
+    fn check_candidate_kept(&self, rhs: &SudokuCell) -> bool {
+        if rhs.has_unique_candidate() {
+            self.candidates == rhs.candidates
+        } else {
+            self.has_unique_candidate()
+        }
+    }
+
     fn merge_candidate(&mut self, rhs: &SudokuCell) {
         self.candidates |= rhs.candidates;
         debug_assert!(self.candidates <= SUDOKU_ALL_CANDIDATES);
@@ -272,6 +281,20 @@ fn test_sudokucell_can_mask() {
         let mut cell = SudokuCell::new();
         cell.candidates = *candidates;
         assert!(cell.can_mask(*other) == *expected);
+    }
+}
+
+#[test]
+fn test_sudokucell_check_candidate_kept() {
+    let test_cases = [(1 as SudokuCandidate, 1 as SudokuCandidate, true),
+                      (2, 1, false), (2, 2, true), (1, SUDOKU_ALL_CANDIDATES, true),
+                      (0b11, SUDOKU_ALL_CANDIDATES, false)];
+    for (answer, preset, expected) in test_cases.iter() {
+        let mut answer_cell = SudokuCell::new();
+        answer_cell.candidates = *answer;
+        let mut preset_cell = SudokuCell::new();
+        preset_cell.candidates = *preset;
+        assert!(answer_cell.check_candidate_kept(&preset_cell) == *expected);
     }
 }
 
@@ -444,7 +467,7 @@ impl<'a> SudokuMap<'a> {
         }
 
         // Leave tail cells if the line is shorter than the number of cells.
-        for (index, ch) in line.chars().enumerate() {
+        for (index, ch) in line.chars().take(SUDOKU_CELL_SIZE).enumerate() {
             cells[index].preset_candidate(ch);
         };
         SudokuMap { cells:cells, groups: cell_groups }
@@ -511,6 +534,22 @@ impl<'a> SudokuMap<'a> {
         }
 
         false
+    }
+
+    // Solved correctly or panic
+    fn check(&self, line: &str) {
+        let solved = self.is_solved() & line.chars().take(SUDOKU_CELL_SIZE).
+            enumerate().fold(true, |result, (index, ch)| result & {
+                let answer = self.cells[index];
+                let mut original = SudokuCell::new();
+                original.preset_candidate(ch);
+                answer.check_candidate_kept(&original)
+            }
+        );
+
+        if !solved {
+            panic!("Wrong solution for {}", line);
+        }
     }
 
     fn filter_unique_candidates(&mut self) {
@@ -633,6 +672,46 @@ impl<'a> SudokuMap<'a> {
     }
 }
 
+#[test]
+fn test_sudokumap_check_correct_answer() {
+//  solution :  "815349267724651893396872415147528639582936741963417582231784956678195324459263178";
+    let input = "........77.4...893..68.2.....75286...8...67.19.34...8....7.49..6...9....459...1.8";
+    let cell_groups = create_group_index_set();
+    let mut sudoku_map = SudokuMap::new(input, &cell_groups);
+    sudoku_map.solve();
+    sudoku_map.check(input);
+}
+
+#[test]
+#[should_panic]
+fn test_sudokumap_check_not_solved() {
+    let input = "........77.4...893..68.2.....75286...8...67.19.34...8....7.49..6...9....459...1.8";
+    let cell_groups = create_group_index_set();
+    SudokuMap::new(input, &cell_groups).check(input);
+}
+
+#[test]
+#[should_panic]
+fn test_sudokumap_check_wrong_answer1() {
+    let input = "........77.4...893..68.2.....75286...8...67.19.34...8....7.49..6...9....459...1.8";
+    let wrong = "........67.4...893..68.2.....75286...8...67.19.34...8....7.49..6...9....459...1.8";
+    let cell_groups = create_group_index_set();
+    let mut sudoku_map = SudokuMap::new(input, &cell_groups);
+    sudoku_map.solve();
+    sudoku_map.check(wrong);
+}
+
+#[test]
+#[should_panic]
+fn test_sudokumap_check_wrong_answer2() {
+    let input = "........77.4...893..68.2.....75286...8...67.19.34...8....7.49..6...9....459...1.8";
+    let wrong = "1.......77.4...893..68.2.....75286...8...67.19.34...8....7.49..6...9....459...1.8";
+    let cell_groups = create_group_index_set();
+    let mut sudoku_map = SudokuMap::new(input, &cell_groups);
+    sudoku_map.solve();
+    sudoku_map.check(wrong);
+}
+
 // Set of sudoku cellgroups
 fn create_group_index_set() -> SudokuCellGroups {
     let mut groups = HashMap::new();
@@ -661,7 +740,7 @@ fn create_group_index_set() -> SudokuCellGroups {
     groups
 }
 
-fn exec_threads(lines: &Vec<String>) -> (bool, String) {
+fn exec_threads(lines: &Vec<String>, verify_mode: bool) -> (bool, String) {
     // Shares cell groups between all questions
     let count = lines.len();
     let n_cores = std::cmp::min(num_cpus::get(), count);
@@ -684,8 +763,12 @@ fn exec_threads(lines: &Vec<String>) -> (bool, String) {
                 let mut result = true;
                 let mut answers = String::new();
                 for line_index in start_pos..end_pos {
-                    let mut sudoku_map = SudokuMap::new(&lines[line_index], &cell_groups);
+                    let line = &lines[line_index];
+                    let mut sudoku_map = SudokuMap::new(&line, &cell_groups);
                     result &= sudoku_map.solve();
+                    if verify_mode {
+                        sudoku_map.check(&line);
+                    }
                     let s = sudoku_map.to_string(true);
                     answers.push_str(&s);
                     answers.push_str("\n");
@@ -704,7 +787,7 @@ fn exec_threads(lines: &Vec<String>) -> (bool, String) {
     return (total_result.load(Ordering::SeqCst), all_answers);
 }
 
-fn exec_single_threads(lines: &Vec<String>) -> (bool, String) {
+fn exec_single_threads(lines: &Vec<String>, verify_mode: bool) -> (bool, String) {
     let cell_groups = create_group_index_set();
     let mut result = true;
     let mut answers = String::new();
@@ -712,6 +795,9 @@ fn exec_single_threads(lines: &Vec<String>) -> (bool, String) {
     for line in lines {
         let mut sudoku_map = SudokuMap::new(&line, &cell_groups);
         result &= sudoku_map.solve();
+        if verify_mode {
+            sudoku_map.check(&line);
+        }
         answers.push_str(&sudoku_map.to_string(true));
         answers.push_str("\n");
     }
@@ -735,6 +821,7 @@ fn main() {
     opts.optopt("n", "max_size", "Solve only the head NUMBER of puzzles", "NUMBER");
     opts.optflag("s", "silent", "Do not print solutions");
     opts.optflag("1", "single_threaded", "Run single-threaded");
+    opts.optflag("v", "verify", "Verify solutions");
     opts.optflag("h", "help", "Print this help menu");
 
     let matches = match opts.parse(&args[0..]) {
@@ -781,12 +868,13 @@ fn main() {
         }
     }
 
+    let verify_mode = matches.opt_present("v");
     let (result, answers) = if matches.opt_present("1") {
         print_unless_silent!(silent, "Solving in Rust (single-threaded)\n");
-        exec_single_threads(&lines)
+        exec_single_threads(&lines, verify_mode)
     } else {
         print_unless_silent!(silent, "Solving in Rust\n");
-        exec_threads(&lines)
+        exec_threads(&lines, verify_mode)
     };
 
     print_unless_silent!(silent, "{}", answers);
