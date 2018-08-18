@@ -38,6 +38,14 @@ const SUDOKU_CELL_SIZE: usize = SUDOKU_GROUP_SIZE * SUDOKU_GROUP_SIZE;
 const SUDOKU_NO_CANDIDATES: SudokuCandidate = 0;
 const SUDOKU_ALL_CANDIDATES: SudokuCandidate = ((1 << SUDOKU_CANDIDATE_SIZE) - 1);
 
+macro_rules! print_if_needed {
+    ($cond:expr, $($arg:tt)*) => {if $cond { print!($($arg)*);} }
+}
+
+macro_rules! print_unless_silent {
+    ($silent:expr, $($arg:tt)*) => { print_if_needed!(!$silent, $($arg)*); }
+}
+
 /// Sudoku cell that contains candidates as a bitboard
 #[derive(Clone, Copy)]
 struct SudokuCell {
@@ -653,13 +661,14 @@ fn create_group_index_set() -> SudokuCellGroups {
     groups
 }
 
-fn exec_threads(lines: &Vec<String>, silent:bool) -> bool {
+fn exec_threads(lines: &Vec<String>) -> (bool, String) {
     // Shares cell groups between all questions
     let count = lines.len();
     let n_cores = std::cmp::min(num_cpus::get(), count);
     let lines_per_core = count / n_cores;
     let mut children = vec![];
     let total_result = AtomicBool::new(true);
+    let mut all_answers = String::new();
 
     crossbeam::scope(|scope| {
         for core_index in 0..n_cores {
@@ -688,16 +697,14 @@ fn exec_threads(lines: &Vec<String>, silent:bool) -> bool {
         for child in children {
             let (result, answers) = child.join().unwrap() as (bool, String);
             total_result.fetch_and(result, Ordering::SeqCst);
-            if !silent {
-                print!("{}", answers);
-            }
+            all_answers.push_str(&answers);
         }
     });
 
-    total_result.load(Ordering::SeqCst)
+    return (total_result.load(Ordering::SeqCst), all_answers);
 }
 
-fn exec_single_threads(lines: &Vec<String>, silent:bool) -> bool {
+fn exec_single_threads(lines: &Vec<String>) -> (bool, String) {
     let cell_groups = create_group_index_set();
     let mut result = true;
     let mut answers = String::new();
@@ -705,16 +712,11 @@ fn exec_single_threads(lines: &Vec<String>, silent:bool) -> bool {
     for line in lines {
         let mut sudoku_map = SudokuMap::new(&line, &cell_groups);
         result &= sudoku_map.solve();
-        if !silent {
-            answers.push_str(&sudoku_map.to_string(true));
-            answers.push_str("\n");
-        }
+        answers.push_str(&sudoku_map.to_string(true));
+        answers.push_str("\n");
     }
 
-    if !silent {
-        print!("{}", answers);
-    }
-    result
+    return (result, answers);
 }
 
 fn main() {
@@ -728,7 +730,6 @@ fn main() {
     opts.optflag("1", "single_threaded", "Run single-threaded");
     opts.optflag("h", "help", "Print this help menu");
 
-    eprintln!("{:?}", args);
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => { m }
         Err(f) => { panic!(f.to_string()) }
@@ -773,22 +774,16 @@ fn main() {
         }
     }
 
-    let result = if matches.opt_present("1") {
-        if !silent {
-            println!("Solving in Rust (single-threaded)");
-        }
-        exec_single_threads(&lines, silent)
+    let (result, answers) = if matches.opt_present("1") {
+        print_unless_silent!(silent, "Solving in Rust (single-threaded)\n");
+        exec_single_threads(&lines)
     } else {
-        if !silent {
-            println!("Solving in Rust");
-        }
-        exec_threads(&lines, silent)
+        print_unless_silent!(silent, "Solving in Rust\n");
+        exec_threads(&lines)
     };
 
-    if !silent && result {
-        println!("All {} cases passed.", count);
-    }
-
+    print_unless_silent!(silent, "{}", answers);
+    print_if_needed!(result && !silent, "All {} cases passed.\n", count);
     if !result {
         std::process::exit(1);
     }
