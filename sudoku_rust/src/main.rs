@@ -8,7 +8,8 @@
 //!
 //! # Solving 9x9 Sudoku puzzles
 //! ```bash
-//! $ target/{debug|release}/sudoku_rust < sudoku_puzzle.txt
+//! $ target/{debug|release}/sudoku_rust [options] < sudoku_puzzle.txt
+//! $ target/{debug|release}/sudoku_rust [options] [sudoku-puzzle-files]
 //! ```
 //! The input file __sudoku_puzzle.txt__ is a text file that contains
 //! 9x9 sudoku puzzles.  In the text file, each line represents a puzzle
@@ -17,11 +18,14 @@
 
 use std::collections::HashMap;
 use std::env;
+use std::fs::File;
 use std::io;
+use std::io::BufReader;
 use std::io::prelude::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 extern crate num_cpus;
 extern crate crossbeam;
+extern crate getopts;
 
 type SudokuCandidate = u64;  // or u32
 type SudokuCellGroups = HashMap<usize, Vec<Vec<usize>>>;
@@ -408,7 +412,7 @@ fn test_sudokugroupgen_next() {
         }
 
         let actual = group.next().unwrap();
-        if expected.len() > 0 {
+        if !expected.is_empty() {
             assert!(actual == expected);
             count += 1;
         }
@@ -649,8 +653,9 @@ fn create_group_index_set() -> SudokuCellGroups {
     groups
 }
 
-fn exec_threads(count:usize, lines: &Vec<String>) {
+fn exec_threads(lines: &Vec<String>, silent:bool) -> bool {
     // Shares cell groups between all questions
+    let count = lines.len();
     let n_cores = std::cmp::min(num_cpus::get(), count);
     let lines_per_core = count / n_cores;
     let mut children = vec![];
@@ -683,16 +688,16 @@ fn exec_threads(count:usize, lines: &Vec<String>) {
         for child in children {
             let (result, answers) = child.join().unwrap() as (bool, String);
             total_result.fetch_and(result, Ordering::SeqCst);
-            print!("{}", answers);
+            if !silent {
+                print!("{}", answers);
+            }
         }
     });
 
-    if total_result.load(Ordering::SeqCst) {
-        println!("All {} cases passed.", count);
-    }
+    total_result.load(Ordering::SeqCst)
 }
 
-fn exec_single_threads(count:usize, lines: &Vec<String>) {
+fn exec_single_threads(lines: &Vec<String>, silent:bool) -> bool {
     let cell_groups = create_group_index_set();
     let mut result = true;
     let mut answers = String::new();
@@ -700,29 +705,91 @@ fn exec_single_threads(count:usize, lines: &Vec<String>) {
     for line in lines {
         let mut sudoku_map = SudokuMap::new(&line, &cell_groups);
         result &= sudoku_map.solve();
-        answers.push_str(&sudoku_map.to_string(true));
-        answers.push_str("\n");
+        if !silent {
+            answers.push_str(&sudoku_map.to_string(true));
+            answers.push_str("\n");
+        }
     }
 
-    print!("{}", answers);
-    if result {
-        println!("All {} cases passed.", count);
+    if !silent {
+        print!("{}", answers);
     }
+    result
 }
 
 fn main() {
-    println!("Solving in Rust");
-    let stdin = io::stdin();
-    let mut lines = Vec::new();
-    let mut count : usize = 0;
-    for line in stdin.lock().lines() {
-        let line = line.unwrap();
-        lines.push(line);
-        count += 1;
+    // cited from the getopts example
+    // https://docs.rs/getopts/0.2.18/getopts/
+    let args: Vec<String> = env::args().collect();
+    let program = args[0].clone();
+    let mut opts = getopts::Options::new();
+    opts.optopt("m", "max_size", "Solve only the head NUMBER of puzzles", "NUMBER");
+    opts.optflag("s", "silent", "Do not print solutions");
+    opts.optflag("1", "single_threaded", "Run single-threaded");
+    opts.optflag("h", "help", "Print this help menu");
+
+    eprintln!("{:?}", args);
+    let matches = match opts.parse(&args[1..]) {
+        Ok(m) => { m }
+        Err(f) => { panic!(f.to_string()) }
+    };
+
+    if matches.opt_present("h") {
+        let brief = format!("Usage: {} FILE(s) [options]", program);
+        print!("{}", opts.usage(&brief));
+        return;
     }
 
-    match env::var("SUDOKU_SINGLE_THREAD") {
-        Ok(_) => exec_single_threads(count, &lines),
-        Err(_) => exec_threads(count, &lines)
+    let max_count = match &matches.opt_str("m") {
+        Some(num) => Some(num.parse().unwrap()),
+        None => None,
+    };
+
+    let silent = matches.opt_present("s");
+
+    let mut lines = Vec::new();
+    let mut count : usize = 0;
+    if matches.free.is_empty() {
+        let stdin = io::stdin();
+        for line in stdin.lock().lines() {
+            let line = line.unwrap();
+            lines.push(line);
+            count += 1;
+            if max_count != None && count >= max_count.unwrap() {
+                break;
+            }
+       }
+    } else {
+        for filename in &matches.free {
+            let infile = File::open(filename).unwrap();
+            for line in BufReader::new(infile).lines() {
+                let line = line.unwrap();
+                lines.push(line);
+                count += 1;
+                if max_count != None && count >= max_count.unwrap() {
+                    break;
+                }
+            }
+        }
+    }
+
+    let result = if matches.opt_present("1") {
+        if !silent {
+            println!("Solving in Rust (single-threaded)");
+        }
+        exec_single_threads(&lines, silent)
+    } else {
+        if !silent {
+            println!("Solving in Rust");
+        }
+        exec_threads(&lines, silent)
+    };
+
+    if !silent && result {
+        println!("All {} cases passed.", count);
+    }
+
+    if !result {
+        std::process::exit(1);
     }
 }
