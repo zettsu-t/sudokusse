@@ -746,10 +746,10 @@ $ python3 sudoku_numpy.py puzzle_text_filename
 
 ## Solving Sudoku puzzles with Rust
 
-You can build a Rust Sudoku solver, measure how long it takes to solve
-puzzles, and check whether their solutions are correct. To do it, the
-make command below builds C++ and Rust based executable, run them and
-compare their solutions.
+You can build a [Rust Sudoku solver](sudoku_rust/src/main.rs),
+measure how long it takes to solve puzzles, and check whether their
+solutions are correct. To do it, the make command below builds C++ and
+Rust based executable, run them and compare their solutions.
 
 ```bash
 $ make all rust
