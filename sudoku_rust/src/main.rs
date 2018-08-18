@@ -39,11 +39,11 @@ const SUDOKU_NO_CANDIDATES: SudokuCandidate = 0;
 const SUDOKU_ALL_CANDIDATES: SudokuCandidate = ((1 << SUDOKU_CANDIDATE_SIZE) - 1);
 
 macro_rules! print_if_needed {
-    ($cond:expr, $($arg:tt)*) => {if $cond { print!($($arg)*);} }
+    ($cond:expr, $($arg:expr),*) => {if $cond { print!($($arg),*);} }
 }
 
 macro_rules! print_unless_silent {
-    ($silent:expr, $($arg:tt)*) => { print_if_needed!(!$silent, $($arg)*); }
+    ($silent:expr, $($arg:expr),*) => { print_if_needed!(!$silent, $($arg),*); }
 }
 
 /// Sudoku cell that contains candidates as a bitboard
