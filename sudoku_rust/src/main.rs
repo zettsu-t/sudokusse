@@ -722,15 +722,22 @@ fn exec_single_threads(lines: &Vec<String>) -> (bool, String) {
 fn main() {
     // cited from the getopts example
     // https://docs.rs/getopts/0.2.18/getopts/
-    let args: Vec<String> = env::args().collect();
-    let program = args[0].clone();
+    let program = env::args().next().unwrap().clone();
+
+    // Set options via the environment variable SUDOKU_RUST
+    // when you cannot pass the options like "cargo profiler"
+    let args: Vec<String> = match env::var("SUDOKU_RUST") {
+        Ok(val) => val.split_whitespace().map(|s| s.to_string()).collect(),
+        Err(_) => env::args().skip(1).collect(),
+    };
+
     let mut opts = getopts::Options::new();
-    opts.optopt("m", "max_size", "Solve only the head NUMBER of puzzles", "NUMBER");
+    opts.optopt("n", "max_size", "Solve only the head NUMBER of puzzles", "NUMBER");
     opts.optflag("s", "silent", "Do not print solutions");
     opts.optflag("1", "single_threaded", "Run single-threaded");
     opts.optflag("h", "help", "Print this help menu");
 
-    let matches = match opts.parse(&args[1..]) {
+    let matches = match opts.parse(&args[0..]) {
         Ok(m) => { m }
         Err(f) => { panic!(f.to_string()) }
     };
@@ -741,7 +748,7 @@ fn main() {
         return;
     }
 
-    let max_count = match &matches.opt_str("m") {
+    let max_count = match &matches.opt_str("n") {
         Some(num) => Some(num.parse().unwrap()),
         None => None,
     };

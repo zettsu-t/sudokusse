@@ -747,10 +747,40 @@ $ python3 sudoku_numpy.py puzzle_text_filename
 ## Solving Sudoku puzzles with Rust
 
 You can build a Rust Sudoku solver, measure how long it takes to solve
-puzzles, and check whether their solutions are correct.
+puzzles, and check whether their solutions are correct. To do it, the
+make command below builds C++ and Rust based executable, run them and
+compare their solutions.
 
 ```bash
-$ make rust
+$ make all rust
+```
+
+The Rust solver is built on __cargo__.
+
+```bash
+$ cd sudoku_rust/
+$ cargo build
+$ target/debug/sudoku_rust ../data/sudoku_example.txt
+```
+
+If you specify one or more sudoku puzzle files, __sudoku_rust__ solves
+puzzles in the files. Otherwise, __sudoku_rust__ takes puzzles from
+stdin. Some options are available to compare execution time with the
+C++/SSE based solvers.
+
+* -n Number : solve only the head Number of puzzles (equivalent to ```head -n Number ../data/sudoku_example.txt | sudoku_rust```)
+* -s : do not print solutions to save time to writing them into stdout
+* -1 : run on a single thread instead of multi-threads
+
+The cargo profiler works with __sudoku_rust__ in some platforms. If it
+does not take command line arguments followed by --, its workaround is
+setting them the environment variable SUDOKU_RUST as a whitespace
+separated string.
+
+```bash
+$ cargo profiler callgrind -n 10 --bin target/release/sudoku_rust -- -n 200 ../data/sudoku17.txt
+$ export SUDOKU_RUST="-n 200 ../data/sudoku17.txt"
+$ cargo profiler callgrind -n 10 --bin target/release/sudoku_rust
 ```
 
 ## Bibliography and acknowledgments
