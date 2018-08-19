@@ -30,8 +30,8 @@ extern crate getopts;
 type SudokuCandidate = u64;  // or u32
 type SudokuCellGroups = HashMap<usize, Vec<Vec<usize>>>;
 
-const SUDOKU_DIGIT_BASE: u32 = 10;
 const SUDOKU_BOX_SIZE: usize = 3;
+const SUDOKU_DIGIT_BASE: u32 = (SUDOKU_BOX_SIZE * SUDOKU_BOX_SIZE + 1) as u32;
 const SUDOKU_CANDIDATE_SIZE: usize = SUDOKU_GROUP_SIZE;
 const SUDOKU_GROUP_SIZE: usize = SUDOKU_BOX_SIZE * SUDOKU_BOX_SIZE;
 const SUDOKU_CELL_SIZE: usize = SUDOKU_GROUP_SIZE * SUDOKU_GROUP_SIZE;
@@ -208,7 +208,7 @@ fn test_sudokucell_preset_full_candidate() {
 }
 
 #[test]
-fn test_sudokucell_preset_candidate() {
+fn test_sudokucell_preset_1to9_candidate() {
     let test_cases = [('1', 1 as SudokuCandidate), ('2', 2), ('3', 4), ('4', 8), ('5', 16),
                       ('6', 32), ('7', 64), ('8', 128), ('9', 256)];
     for (ch, expected) in test_cases.iter() {
@@ -410,7 +410,7 @@ impl Iterator for SudokuGroupGen {
                 |row| column + row * SUDOKU_GROUP_SIZE).collect::<Vec<_>>())
         } else if self.index < (SUDOKU_GROUP_SIZE * 3) {
             let box_index = self.index - SUDOKU_GROUP_SIZE * 2;
-            let offset = (box_index % 3) * 3  + (box_index / 3) * SUDOKU_GROUP_SIZE * 3;
+            let offset = (box_index % SUDOKU_BOX_SIZE) * SUDOKU_BOX_SIZE  + (box_index / SUDOKU_BOX_SIZE) * SUDOKU_GROUP_SIZE * SUDOKU_BOX_SIZE;
             let mut indexes : Vec<usize> = Vec::new();
             for row in 0..SUDOKU_BOX_SIZE {
                 let x = (0..SUDOKU_BOX_SIZE).map(
