@@ -549,14 +549,16 @@ impl<'a> SudokuMap<'a> {
         }
 
         for candidate in 0..(SUDOKU_CANDIDATE_SIZE as SudokuCandidate) {
-            if self.cells[index_min_count].can_mask(candidate) {
-                let mut new_map = SudokuMap::new("", self.cell_groups, self.group_builder);
-                new_map.cells = self.cells.clone();
-                new_map.cells[index_min_count].overwrite_candidate(candidate);
-                if new_map.solve() {
-                    self.cells = new_map.cells;
-                    return self.is_solved();
-                }
+            if !self.cells[index_min_count].can_mask(candidate) {
+                continue;
+            }
+
+            let mut new_map = SudokuMap::new("", self.cell_groups, self.group_builder);
+            new_map.cells = self.cells.clone();
+            new_map.cells[index_min_count].overwrite_candidate(candidate);
+            if new_map.solve() {
+                self.cells = new_map.cells;
+                return self.is_solved();
             }
         }
 

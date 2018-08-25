@@ -24,7 +24,8 @@ PARALLEL_DESCRIPTION_SET = ["Single thread", "Multi-threads"]
 # Print or check sudoku solutions, or just solving
 MODE_PRINT_SOLUTIONS = "print"
 MODE_ARGUMENT_SET = [MODE_PRINT_SOLUTIONS, "on", "off"]
-MODE_ARGUMENT_RUST_SET = ["", "-s -v", "-s"]
+MODE_SILENT_RUST = "-s"
+MODE_ARGUMENT_RUST_SET = ["-v", MODE_SILENT_RUST + " -v", MODE_SILENT_RUST]
 MODE_DESCRIPTION_SET = ["print solutions", "check solutions", "solve only"]
 MODE_RESULT_SET = ["passed", "passed", "solved"]
 
@@ -133,7 +134,7 @@ class ParameterSet
 
     @parallelStrRustSet.each do |parallel|
       @modeStrRustSet.each do |mode|
-        numberOfLogLines = mode.empty? ? (NUMBER_OF_LINES + @numberOfPuzzles) : 0
+        numberOfLogLines = mode.index(MODE_SILENT_RUST) ? 0 : (NUMBER_OF_LINES + @numberOfPuzzles)
         resultKeyword = resultMap.fetch(mode, nil)
         optionSet = [parallel, mode.split(/\s+/)].flatten()
         desc = ["Rust", @parallelStrRustMap[parallel], @modeStrRustMap[mode]].join(" / ") + " :"
