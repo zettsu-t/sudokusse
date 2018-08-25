@@ -18,11 +18,13 @@ CODE_DESCRIPTION_SET = ["SIMD", "C++"]
 
 # Solve parallel or not
 PARALLEL_ARGUMENT_SET = [" ", "-N"]
+PARALLEL_ARGUMENT_RUST_SET = ["-1", ""]
 PARALLEL_DESCRIPTION_SET = ["Single thread", "Multi-threads"]
 
 # Print or check sudoku solutions, or just solving
 MODE_PRINT_SOLUTIONS = "print"
 MODE_ARGUMENT_SET = [MODE_PRINT_SOLUTIONS, "on", "off"]
+MODE_ARGUMENT_RUST_SET = ["", "-s -v", "-s"]
 MODE_DESCRIPTION_SET = ["print solutions", "check solutions", "solve only"]
 MODE_RESULT_SET = ["passed", "passed", "solved"]
 
@@ -39,6 +41,9 @@ ALT_DEFAULT_PUZZLE_FILENAME = "data/sudoku17"
 
 # SudokuSSE executable name
 DEFAULT_EXEC_FILENAME = RUN_ON_MINGW ? "bin\\sudokusse.exe" : "bin/sudokusse"
+
+# Sudoku Rust executable name
+RUST_EXEC_FILENAME = "sudoku_rust/target/release/sudoku_rust"
 
 # Log file name for each execution
 TEMPORARY_LOGFILE_NAME="./_sudoku_temp_log.txt"
@@ -93,10 +98,15 @@ class ParameterSet
 
     @codeStrSet = CODE_ARGUMENT_SET
     @parallelStrSet = PARALLEL_ARGUMENT_SET
+    @parallelStrRustSet = PARALLEL_ARGUMENT_RUST_SET
     @modeStrSet = MODE_ARGUMENT_SET
+    @modeStrRustSet = MODE_ARGUMENT_RUST_SET
+
     @codeStrMap = makeMap(@codeStrSet, CODE_DESCRIPTION_SET)
     @parallelStrMap = makeMap(@parallelStrSet, PARALLEL_DESCRIPTION_SET)
+    @parallelStrRustMap = makeMap(@parallelStrRustSet, PARALLEL_DESCRIPTION_SET)
     @modeStrMap = makeMap(@modeStrSet, MODE_DESCRIPTION_SET)
+    @modeStrRustMap = makeMap(@modeStrRustSet, MODE_DESCRIPTION_SET)
   end
 
   def execAll
@@ -111,8 +121,24 @@ class ParameterSet
           optionSet = [code, parallel, mode]
           desc = [@codeStrMap[code], @parallelStrMap[parallel], @modeStrMap[mode]].join(" / ") + " :"
           print desc
-          puts exec(numberOfLogLines, resultKeyword, optionSet)
+          puts exec(NUMBER_OF_LINES + numberOfLogLines, resultKeyword, optionSet)
         end
+      end
+    end
+  end
+
+  def execAllRust
+    puts "Solving #{@puzzleFilename} with #{@execFilename} (time in seconds)"
+    resultMap = Hash[MODE_ARGUMENT_SET.zip(MODE_RESULT_SET)]
+
+    @parallelStrRustSet.each do |parallel|
+      @modeStrRustSet.each do |mode|
+        numberOfLogLines = mode.empty? ? (NUMBER_OF_LINES + @numberOfPuzzles) : 0
+        resultKeyword = resultMap.fetch(mode, nil)
+        optionSet = [parallel, mode.split(/\s+/)].flatten()
+        desc = ["Rust", @parallelStrRustMap[parallel], @modeStrRustMap[mode]].join(" / ") + " :"
+        print desc
+        puts exec(numberOfLogLines, resultKeyword, optionSet)
       end
     end
   end
@@ -128,15 +154,19 @@ class ParameterSet
   end
 
   def exec(numberOfLogLines, resultKeyword, optionSet)
-    numberOfLines = NUMBER_OF_LINES + numberOfLogLines
-    Launcher.new(@execFilename, @puzzleFilename, @logFilename, resultKeyword, numberOfLines, optionSet).exec
+    Launcher.new(@execFilename, @puzzleFilename, @logFilename, resultKeyword, numberOfLogLines, optionSet).exec
   end
 end
 
 puzzleFilename = File.exist?(PRIMARY_DEFAULT_PUZZLE_FILENAME) ?
                    PRIMARY_DEFAULT_PUZZLE_FILENAME : ALT_DEFAULT_PUZZLE_FILENAME
-execFilename   = DEFAULT_EXEC_FILENAME
 puzzleFilename = ARGV[0] if ARGV.size > 0
+
+if File.exist?(RUST_EXEC_FILENAME)
+  ParameterSet.new(puzzleFilename, RUST_EXEC_FILENAME, TEMPORARY_LOGFILE_NAME).execAllRust
+end
+
+execFilename   = DEFAULT_EXEC_FILENAME
 execFilename   = ARGV[1] if ARGV.size > 1
 ParameterSet.new(puzzleFilename, execFilename, TEMPORARY_LOGFILE_NAME).execAll
 0
