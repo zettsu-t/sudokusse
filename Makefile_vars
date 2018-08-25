@@ -18,6 +18,7 @@ ifeq ($(USE_AVX_VALUE),0)
 CPPFLAGS_SSE_AVX=-msse4.2
 else
 CPPFLAGS_SSE_AVX=-mavx2
+RUSTFLAGS_AVX2=-C target-feature=+avx2
 endif
 
 CPPFLAGS_INTEL_SYNTAX=-masm=intel

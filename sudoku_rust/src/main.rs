@@ -27,7 +27,7 @@ extern crate num_cpus;
 extern crate crossbeam;
 extern crate getopts;
 
-type SudokuCandidate = u64;  // or u32
+type SudokuCandidate = u32;  // u16, u32, u64
 type SudokuCellGroups = HashMap<usize, Vec<Vec<usize>>>;
 
 const SUDOKU_BOX_SIZE: usize = 3;
@@ -135,35 +135,43 @@ impl SudokuCell {
     fn merge_unique_candidate(&mut self, rhs: &SudokuCell) -> bool {
         debug_assert!(rhs.candidates <= SUDOKU_ALL_CANDIDATES);
 
-        if rhs.has_unique_candidate() {
-            if (self.candidates & rhs.candidates) != 0 {
-                return true;
-            }
-            self.candidates |= rhs.candidates;
-            debug_assert!(self.candidates <= SUDOKU_ALL_CANDIDATES);
-        }
-        false
+        let has_unique = rhs.has_unique_candidate();
+        let candidates = if has_unique {
+            rhs.candidates
+        } else {
+            SUDOKU_NO_CANDIDATES
+        };
+
+        let not_merged = has_unique && ((self.candidates & rhs.candidates) != 0);
+        self.candidates |= candidates;
+        debug_assert!(self.candidates <= SUDOKU_ALL_CANDIDATES);
+        not_merged
     }
 
     fn filter_by_candidates(&mut self, rhs: &SudokuCell) {
         debug_assert!(rhs.candidates <= SUDOKU_ALL_CANDIDATES);
 
-        if !self.has_unique_candidate() {
-            self.candidates &= !rhs.candidates;
-            debug_assert!(self.candidates <= SUDOKU_ALL_CANDIDATES);
-        }
+        let candidates = if self.has_unique_candidate() {
+            SUDOKU_ALL_CANDIDATES
+        } else {
+            !rhs.candidates
+        };
+
+        self.candidates &= candidates;
+        debug_assert!(self.candidates <= SUDOKU_ALL_CANDIDATES);
     }
 
     fn fill_unused_candidate(&mut self, rhs: &SudokuCell) {
         debug_assert!(rhs.candidates <= SUDOKU_ALL_CANDIDATES);
 
-        if !self.has_unique_candidate() {
-            let candidates = SUDOKU_ALL_CANDIDATES & !rhs.candidates;
-            debug_assert!(candidates <= SUDOKU_ALL_CANDIDATES);
-            if SudokuCell::is_unique_candidate(candidates) {
-                self.candidates = candidates;
-            }
-        }
+        let candidates = SUDOKU_ALL_CANDIDATES & !rhs.candidates;
+        debug_assert!(candidates <= SUDOKU_ALL_CANDIDATES);
+
+        self.candidates = if !self.has_unique_candidate() && SudokuCell::is_unique_candidate(candidates) {
+            candidates
+        } else {
+            self.candidates
+        };
     }
 
     // Input 0..8
@@ -383,40 +391,57 @@ fn test_sudokucell_has_unique_all_candidatex() {
    }
 }
 
-/// Generator for sudoku cellgroups
-struct SudokuGroupGen {
-    index: usize
+struct SudokuGroupGenBuilder {
+    groups: Vec<Vec<usize>>
 }
 
-impl SudokuGroupGen {
-    fn new() -> SudokuGroupGen {
-        SudokuGroupGen { index:0 }
-    }
-}
+impl SudokuGroupGenBuilder {
+    fn new() -> SudokuGroupGenBuilder {
+        let mut groups: Vec<Vec<usize>> = Vec::new();
 
-impl Iterator for SudokuGroupGen {
-    type Item = Vec<usize>;
+        for row in 0..SUDOKU_GROUP_SIZE {
+            let lower = row * SUDOKU_GROUP_SIZE;
+            let upper = (row + 1) * SUDOKU_GROUP_SIZE;
+            groups.push((lower..upper).collect::<Vec<_>>());
+        }
 
-    fn next(&mut self) -> Option<Vec<usize>> {
-        if self.index < SUDOKU_GROUP_SIZE {
-            let lower = self.index * SUDOKU_GROUP_SIZE;
-            let upper = (self.index + 1) * SUDOKU_GROUP_SIZE;
-            self.index += 1;
-            Some((lower..upper).collect::<Vec<_>>())
-        } else if self.index < (SUDOKU_GROUP_SIZE * 2) {
-            let column = self.index - SUDOKU_GROUP_SIZE;
-            self.index += 1;
-            Some((0..SUDOKU_GROUP_SIZE).map(
-                |row| column + row * SUDOKU_GROUP_SIZE).collect::<Vec<_>>())
-        } else if self.index < (SUDOKU_GROUP_SIZE * 3) {
-            let box_index = self.index - SUDOKU_GROUP_SIZE * 2;
-            let offset = (box_index % SUDOKU_BOX_SIZE) * SUDOKU_BOX_SIZE  + (box_index / SUDOKU_BOX_SIZE) * SUDOKU_GROUP_SIZE * SUDOKU_BOX_SIZE;
+        for column in 0..SUDOKU_GROUP_SIZE {
+            groups.push((0..SUDOKU_GROUP_SIZE).map(
+                |row| column + row * SUDOKU_GROUP_SIZE).collect::<Vec<_>>());
+        }
+
+        for box_index in 0..SUDOKU_GROUP_SIZE {
+            let offset = (box_index % SUDOKU_BOX_SIZE) * SUDOKU_BOX_SIZE +
+                (box_index / SUDOKU_BOX_SIZE) * SUDOKU_GROUP_SIZE * SUDOKU_BOX_SIZE;
             let mut indexes : Vec<usize> = Vec::new();
             for row in 0..SUDOKU_BOX_SIZE {
                 let x = (0..SUDOKU_BOX_SIZE).map(
                     |column| row * SUDOKU_GROUP_SIZE + column + offset).collect::<Vec<_>>();
                 indexes.extend(x);
             }
+            groups.push(indexes);
+        }
+
+        SudokuGroupGenBuilder { groups:groups }
+    }
+
+    fn create(&self) -> SudokuGroupGen {
+        SudokuGroupGen { index:0, groups:&self.groups }
+    }
+}
+
+/// Generator for sudoku cellgroups
+struct SudokuGroupGen<'a> {
+    index: usize,
+    groups: &'a Vec<Vec<usize>>,
+}
+
+impl<'a> Iterator for SudokuGroupGen<'a> {
+    type Item = &'a Vec<usize>;
+
+    fn next(&mut self) -> Option<&'a Vec<usize>> {
+        if self.index < self.groups.len() {
+            let indexes = &self.groups[self.index];
             self.index += 1;
             Some(indexes)
         } else {
@@ -428,7 +453,8 @@ impl Iterator for SudokuGroupGen {
 #[test]
 fn test_sudokugroupgen_next() {
     let number_of_group_type: usize = 3;
-    let mut group = SudokuGroupGen::new();
+    let group_builder = SudokuGroupGenBuilder::new();
+    let mut group = group_builder.create();
     let mut count = 0;
 
     for i in 0..(SUDOKU_GROUP_SIZE * number_of_group_type) {
@@ -444,7 +470,7 @@ fn test_sudokugroupgen_next() {
 
         let actual = group.next().unwrap();
         if !expected.is_empty() {
-            assert!(actual == expected);
+            assert!(*actual == expected);
             count += 1;
         }
     }
@@ -456,11 +482,12 @@ fn test_sudokugroupgen_next() {
 /// Sudoku cell map
 struct SudokuMap<'a> {
     cells : Vec<SudokuCell>,
-    groups : &'a SudokuCellGroups,
+    cell_groups : &'a SudokuCellGroups,
+    group_builder : &'a SudokuGroupGenBuilder,
 }
 
 impl<'a> SudokuMap<'a> {
-    fn new(line: &str, cell_groups: &'a SudokuCellGroups) -> SudokuMap<'a> {
+    fn new(line: &str, cell_groups: &'a SudokuCellGroups, group_builder: &'a SudokuGroupGenBuilder) -> SudokuMap<'a> {
         let mut cells = vec![SudokuCell::new(); SUDOKU_CELL_SIZE];
         for cell in &mut cells {
             cell.preset_full_candidate();
@@ -470,7 +497,7 @@ impl<'a> SudokuMap<'a> {
         for (index, ch) in line.chars().take(SUDOKU_CELL_SIZE).enumerate() {
             cells[index].preset_candidate(ch);
         };
-        SudokuMap { cells:cells, groups: cell_groups }
+        SudokuMap { cells:cells, cell_groups: cell_groups, group_builder:group_builder }
     }
 
     fn to_string(&self, one_line: bool) -> String {
@@ -523,7 +550,7 @@ impl<'a> SudokuMap<'a> {
 
         for candidate in 0..(SUDOKU_CANDIDATE_SIZE as SudokuCandidate) {
             if self.cells[index_min_count].can_mask(candidate) {
-                let mut new_map = SudokuMap::new("", self.groups);
+                let mut new_map = SudokuMap::new("", self.cell_groups, self.group_builder);
                 new_map.cells = self.cells.clone();
                 new_map.cells[index_min_count].overwrite_candidate(candidate);
                 if new_map.solve() {
@@ -553,17 +580,21 @@ impl<'a> SudokuMap<'a> {
     }
 
     fn filter_unique_candidates(&mut self) {
+        let empty_cell = SudokuCell::new();
         for target_index in 0..SUDOKU_CELL_SIZE {
             if self.cells[target_index].has_unique_candidate() {
                 continue;
             }
 
             let mut sum = SudokuCell::new();
-            for group in self.groups[&target_index].iter() {
+            for group in self.cell_groups[&target_index].iter() {
                 for cell_index in group.iter() {
-                    if *cell_index != target_index {
-                        sum.merge_unique_candidate(&self.cells[*cell_index]);
-                    }
+                    let other_cell = if *cell_index != target_index {
+                        &self.cells[*cell_index]
+                    } else {
+                        &empty_cell
+                    };
+                    sum.merge_unique_candidate(other_cell);
                 }
             }
             self.cells[target_index].filter_by_candidates(&sum);
@@ -571,17 +602,21 @@ impl<'a> SudokuMap<'a> {
     }
 
     fn find_unused_candidates(&mut self) {
+        let empty_cell = SudokuCell::new();
         for target_index in 0..SUDOKU_CELL_SIZE {
             if self.cells[target_index].has_unique_candidate() {
                 continue;
             }
 
-            for group in self.groups[&target_index].iter() {
+            for group in self.cell_groups[&target_index].iter() {
                 let mut sum = SudokuCell::new();
                 for cell_index in group.iter() {
-                    if *cell_index != target_index {
-                        sum.merge_candidate(&self.cells[*cell_index]);
-                    }
+                    let other_cell = if *cell_index != target_index {
+                        &self.cells[*cell_index]
+                    } else {
+                        &empty_cell
+                    };
+                    sum.merge_candidate(other_cell);
                 }
                 self.cells[target_index].fill_unused_candidate(&sum);
             }
@@ -597,13 +632,17 @@ impl<'a> SudokuMap<'a> {
             let mut row_counts = vec![SUDOKU_CELL_SIZE; SUDOKU_GROUP_SIZE];
             for column_index in 0..SUDOKU_GROUP_SIZE {
                 let cell_count = self.cells[row_index * SUDOKU_GROUP_SIZE + column_index].count_candidates();
-                if cell_count > 1 {
-                    row_counts[column_index] = cell_count;
-                    if cell_count < min_count {
-                        min_count = cell_count;
-                    }
-                }
+                // Remove branches
+                let adjusted_count = if cell_count > 1 {
+                    cell_count
+                } else {
+                    row_counts[column_index]
+                };
+
+                row_counts[column_index] = adjusted_count;
+                min_count = std::cmp::min(adjusted_count, min_count);
             }
+
             cell_counts.push(row_counts);
         }
 
@@ -627,7 +666,7 @@ impl<'a> SudokuMap<'a> {
             }
         }
 
-        let mut group_gen = SudokuGroupGen::new();
+        let mut group_gen = self.group_builder.create();
         while let Some(indexes) = group_gen.next() {
             if !self.is_group_solved(indexes) {
                 return false;
@@ -636,18 +675,18 @@ impl<'a> SudokuMap<'a> {
         true
     }
 
-    fn is_group_solved(&self, cell_indexes: Vec<usize>) -> bool {
+    fn is_group_solved(&self, cell_indexes: &Vec<usize>) -> bool {
         let mut sum = SudokuCell::new();
         let mut conflict = false;
         for cell_index in cell_indexes {
-            let cell = &self.cells[cell_index];
+            let cell = &self.cells[*cell_index];
             conflict |= sum.merge_unique_candidate(&cell);
         }
         sum.has_all_candidates() && !conflict
     }
 
     fn is_consistent(&self) -> bool {
-        let mut group_gen = SudokuGroupGen::new();
+        let mut group_gen = self.group_builder.create();
         while let Some(indexes) = group_gen.next() {
             if !self.is_group_consistent(indexes) {
                 return false;
@@ -656,14 +695,14 @@ impl<'a> SudokuMap<'a> {
         true
     }
 
-    fn is_group_consistent(&self, cell_indexes: Vec<usize>) -> bool {
+    fn is_group_consistent(&self, cell_indexes: &Vec<usize>) -> bool {
         let mut all_candidates = SudokuCell::new();
         let mut unique_candidates = SudokuCell::new();
         let mut conflict = false;
 
         for cell_index in cell_indexes {
-            all_candidates.merge_candidate(&self.cells[cell_index]);
-            conflict |= unique_candidates.merge_unique_candidate(&self.cells[cell_index]);
+            all_candidates.merge_candidate(&self.cells[*cell_index]);
+            conflict |= unique_candidates.merge_unique_candidate(&self.cells[*cell_index]);
             if conflict {
                 return false;
             }
@@ -677,7 +716,8 @@ fn test_sudokumap_check_correct_answer() {
 //  solution :  "815349267724651893396872415147528639582936741963417582231784956678195324459263178";
     let input = "........77.4...893..68.2.....75286...8...67.19.34...8....7.49..6...9....459...1.8";
     let cell_groups = create_group_index_set();
-    let mut sudoku_map = SudokuMap::new(input, &cell_groups);
+    let group_builder = SudokuGroupGenBuilder::new();
+    let mut sudoku_map = SudokuMap::new(input, &cell_groups, &group_builder);
     sudoku_map.solve();
     sudoku_map.check(input);
 }
@@ -687,7 +727,8 @@ fn test_sudokumap_check_correct_answer() {
 fn test_sudokumap_check_not_solved() {
     let input = "........77.4...893..68.2.....75286...8...67.19.34...8....7.49..6...9....459...1.8";
     let cell_groups = create_group_index_set();
-    SudokuMap::new(input, &cell_groups).check(input);
+    let group_builder = SudokuGroupGenBuilder::new();
+    SudokuMap::new(input, &cell_groups, &group_builder).check(input);
 }
 
 #[test]
@@ -696,7 +737,8 @@ fn test_sudokumap_check_wrong_answer1() {
     let input = "........77.4...893..68.2.....75286...8...67.19.34...8....7.49..6...9....459...1.8";
     let wrong = "........67.4...893..68.2.....75286...8...67.19.34...8....7.49..6...9....459...1.8";
     let cell_groups = create_group_index_set();
-    let mut sudoku_map = SudokuMap::new(input, &cell_groups);
+    let group_builder = SudokuGroupGenBuilder::new();
+    let mut sudoku_map = SudokuMap::new(input, &cell_groups, &group_builder);
     sudoku_map.solve();
     sudoku_map.check(wrong);
 }
@@ -707,7 +749,8 @@ fn test_sudokumap_check_wrong_answer2() {
     let input = "........77.4...893..68.2.....75286...8...67.19.34...8....7.49..6...9....459...1.8";
     let wrong = "1.......77.4...893..68.2.....75286...8...67.19.34...8....7.49..6...9....459...1.8";
     let cell_groups = create_group_index_set();
-    let mut sudoku_map = SudokuMap::new(input, &cell_groups);
+    let group_builder = SudokuGroupGenBuilder::new();
+    let mut sudoku_map = SudokuMap::new(input, &cell_groups, &group_builder);
     sudoku_map.solve();
     sudoku_map.check(wrong);
 }
@@ -752,6 +795,7 @@ fn exec_threads(lines: &Vec<String>, verify_mode: bool) -> (bool, String) {
     crossbeam::scope(|scope| {
         for core_index in 0..n_cores {
             let cell_groups = create_group_index_set();
+            let group_builder = SudokuGroupGenBuilder::new();
             let start_pos = core_index * lines_per_core;
             let end_pos = if (core_index + 1) == n_cores {
                 count
@@ -764,7 +808,7 @@ fn exec_threads(lines: &Vec<String>, verify_mode: bool) -> (bool, String) {
                 let mut answers = String::new();
                 for line_index in start_pos..end_pos {
                     let line = &lines[line_index];
-                    let mut sudoku_map = SudokuMap::new(&line, &cell_groups);
+                    let mut sudoku_map = SudokuMap::new(&line, &cell_groups, &group_builder);
                     result &= sudoku_map.solve();
                     if verify_mode {
                         sudoku_map.check(&line);
@@ -789,11 +833,12 @@ fn exec_threads(lines: &Vec<String>, verify_mode: bool) -> (bool, String) {
 
 fn exec_single_threads(lines: &Vec<String>, verify_mode: bool) -> (bool, String) {
     let cell_groups = create_group_index_set();
+    let group_builder = SudokuGroupGenBuilder::new();
     let mut result = true;
     let mut answers = String::new();
 
     for line in lines {
-        let mut sudoku_map = SudokuMap::new(&line, &cell_groups);
+        let mut sudoku_map = SudokuMap::new(&line, &cell_groups, &group_builder);
         result &= sudoku_map.solve();
         if verify_mode {
             sudoku_map.check(&line);
