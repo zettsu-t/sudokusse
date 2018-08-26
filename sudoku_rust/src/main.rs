@@ -103,9 +103,20 @@ impl SudokuCell {
         SudokuCell::is_unique_candidate(self.candidates)
     }
 
+    fn has_unique_or_no_candidates(&self) -> bool {
+        SudokuCell::is_unique_or_no_candidates(self.candidates)
+    }
+
     fn is_unique_candidate(candidates: SudokuCandidate) -> bool {
         // Check whether only one bit is set
+        // Slow: candidates.count_ones() == 1
         candidates > 0 && (candidates & (candidates - 1)) == 0
+    }
+
+    fn is_unique_or_no_candidates(candidates: SudokuCandidate) -> bool {
+        // Fast and expanded to conditional move instructions
+        // Slow: candidates.count_ones() <= 1
+        (candidates & candidates.wrapping_sub(1)) == 0
     }
 
     fn has_all_candidates(&self) -> bool {
@@ -135,7 +146,7 @@ impl SudokuCell {
     fn merge_unique_candidate(&mut self, rhs: &SudokuCell) -> bool {
         debug_assert!(rhs.candidates <= SUDOKU_ALL_CANDIDATES);
 
-        let has_unique = rhs.has_unique_candidate();
+        let has_unique = rhs.has_unique_or_no_candidates();
         let candidates = if has_unique {
             rhs.candidates
         } else {
@@ -151,7 +162,7 @@ impl SudokuCell {
     fn filter_by_candidates(&mut self, rhs: &SudokuCell) {
         debug_assert!(rhs.candidates <= SUDOKU_ALL_CANDIDATES);
 
-        let candidates = if self.has_unique_candidate() {
+        let candidates = if self.has_unique_or_no_candidates() {
             SUDOKU_ALL_CANDIDATES
         } else {
             !rhs.candidates
@@ -167,7 +178,8 @@ impl SudokuCell {
         let candidates = SUDOKU_ALL_CANDIDATES & !rhs.candidates;
         debug_assert!(candidates <= SUDOKU_ALL_CANDIDATES);
 
-        self.candidates = if !self.has_unique_candidate() && SudokuCell::is_unique_candidate(candidates) {
+        self.candidates = if !self.has_unique_or_no_candidates() &&
+            SudokuCell::is_unique_candidate(candidates) {
             candidates
         } else {
             self.candidates
@@ -282,6 +294,17 @@ fn test_sudokucell_has_unique_all_candidate() {
 }
 
 #[test]
+fn test_sudokucell_has_unique_or_no_candidates() {
+    for candidates in 0..(SUDOKU_ALL_CANDIDATES + 1) {
+        let mut cell = SudokuCell::new();
+        let expected = candidates == 0 || candidates.count_ones() == 1;
+        assert!(SudokuCell::is_unique_or_no_candidates(candidates) == expected);
+        cell.candidates = candidates;
+        assert!(cell.has_unique_or_no_candidates() == expected);
+    }
+}
+
+#[test]
 fn test_sudokucell_can_mask() {
     let test_cases = [(1 as SudokuCandidate, 0 as SudokuCandidate, true),
                       (1, 1, false), (3, 0, true), (3, 1, true), (3, 2, false)];
@@ -324,7 +347,7 @@ fn test_sudokucell_merge_candidate() {
 fn test_sudokucell_merge_unique_candidate() {
     let test_cases = [(1 as SudokuCandidate, 1 as SudokuCandidate, 1 as SudokuCandidate, true),
                       (1, 0b10, 0b11, false), (0b10, 1, 0b11, false),
-                      (0b11, 1, 0b11, true), (1, 0b11, 1, false)];
+                      (0b11, 1, 0b11, true), (1, 0b11, 1, false), (1, 0, 1, false)];
     for (candidates, other, expected, conflict) in test_cases.iter() {
         let mut left = SudokuCell::new();
         let mut right = SudokuCell::new();
@@ -340,7 +363,7 @@ fn test_sudokucell_merge_unique_candidate() {
 fn test_sudokucell_filter_by_candidates() {
     let test_cases = [(1 as SudokuCandidate, 1 as SudokuCandidate, 1 as SudokuCandidate),
                       (1, 0b10, 1), (0b10, 0b11, 0b10),
-                      (0b11, 1, 0b10), (0b11, 0b110, 1)];
+                      (0b11, 1, 0b10), (0b11, 0b110, 1), (1, 0, 1)];
     for (candidates, other, expected) in test_cases.iter() {
         let mut left = SudokuCell::new();
         let mut right = SudokuCell::new();
@@ -357,7 +380,7 @@ fn test_sudokucell_fill_unused_candidate() {
                       (1, 0b111_111_101, 1), (0x100, 0b111_111_101, 0x100),
                       (0b11, 0b111_111_101, 0b10), (0x1f0, 0b11_111_111, 0x100),
                       (SUDOKU_ALL_CANDIDATES, !0x100, 0x100),
-                      (SUDOKU_ALL_CANDIDATES, !1, 1)];
+                      (SUDOKU_ALL_CANDIDATES, !1, 1), (1, 0, 1)];
     for (candidates, other, expected) in test_cases.iter() {
         let mut left = SudokuCell::new();
         let mut right = SudokuCell::new();
@@ -584,7 +607,7 @@ impl<'a> SudokuMap<'a> {
     fn filter_unique_candidates(&mut self) {
         let empty_cell = SudokuCell::new();
         for target_index in 0..SUDOKU_CELL_SIZE {
-            if self.cells[target_index].has_unique_candidate() {
+            if self.cells[target_index].has_unique_or_no_candidates() {
                 continue;
             }
 
@@ -606,7 +629,7 @@ impl<'a> SudokuMap<'a> {
     fn find_unused_candidates(&mut self) {
         let empty_cell = SudokuCell::new();
         for target_index in 0..SUDOKU_CELL_SIZE {
-            if self.cells[target_index].has_unique_candidate() {
+            if self.cells[target_index].has_unique_or_no_candidates() {
                 continue;
             }
 
