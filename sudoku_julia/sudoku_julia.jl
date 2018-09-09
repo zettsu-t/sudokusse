@@ -4,7 +4,7 @@ const SUDOKU_CANDIDATE_SIZE = SUDOKU_GROUP_SIZE
 const SUDOKU_CELL_SIZE = SUDOKU_GROUP_SIZE * SUDOKU_GROUP_SIZE
 const SUDOKU_NO_CANDIDATES = 0
 const SUDOKU_ALL_CANDIDATES = ((1 << SUDOKU_CANDIDATE_SIZE) - 1)
-const SudokuCandidate=UInt32
+const SudokuCandidate=UInt8
 const SudokuIndex=Int64
 const SudokuMap=Array{SudokuCandidate, 2}
 
@@ -102,7 +102,7 @@ function is_solved_sudokumap(sudoku_map::SudokuMap)
 end
 
 function is_consistent_sudokumap(sudoku_map::SudokuMap)
-    all(candidate -> (candidate > zero(sudoku_map[1,1])), sudoku_map)
+    all(count -> (count > zero(sudoku_map[1,1])), sum(sudoku_map, dims=(1)))
 end
 
 function has_unique_candidate_sudokumap(sudoku_map::SudokuMap, cell_index::SudokuIndex)
@@ -195,7 +195,7 @@ end
 function find_backtracking_target(sudoku_map::SudokuMap)
     min_count = SUDOKU_CELL_SIZE
     found = false
-    target_index = 1
+    target_index = 0
 
     candidate_counts = sum(sudoku_map, dims=(1))
     for (index, count) in enumerate(candidate_counts)
@@ -204,7 +204,6 @@ function find_backtracking_target(sudoku_map::SudokuMap)
         end
 
         if min_count > count
-            target_index = index
             min_count = count
             found = true
         end
@@ -232,8 +231,7 @@ function solve_sudokumap(sudoku_map::SudokuMap)
         end
 
         n_candidates = new_n_candidates
-
-        if is_consistent_sudokumap(sudoku_map)
+        if !is_consistent_sudokumap(sudoku_map)
             return (sudoku_map, false)
         end
     end
