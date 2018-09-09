@@ -1,23 +1,20 @@
+const SUDOKU_BOX_SIZE = 3
+const SUDOKU_GROUP_SIZE = SUDOKU_BOX_SIZE * SUDOKU_BOX_SIZE
+const SUDOKU_CANDIDATE_SIZE = SUDOKU_GROUP_SIZE
+const SUDOKU_CELL_SIZE = SUDOKU_GROUP_SIZE * SUDOKU_GROUP_SIZE
+const SUDOKU_NO_CANDIDATES = 0
+const SUDOKU_ALL_CANDIDATES = ((1 << SUDOKU_CANDIDATE_SIZE) - 1)
 const SudokuCandidate=UInt32
+const SudokuIndex=Int64
+const SudokuMap=Array{SudokuCandidate, 2}
 
-SUDOKU_BOX_SIZE = 3
-SUDOKU_GROUP_SIZE = SUDOKU_BOX_SIZE * SUDOKU_BOX_SIZE
-SUDOKU_CANDIDATE_SIZE = SUDOKU_GROUP_SIZE
-SUDOKU_CELL_SIZE = SUDOKU_GROUP_SIZE * SUDOKU_GROUP_SIZE
-SUDOKU_NO_CANDIDATES = 0
-SUDOKU_ALL_CANDIDATES = ((1 << SUDOKU_CANDIDATE_SIZE) - 1)
-
-struct SudokuMap
-   cells
+function overwrite_sudokumap(sudoku_map::SudokuMap, cell_index::SudokuIndex, candidate_index::SudokuIndex)
+    sudoku_map[:, cell_index] .= zero(sudoku_map[1,1])
+    sudoku_map[candidate_index, cell_index] = one(sudoku_map[1,1])
 end
 
-function overwrite_sudokumap(sudoku_map::SudokuMap, cell_index, candidate)
-    sudoku_map.cells[cell_index, :] .= 0
-    sudoku_map.cells[cell_index, candidate] = 1
-end
-
-function string_to_sudokumap(line)
-    sudoku_map = SudokuMap(ones(SudokuCandidate, SUDOKU_CELL_SIZE, SUDOKU_CANDIDATE_SIZE))
+function string_to_sudokumap(line::String)
+    sudoku_map = SudokuMap(ones(SudokuCandidate, SUDOKU_CANDIDATE_SIZE, SUDOKU_CELL_SIZE))
     for (index, c) in enumerate(line)
         if index > SUDOKU_CELL_SIZE
             break
@@ -31,39 +28,47 @@ function string_to_sudokumap(line)
     sudoku_map
 end
 
-function print_sudokumap(sudoku_map::SudokuMap)
+function to_string_sudokumap(sudoku_map::SudokuMap, one_line::Bool)
+    result_str = ""
+
     for cell_index in 1:SUDOKU_CELL_SIZE
         for candidate in 1:SUDOKU_CANDIDATE_SIZE
-            if sudoku_map.cells[cell_index, candidate] != 0
-                print(candidate)
+            if sudoku_map[candidate, cell_index] != zero(sudoku_map[1,1])
+                result_str *= string(candidate)
             end
         end
-        print(":")
-        if cell_index % SUDOKU_GROUP_SIZE == 0
-            println("")
+
+        if !one_line
+            result_str *= ":"
+        end
+
+        if cell_index % SUDOKU_GROUP_SIZE == zero(sudoku_map[1,1]) && !one_line
+            result_str *= "\n"
         end
     end
+
+    result_str
 end
 
 function is_solved_group(sudoku_group)
-    all(count -> (count == 1), sum(sudoku_group, dims=(1))) && all(count -> (count == 1), sum(sudoku_group, dims=(2)))
+    all(count -> (count == one(sudoku_group[1,1])), sum(sudoku_group, dims=(1))) && all(count -> (count == one(sudoku_group[1,1])), sum(sudoku_group, dims=(2)))
 end
 
 function is_solved_sudoku_rows(sudoku_map::SudokuMap)
     all(row ->
         (index = SUDOKU_GROUP_SIZE * (row - 1);
-         is_solved_group(sudoku_map.cells[index + 1: index + SUDOKU_GROUP_SIZE, :])),
+         is_solved_group(sudoku_map[:, index + 1: index + SUDOKU_GROUP_SIZE])),
         1:SUDOKU_GROUP_SIZE)
 end
 
 function is_solved_sudoku_columns(sudoku_map::SudokuMap)
     all(column ->
         (indexes = collect(column: SUDOKU_GROUP_SIZE: column + SUDOKU_GROUP_SIZE * (SUDOKU_GROUP_SIZE - 1));
-         is_solved_group(view(sudoku_map.cells, indexes, :))),
+         is_solved_group(view(sudoku_map, :, indexes))),
         1:SUDOKU_GROUP_SIZE)
 end
 
-function is_solved_sudoku_box_group(sudoku_map::SudokuMap, out_box_row, out_box_column)
+function is_solved_sudoku_box_group(sudoku_map::SudokuMap, out_box_row::SudokuIndex, out_box_column::SudokuIndex)
     group = zeros(SudokuCandidate, SUDOKU_GROUP_SIZE, SUDOKU_CANDIDATE_SIZE)
     for in_box_index in 1:SUDOKU_BOX_SIZE
         base = (out_box_column - 1) * SUDOKU_BOX_SIZE
@@ -75,7 +80,7 @@ function is_solved_sudoku_box_group(sudoku_map::SudokuMap, out_box_row, out_box_
         dest = collect(1:SUDOKU_BOX_SIZE)
         dest .+= (in_box_index - 1) * SUDOKU_BOX_SIZE
 
-        group[dest, :] = view(sudoku_map.cells, sources, :)
+        group[:, dest] = view(sudoku_map, :, sources)
     end
 
     is_solved_group(group)
@@ -97,16 +102,16 @@ function is_solved_sudokumap(sudoku_map::SudokuMap)
 end
 
 function is_consistent_sudokumap(sudoku_map::SudokuMap)
-    all(candidate -> (candidate > 0), sudoku_map.cells)
+    all(candidate -> (candidate > zero(sudoku_map[1,1])), sudoku_map)
 end
 
-function has_unique_candidate_sudokumap(sudoku_map::SudokuMap, cell_index)
-    sum(sudoku_map.cells[cell_index, :]) == 1
+function has_unique_candidate_sudokumap(sudoku_map::SudokuMap, cell_index::SudokuIndex)
+    sum(sudoku_map[:, cell_index]) == one(sudoku_map[1,1])
 end
 
-function set_unused_candidates_sudokumap(sudoku_map::SudokuMap, cell_index, other_index, candidates)
+function set_unused_candidates_sudokumap(sudoku_map::SudokuMap, cell_index::SudokuIndex, other_index::SudokuIndex, candidates::Array{SudokuCandidate,1})
     if other_index != cell_index && has_unique_candidate_sudokumap(sudoku_map, other_index)
-        candidates[:] .|= sudoku_map.cells[other_index, :]
+        candidates[:] .|= sudoku_map[:, other_index]
     end
 end
 
@@ -133,21 +138,20 @@ function find_unique_candidates_sudokumap(sudoku_map::SudokuMap)
         end
 
         for (index, candidate) in enumerate(candidates)
-            if candidate > 0
-                sudoku_map.cells[cell_index, index] = 0
+            if candidate != 0
+                sudoku_map[index, cell_index] = zero(sudoku_map[1,1])
             end
         end
     end
 end
 
-function set_unused_candidates_sudokumap(sudoku_map::SudokuMap, cell_index, candidates)
+function set_unused_candidates_sudokumap(sudoku_map::SudokuMap, cell_index::SudokuIndex, candidates::Array{SudokuCandidate,1})
     if sum(candidates) == SUDOKU_CANDIDATE_SIZE - 1
         index = findfirst(x -> x == 0, candidates)
         overwrite_sudokumap(sudoku_map, cell_index, index)
     end
 end
 
-## ToDo : merge with is_solved_sudoku_rows()
 function fill_unused_candidates_sudokumap(sudoku_map::SudokuMap)
     for cell_index in 1:SUDOKU_CELL_SIZE
         if has_unique_candidate_sudokumap(sudoku_map, cell_index)
@@ -155,36 +159,36 @@ function fill_unused_candidates_sudokumap(sudoku_map::SudokuMap)
         end
 
         cell_row = div((cell_index - 1), SUDOKU_GROUP_SIZE)
-        candidates = zeros(SudokuCandidate, SUDOKU_CANDIDATE_SIZE)
+        candidates_row = zeros(SudokuCandidate, SUDOKU_CANDIDATE_SIZE)
         for column_index in 1:SUDOKU_GROUP_SIZE
             in_row_index = cell_row * SUDOKU_GROUP_SIZE + column_index
             if in_row_index != cell_index
-                candidates[:] .|= sudoku_map.cells[in_row_index, :]
+                candidates_row[:] .|= sudoku_map[:, in_row_index]
             end
         end
-        set_unused_candidates_sudokumap(sudoku_map, cell_index, candidates)
+        set_unused_candidates_sudokumap(sudoku_map, cell_index, candidates_row)
 
         cell_column = (cell_index - 1) % SUDOKU_GROUP_SIZE
-        candidates = zeros(SudokuCandidate, SUDOKU_CANDIDATE_SIZE)
+        candidates_column = zeros(SudokuCandidate, SUDOKU_CANDIDATE_SIZE)
         for row_index in 1:SUDOKU_GROUP_SIZE
             in_column_index = cell_column + (row_index - 1) * SUDOKU_GROUP_SIZE + 1
             if in_column_index != cell_index
-                candidates[:] .|= sudoku_map.cells[in_column_index, :]
+                candidates_column[:] .|= sudoku_map[:, in_column_index]
             end
         end
-        set_unused_candidates_sudokumap(sudoku_map, cell_index, candidates)
+        set_unused_candidates_sudokumap(sudoku_map, cell_index, candidates_column)
 
         box_base = div(cell_row, SUDOKU_BOX_SIZE) * SUDOKU_BOX_SIZE * SUDOKU_GROUP_SIZE
         box_base += div(cell_column, SUDOKU_BOX_SIZE) * SUDOKU_BOX_SIZE + 1
-        candidates = zeros(SudokuCandidate, SUDOKU_CANDIDATE_SIZE)
+        candidates_box = zeros(SudokuCandidate, SUDOKU_CANDIDATE_SIZE)
         for box_index in 1:SUDOKU_GROUP_SIZE
             in_box_index = div(box_index - 1, SUDOKU_BOX_SIZE) * SUDOKU_GROUP_SIZE
             in_box_index += (box_index - 1) % SUDOKU_BOX_SIZE + box_base
             if in_box_index != cell_index
-                candidates[:] .|= sudoku_map.cells[in_box_index, :]
+                candidates_box[:] .|= sudoku_map[:, in_box_index]
             end
         end
-        set_unused_candidates_sudokumap(sudoku_map, cell_index, candidates)
+        set_unused_candidates_sudokumap(sudoku_map, cell_index, candidates_box)
     end
 end
 
@@ -193,14 +197,10 @@ function find_backtracking_target(sudoku_map::SudokuMap)
     found = false
     target_index = 1
 
-    candidate_counts = sum(sudoku_map.cells, dims=(2))
+    candidate_counts = sum(sudoku_map, dims=(1))
     for (index, count) in enumerate(candidate_counts)
-        if count <= 1
+        if count <= one(sudoku_map[1,1])
             continue
-        end
-
-        if count == 2
-            return index, true
         end
 
         if min_count > count
@@ -210,28 +210,36 @@ function find_backtracking_target(sudoku_map::SudokuMap)
         end
     end
 
+    extract_row = (row -> view(candidate_counts,
+                               ((row - 1) * SUDOKU_GROUP_SIZE + 1):(row * SUDOKU_GROUP_SIZE)))
+    if found
+        row_counts = map(row -> count(n -> (n == min_count), extract_row(row)), 1:SUDOKU_GROUP_SIZE)
+        row = argmax(row_counts)
+        target_index = findfirst(x -> (x == min_count), extract_row(row)) + (row - 1) * SUDOKU_GROUP_SIZE
+    end
+
     target_index, found
 end
 
 function solve_sudokumap(sudoku_map::SudokuMap)
-    n_candidates = sum(sudoku_map.cells)
+    n_candidates = sum(sudoku_map)
     while true
-        if is_solved_sudokumap(sudoku_map)
-            return (sudoku_map, true)
-        end
-
-        if is_consistent_sudokumap(sudoku_map)
-            return (sudoku_map, false)
-        end
-
         find_unique_candidates_sudokumap(sudoku_map)
         fill_unused_candidates_sudokumap(sudoku_map)
-        new_n_candidates = sum(sudoku_map.cells)
+        new_n_candidates = sum(sudoku_map)
         if n_candidates == new_n_candidates
             break
         end
 
         n_candidates = new_n_candidates
+
+        if is_consistent_sudokumap(sudoku_map)
+            return (sudoku_map, false)
+        end
+    end
+
+    if is_solved_sudokumap(sudoku_map)
+        return (sudoku_map, true)
     end
 
     target_index, found = find_backtracking_target(sudoku_map)
@@ -239,8 +247,8 @@ function solve_sudokumap(sudoku_map::SudokuMap)
         return (sudoku_map, false)
     end
 
-    for (index, candidate) in enumerate(sudoku_map.cells[target_index, :])
-        if candidate == 0
+    for (index, candidate) in enumerate(sudoku_map[:, target_index])
+        if candidate == zero(sudoku_map[1,1])
             continue
         end
 
@@ -256,19 +264,38 @@ function solve_sudokumap(sudoku_map::SudokuMap)
 end
 
 function main()
-    num = 1
+    num = 0
+    one_line = true
+    total_result = true
+
+    if one_line
+        "Solving in Julia"
+    end
+
     for line in eachline(stdin)
         puzzle = string_to_sudokumap(line)
         solution, result = solve_sudokumap(puzzle)
         result = is_solved_sudokumap(solution)
+        total_result &= result
 
-        print_sudokumap(solution)
-        if result
-            println(num, " Solved")
+        one_line_result = to_string_sudokumap(solution, one_line)
+        print(one_line_result)
+        if one_line
+            println("")
         else
-            println(num, " Not solved")
+            if result
+                println("Solved\n")
+            else
+                println("Not solved\n")
+            end
         end
         num += 1
+    end
+
+    if total_result
+        println("All ", num, " cases passed.")
+    else
+        println("Some of ", num, " cases are not solved correctly.")
     end
 end
 
