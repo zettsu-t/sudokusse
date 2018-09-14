@@ -142,7 +142,13 @@ function find_unique_candidates_sudokumap(sudoku_map::SudokuMap)
                 sudoku_map[index, cell_index] = zero(sudoku_map[1,1])
             end
         end
+
+        if sum(sudoku_map[:, cell_index]) == 0
+            return false
+        end
     end
+
+    true
 end
 
 function set_unused_candidates_sudokumap(sudoku_map::SudokuMap, cell_index::SudokuIndex, candidates::Array{SudokuCandidate,1})
@@ -189,7 +195,13 @@ function fill_unused_candidates_sudokumap(sudoku_map::SudokuMap)
             end
         end
         set_unused_candidates_sudokumap(sudoku_map, cell_index, candidates_box)
+
+        if sum(sudoku_map[:, cell_index]) == zero(sudoku_map[1, 1])
+            return false
+        end
     end
+
+    true
 end
 
 function find_backtracking_target(sudoku_map::SudokuMap)
@@ -223,21 +235,28 @@ end
 function solve_sudokumap(sudoku_map::SudokuMap)
     n_candidates = sum(sudoku_map)
     while true
-        find_unique_candidates_sudokumap(sudoku_map)
-        fill_unused_candidates_sudokumap(sudoku_map)
+        if find_unique_candidates_sudokumap(sudoku_map) == false
+            return (sudoku_map, false)
+        end
+
+        if fill_unused_candidates_sudokumap(sudoku_map) == false
+            return (sudoku_map, false)
+        end
+
         new_n_candidates = sum(sudoku_map)
         if n_candidates == new_n_candidates
             break
         end
 
         n_candidates = new_n_candidates
-        if !is_consistent_sudokumap(sudoku_map)
-            return (sudoku_map, false)
-        end
     end
 
     if is_solved_sudokumap(sudoku_map)
         return (sudoku_map, true)
+    end
+
+    if !is_consistent_sudokumap(sudoku_map)
+        return (sudoku_map, false)
     end
 
     target_index, found = find_backtracking_target(sudoku_map)
@@ -267,7 +286,7 @@ function main()
     total_result = true
 
     if one_line
-        "Solving in Julia"
+        println("Solving in Julia")
     end
 
     for line in eachline(stdin)
