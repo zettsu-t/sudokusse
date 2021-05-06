@@ -59,14 +59,14 @@ SudokuSSE solves the hardest 49151 puzzles
 format.
 
 ```bash
-bin/sudokusse.exe sudoku17
+bin/sudokusse sudoku17
 ```
 
 When you place an argument "-N" following a filename, SudokuSSE
 solves puzzles with multi-threading.
 
 ```bash
-bin/sudokusse.exe sudoku17 -N
+bin/sudokusse sudoku17 -N
 ```
 
 ## Solve Sudoku-X puzzles
@@ -95,7 +95,7 @@ python3 solve_sudoku_x.py --log ./solutions.txt
 
 ## License
 
-Copyright (c) 2016-2018 Zettsu Tatsuya
+Copyright (c) 2016-2021 Zettsu Tatsuya
 
 This software is released under the MIT License, see [LICENSE.txt](LICENSE.txt).
 

@@ -24,6 +24,7 @@ endif
 CPPFLAGS_INTEL_SYNTAX=-masm=intel
 
 ifneq ($(OS),Windows_NT)
+# Linux
 # Workaround for GCC 4.8 and std::thread
 GCC_MAJOR_VERSION:=$(shell export LC_ALL=C ; gcc -v 2>&1 | tail -1 | cut -d " " -f 3 | cut -d "." -f1)
 PYTHON=python3
@@ -34,6 +35,8 @@ CPPFLAGS_PARALLEL=
 
 else
 ifneq (,$(findstring cygwin,$(shell gcc -dumpmachine)))
+# Cygwin
+BUILD_ON_CYGWIN=yes
 PYTHON=python3
 ifeq (yes,$(USE_BOOST_THREAD))
 LDFLAGS=
@@ -69,7 +72,7 @@ endif
 GCC_FULL_VERSION:=$(shell export LC_ALL=C ; gcc -v 2>&1 | tail -1 | cut -d " " -f 3)
 ifeq ($(CXX),clang++)
 # Using clang++
-LLVM_VERSION:=$(shell export LC_ALL=C ; clang++ -v 2>&1 | head -1 | sed -e "s/.* \\([0-9]\\)\\.\\([0-9]\\).*/\\1.\\2/")
+LLVM_VERSION:=$(shell export LC_ALL=C ; clang++ -v 2>&1 | head -1 | sed -ne "s/[^0-9]*\\([0-9]\\{1,4\\}\\.[0-9]\\{1,4\\}\\).*/\\1/p")
 LLVM_CPP17_VERSION=5.0
 VERSION_COMPARED=$(shell echo "$(LLVM_VERSION) >= $(LLVM_CPP17_VERSION)" | bc)
 
@@ -83,11 +86,16 @@ ISYSTEM_MINGW_INCLUDE_X86_DIR = $(subst $(SPACE),$(COMMA),$(MINGW_DIR))\include\
 ISYSTEM_X64_DIR = $(subst $(SPACE),$(COMMA),$(MINGW_DIR))\x86_64-w64-mingw32\include
 ISYSTEM_GCC_INCLUDE_DIR = $(subst $(SPACE),$(COMMA),$(MINGW_GCC_INCLUDE_DIR))
 MINGW_ALL_INCLUDES = $(subst $(COMMA),$(SPACE),$(addprefix -isystem ,$(addsuffix ,$(ISYSTEM_MINGW_INCLUDE_DIR) $(ISYSTEM_MINGW_INCLUDE_CPP_DIR) $(ISYSTEM_MINGW_INCLUDE_X86_DIR) $(ISYSTEM_X64_DIR))))
+else
+ifneq ($(BUILD_ON_CYGWIN),yes)
+# Workaround for Ubuntu 18.04 LTS on WSL2
+CLANG_FLAGS=-fPIC
+endif
 endif
 
 else
 # Using g++
-GCC_VERSION:=$(shell export LC_ALL=C ; g++ -v 2>&1 | tail -1 | sed -e "s/.* \\([0-9]\\)\\.\\([0-9]\\).*/\\1.\\2/")
+GCC_VERSION:=$(shell export LC_ALL=C ; g++ -v 2>&1 | tail -1 | sed -ne "s/[^0-9]*\\([0-9]\\{1,4\\}\\.[0-9]\\{1,4\\}\\).*/\\1/p")
 GCC_CPP17_VERSION=7.2
 VERSION_COMPARED=$(shell echo "$(GCC_VERSION) >= $(GCC_CPP17_VERSION)" | bc)
 endif
@@ -156,6 +164,7 @@ TEST_CASE_SOLUTION=./sudoku_solution.txt
 TEST_CASE_SOLUTION_RUST=./sudoku_solution_rust.txt
 
 ALL_UPDATED_VARIABLES= \
+	BUILD_ON_CYGWIN BUILD_ON_MINGW \
 	LD CXX AS RUBY PYTHON \
 	USE_AVX_VALUE ASFLAGS_SSE_AVX CPPFLAGS_SSE_AVX CPPFLAGS_INTEL_SYNTAX \
 	USE_BOOST_THREAD GCC_MAJOR_VERSION LDFLAGS LIBS CPPFLAGS_PARALLEL \

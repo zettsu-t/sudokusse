@@ -20,7 +20,7 @@
 
 // Set 1 to solve diagonal Sudoku (Sudoku-X)
 #if defined(DIAGONAL_SUDOKU)
-constexpr bool DiagonalSudokuMode = static_cast<decltype(DiagonalSudokuMode)>(DIAGONAL_SUDOKU);
+constexpr bool DiagonalSudokuMode = static_cast<bool>(DIAGONAL_SUDOKU);
 #else
 constexpr bool DiagonalSudokuMode = false;
 #endif

@@ -8,7 +8,8 @@
 #ifdef SOLVE_PARALLEL_WITH_BOOST_THREAD
 
 #ifdef __CYGWIN__
-#define getpagesize() sysconf(_SC_PAGESIZE)
+// Disable to avoid compilation on the latest Cygwin
+// #define getpagesize() sysconf(_SC_PAGESIZE)
 #endif
 
 #include <boost/thread/future.hpp>

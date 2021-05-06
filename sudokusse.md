@@ -9,15 +9,15 @@ SudokuSSE is a C++ and assembly program that runs on Windows 64bit
 Edition.  Cygwin, Bash on Ubuntu on Windows or MinGW-w64 with tools
 shown below are required.
 
-|Tool|Cygwin 64bit|Bash on Ubuntu on Windows|MinGW-w64|
+|Tool|Cygwin 64bit|Ubuntu 18.04 LTS on WSL2|MinGW-w64|
 |:------|:------|:------|:------|
-|GCC (g++)|6.4.0|7.2.0|7.3.0|
-|LLVM (clang++)|5.0.1|6.0.0|6.0.0|
-|GNU assembler (as)|2.29.51|2.24|2.29.1|
-|GNU Make|4.2.1|3.81|4.2.1|
-|Ruby|2.3.6p384|1.9.3p484|2.5.0p0|
-|Perl|5.26.4|5.18.2|Cygwin perl|
-|CppUnit|1.13.2|1.13.0|-|
+|GCC (g++)|10.2.0|10.1.0|9.2.0|
+|LLVM (clang++)|8.0.1|10.0.0|11.0.0|
+|GNU assembler (as)|2.36.1|2.30|2.33.1|
+|GNU Make|4.3|4.1|4.2.1|
+|Ruby|2.6.4p104|3.0.1p64|3.0.1p64|
+|Perl|5.32.1|5.26.1|Cygwin perl|
+|CppUnit|1.13.2|1.14.0|-|
 
 * SudokuSSE requires C++ compilers that support C++11 and GNU style
   inline assembly.
@@ -139,7 +139,7 @@ SudokuSSE reads first 81 characters of an input text.
 Execute from a terminal
 
 ```bash
-bin/sudokusse.exe times_to_solve < puzzle_text_filename
+bin/sudokusse times_to_solve < puzzle_text_filename
 ```
 
 When `times_to_solve` is a positive integer number, SudokuSSE solves
@@ -196,7 +196,7 @@ format 2 (81 characters in one line). SudokuSSE solves all lines of
 the file and checks whether their solutions are valid.
 
 ```bash
-bin/sudokusse.exe filename
+bin/sudokusse filename
 ```
 
 When the second argument is "0" or "c++" or omitted, SudokuSSE solves
@@ -204,7 +204,7 @@ sudoku puzzles without SSE/AVX instructions.  Set "1" or "sse" to the
 second argument and SudokuSSE uses SSE/AVX instructions.
 
 ```bash
-bin/sudokusse.exe filename 1
+bin/sudokusse filename 1
 ```
 
 SudokuSSE solves the hardest 49151 puzzles
@@ -217,8 +217,8 @@ third argument is "2" or "print", SudokuSSE checks whether their
 solutions are valid and prints the solutions.
 
 ```bash
-bin/sudokusse.exe filename sse off
-bin/sudokusse.exe filename sse print
+bin/sudokusse filename sse off
+bin/sudokusse filename sse print
 ```
 
 When you place an argument "-Nnumber" or "-N" following a filename,
@@ -229,8 +229,8 @@ std::thread::hardware_concurrency()). My CPU (Intel Core i3 4160)
 has 4 threads (2 cores with hyper-threading).
 
 ```bash
-bin/sudokusse.exe filename -N8 sse
-bin/sudokusse.exe filename -N sse
+bin/sudokusse filename -N8 sse
+bin/sudokusse filename -N sse
 ```
 
 ### Count how many solutions a sudoku puzzle has
@@ -242,7 +242,7 @@ of a puzzle.
 Execute from a terminal
 
 ```bash
-bin/sudokusse.exe 0 < puzzle_text_filename
+bin/sudokusse 0 < puzzle_text_filename
 ```
 
 and SudokuSSE prints the number of solutions of `puzzle_text_filename`
@@ -251,7 +251,7 @@ and its execution time.
 Set a non-zero number as a second argument
 
 ```bash
-bin/sudokusse.exe 0 100 < puzzle_text_filename
+bin/sudokusse 0 100 < puzzle_text_filename
 ```
 
 and SudokuSSE prints 100 solutions and exits after all solutions

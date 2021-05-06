@@ -44,7 +44,7 @@ protected:
 
     // Access to members of derived classes of ITimer
     std::shared_ptr<TestedTimer> createTimerInstance(void) {
-        std::shared_ptr<Sudoku::ITimer> pTimer = std::move(Sudoku::CreateTimerInstance());
+        std::shared_ptr<Sudoku::ITimer> pTimer(Sudoku::CreateTimerInstance());
         std::shared_ptr<TestedTimer> pBaseTimer = std::dynamic_pointer_cast<TestedTimer>(pTimer);
         return pBaseTimer;
     }

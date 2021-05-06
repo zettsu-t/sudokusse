@@ -131,11 +131,14 @@ namespace Sudoku {
             const SudokuTime actualCount = (count) ? count : 1;  // 1 for counting solutions
             const SudokuTime usecTime = GetElapsedTime() / SudokuTimeUnitInUsec;
             const SudokuTime clockElapsed = GetClockInterval();
-            const double usecOnceTime = static_cast<decltype(usecOnceTime)>(usecTime) /
-                static_cast<decltype(usecOnceTime)>(actualCount);
+            using FloatTime = double;
+
+            FloatTime usecOnceTime = static_cast<FloatTime>(usecTime);
+            usecOnceTime /= static_cast<FloatTime>(actualCount);
+
             const SudokuTime clockOnce = clockElapsed / actualCount;
-            const double leastUsecOnceTime = static_cast<decltype(leastUsecOnceTime)>(leastClock  * usecTime) /
-                static_cast<decltype(leastUsecOnceTime)>(clockElapsed);
+            FloatTime leastUsecOnceTime = static_cast<FloatTime>(leastClock * usecTime);
+            leastUsecOnceTime /= static_cast<FloatTime>(clockElapsed);
 
             SudokuTime secTime = usecTime / SudokuTimeUsecPerSec;
             const SudokuTime minTime = secTime / SudokuTimeSecPerMinute;

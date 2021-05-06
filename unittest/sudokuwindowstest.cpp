@@ -6,6 +6,9 @@
 
 #include <cassert>
 #include <windows.h>
+
+// Workaround for Cygwin to avoid using sprintf_s
+#undef __STDC_SECURE_LIB__
 #include "sudokutest_os_dependent.h"
 
 namespace {

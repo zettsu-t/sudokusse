@@ -36,7 +36,9 @@ namespace Sudoku {
         timeIn100nsec *= SudokuTimeUsecPerSec;
         timeIn100nsec *= SudokuTimeUnitInUsec;
 
-        constexpr auto unit = static_cast<decltype(SudokuTimeUnitInUsec)>(1000) / SudokuTimeUnitInUsec;
+        using TimeUnitInUsec = decltype(SudokuTimeUnitInUsec);
+        constexpr TimeUnitInUsec unitDividend = 1000;
+        constexpr TimeUnitInUsec unit = unitDividend / SudokuTimeUnitInUsec;
         timeIn100nsec += timestamp.tv_nsec / unit;
         return timeIn100nsec;
     }

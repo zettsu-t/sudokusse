@@ -1885,6 +1885,11 @@ SudokuLoader::SudokuLoader(int argc, const char * const argv[], std::istream* pS
         if (pSudokuInStream == nullptr) {
             return;
         }
+
+        if (&std::cin == pSudokuInStream) {
+            // Warns std::cin is waiting inputs
+            std::cerr << "Reading from stdin.\n";
+        }
         setSingleMode(argc, argv, pSudokuInStream);
     }
 
@@ -2175,7 +2180,7 @@ void SudokuLoader::measureTimeToSolve(SudokuSolverType solverType) {
 }
 
 SudokuTime SudokuLoader::solveSudoku(SudokuSolverType solverType, int count, bool warmup) {
-    const SudokuIndex solverseed = static_cast<decltype(solverseed)>(count);
+    const SudokuIndex solverseed = static_cast<SudokuIndex>(count);
     SudokuSolver cppSolver(sudokuStr_, solverseed, pSudokuOutStream_);
     SudokuSseSolver sseSolver(sudokuStr_, pSudokuOutStream_, printAllCandidate_);
     SudokuBaseSolver* pSolver = nullptr;
