@@ -1,6 +1,6 @@
 # Sudoku asm solver with SSE/AVX SIMD instructions
 
-_SudokuSSE_ solves sudoku puzzles with SIMD instructions and C++
+_SudokuSSE_ solves Sudoku puzzles with SIMD instructions and C++
 template metaprogramming.
 
 ## Platform
@@ -19,13 +19,10 @@ shown below are required.
 |Perl|5.32.1|5.26.1|Cygwin perl|
 |CppUnit|1.13.2|1.14.0|-|
 
-* SudokuSSE requires C++ compilers that support C++11 and GNU style
-  inline assembly.
-* Inline assembly of clang++ is not compatible with the GNU style and
-  my unit tests for assembly do not run on clang++.
-* Building SudokuSSE on MinGW requires Cygwin _/usr/bin_ tools such as
-  perl and rm. Set environment variable _PATH_ to find them.
-* I have not tried to build unittests with CppUnit on MinGW.
+* SudokuSSE requires C++ compilers that support C++11 and GNU-style inline assembly.
+* Inline assembly of clang++ is not compatible with GNU-style inline assembly and my unit tests for assembly do not run on clang++.
+* Building SudokuSSE on MinGW requires Cygwin _/usr/bin_ tools such as perl and rm. Set environment variable _PATH_ to find them.
+* I have not tried to build unit tests with CppUnit on MinGW.
 
 ## How to build
 
@@ -35,7 +32,7 @@ Launch a terminal and change its current directory to a directory
 that contains _sudoku.cpp_.
 
 ```bash
-cd .../sudokusse
+cd path/to/sudokusse
 ```
 
 And execute make without arguments to build.
@@ -86,25 +83,23 @@ use boost::thread instead of it, set "yes" to _USE_BOOST_THREAD_
 environment variable so that the Makefile passes
 `-DSOLVE_PARALLEL_WITH_BOOST_THREAD` to C++ compilers.
 
-Checking sudoku solutions on Cygwin may be very slow. I applied these
+Checking Sudoku solutions on Cygwin may be very slow. I applied these
 items below to improve this issue. I guess the false sharing issue or
 other overhead occurs on heap memory holding string buffers. This
 issue does not occur on Bash on Ubuntu on Windows.
 
 * Use std::array instead of std::vector if available
-* Call std::string::reserve(N) to separate string buffers on heap
-  memory. N is larger than a size of a cache line in bytes.
+* Call std::string::reserve(N) to separate string buffers on heap memory. N is larger than a size of a cache line in bytes.
 
-## Prepare sudoku puzzles
+## Prepare Sudoku puzzles
 
-SudokuSSE accepts sudoku puzzles in text files.
+SudokuSSE accepts Sudoku puzzles in text files.
 
 * For cells with an initial number, write the number (1 to 9).
-* For cells which are blank and going to be filled by solvers, write a
-  printable character such as a period, 0, or white space.
+* For cells that are blank and going to be filled by solvers, write a printable character such as a period, 0, or white space.
 
 SudokuSSE accepts two formats. Redundant lines are not parsed in both
-formats and you can write anything there as comments. Every sudoku
+formats and you can write anything there as comments. Every Sudoku
 puzzle must have at least one cell with an initial number.
 
 ### Format 1 : 9 characters x 9 lines
@@ -121,8 +116,8 @@ puzzle must have at least one cell with an initial number.
 .5..71.8.
 ```
 
-SudokuSSE reads first nine lines and first nine characters in each
-line of an input file. No indents are allowed.
+SudokuSSE reads the first nine lines and the first nine characters in
+each line of an input file. No indents are allowed.
 
 ### Format 2 : 81 characters in one line
 
@@ -130,11 +125,11 @@ line of an input file. No indents are allowed.
 .3.....4..1..97.5...25.86....3...8..9....43....76....4..98.54...7.....2..5..71.8.
 ```
 
-SudokuSSE reads first 81 characters of an input text.
+SudokuSSE reads the first 81 characters of an input text.
 
 ## Run SudokuSSE
 
-### Solve a sudoku puzzle
+### Solve a Sudoku puzzle
 
 Execute from a terminal
 
@@ -164,7 +159,7 @@ and includes printing time to a terminal.
 * Once least : least execution time in repetition
 
 Even when SudokuSSE solves a puzzle once, Once least is shorter than
-Total because checkpoints of time stamp are different.
+Total because checkpoints of timestamps are different.
 
 I assume the average is much longer than the least for these reasons.
 
@@ -179,19 +174,19 @@ I assume the average is much longer than the least for these reasons.
 Process affinity must not set in using std::future because it prevents
 running threads of a process on multi-core.
 
-#### Print steps to solve a sudoku puzzle
+#### Print steps to solve a Sudoku puzzle
 
-When SudokuSSE prints steps to solve a sudoku puzzle, each line of the
+When SudokuSSE prints steps to solve a Sudoku puzzle, each line of the
 output matches a line of the input puzzle and `:` splits cells in a
 line. Numbers in a cell mean candidates of the cell at a step.
 
 For example `:123:` means the cell can contain 1 or 2 or 3 but cannot
-contain 4 to 9 (SudokuSSE judges so at the step). When the puzzle
+contain 4 to 9 (SudokuSSE judges so at the step). When the puzzle is
 solved completely, each cell has a unique number.
 
-### Solve sudoku puzzles in one step
+### Solve Sudoku puzzles in one step
 
-Prepare a file which contains sudoku puzzles at each line in the
+Prepare a file that contains Sudoku puzzles at each line in the
 format 2 (81 characters in one line). SudokuSSE solves all lines of
 the file and checks whether their solutions are valid.
 
@@ -200,7 +195,7 @@ bin/sudokusse filename
 ```
 
 When the second argument is "0" or "c++" or omitted, SudokuSSE solves
-sudoku puzzles without SSE/AVX instructions.  Set "1" or "sse" to the
+Sudoku puzzles without SSE/AVX instructions.  Set "1" or "sse" to the
 second argument and SudokuSSE uses SSE/AVX instructions.
 
 ```bash
@@ -208,7 +203,7 @@ bin/sudokusse filename 1
 ```
 
 SudokuSSE solves the hardest 49151 puzzles
-[sudoku17](http://staffhome.ecm.uwa.edu.au/~00013890/sudoku17)
+[sudoku17 : broken link](http://staffhome.ecm.uwa.edu.au/~00013890/sudoku17)
 within 10 seconds.
 
 When the third argument is "1" or "off", SudokuSSE does not check
@@ -222,7 +217,7 @@ bin/sudokusse filename sse print
 ```
 
 When you place an argument "-Nnumber" or "-N" following a filename,
-SudokuSSE solves in sudoku puzzles of the file with _number_ of
+SudokuSSE solves in Sudoku puzzles of the file with _number_ of
 threads. If you omit the number, the number is set to the number of
 threads of a processor on which SudokuSSE runs (actually this is
 std::thread::hardware_concurrency()). My CPU (Intel Core i3 4160)
@@ -233,11 +228,11 @@ bin/sudokusse filename -N8 sse
 bin/sudokusse filename -N sse
 ```
 
-### Count how many solutions a sudoku puzzle has
+### Count how many solutions a Sudoku puzzle has
 
-A well-posed sudoku puzzle has a unique solution but a not well-posed
-sudoku puzzle may have many solutions. SudokuSSE counts all solutions
-of a puzzle.
+A well-posed Sudoku puzzle has a unique solution but an ill-posed
+Sudoku puzzle possibly has many solutions. SudokuSSE counts all
+solutions of a puzzle.
 
 Execute from a terminal
 
@@ -257,7 +252,7 @@ bin/sudokusse 0 100 < puzzle_text_filename
 and SudokuSSE prints 100 solutions and exits after all solutions
 counted.
 
-_bin/sudokusse_cells_packed.exe_ assumes sudoku cells are packed at
+_bin/sudokusse_cells_packed.exe_ assumes Sudoku cells are packed at
 the top left corner of a puzzle. This means the puzzle has such nine
 lines from its top to bottom ordered by
 
@@ -274,8 +269,9 @@ instead of original Sudoku puzzles.
 It is hard-coded whether executables solve original or diagonal Sudoku
 puzzles to run fast.
 
-Its usage is same as the solver for original Sudoku. You can check
-whether the solutions are correct with script __solve_sudoku_x.py__.
+Its usage is the same as the solver for the original Sudoku. You can
+check whether the solutions are correct with script
+__solve_sudoku_x.py__.
 
 ```bash
 # Solve a puzzle
@@ -291,9 +287,9 @@ python3 solve_sudoku_x.py --log ./solutions.txt
 #### Measure time to solve puzzles
 
 1. Download [sudoku17](http://staffhome.ecm.uwa.edu.au/~00013890/sudoku17) into data/ directory.
-1. Execute `make time` to measure how long it takes to solve _sudoku17_. `make check` solves sudoku puzzle examples in data/ before solves _sudoku17_.
+1. Execute `make time` to measure how long it takes to solve _sudoku17_. `make check` solves Sudoku puzzle examples in data/ before solves _sudoku17_.
 
-To solve other sudoku puzzle files instead of _sudoku17_, launch the ruby script directly.
+To solve other Sudoku puzzle files instead of _sudoku17_, launch the ruby script directly.
 
 ```bash
 ruby sudoku_check.rb sudoku_puzzle_filename
@@ -313,7 +309,7 @@ with current time such as SudokuTime_2013_09_27_21_34_56.log.
 
 This repeats infinitely and you need to hit ctrl-c many times to abort
 (hitting once can break _sudoku*.exe_ and may not break the script.)
-In some platform, hitting ctrl-z and `kill %1` are needed.
+In some platforms, hitting ctrl-z and `kill %1` are needed.
 
 #### Search minimum execution time to count solutions from the log file
 
@@ -324,12 +320,11 @@ perl sudoku_search_timelog.pl SudokuTime_2013_09_27_21_34_56.log
 ```
 
 and this script parses the log `SudokuTime_2013_09_27_21_34_56.log`
-(or other specified file name) and print minimum execution time to
-solve.
+and print minimum execution time to solve.
 
 ## Test SudokuSSE
 
-### Check if solving sudoku puzzles correctly
+### Check if solving Sudoku puzzles correctly
 
 Execute
 
@@ -344,25 +339,25 @@ immediately.
 
 ### Check C++ functions and assembly macros
 
-Change current directory to _unittest/_ and execute
+Change your working directory to _unittest/_ and execute
 
 ```bash
 make
 ```
 
 If the make command completes successfully, it generated
-_unittest*_.exe executables, ran them and reported a testing result
+_unittest*_.exe executables, ran them, and reported a testing result
 which indicates all tests passed.
 
 ## The inside of SudokuSSE
 
-SudokuSSE uses bitboards to represent sudoku puzzles.
+SudokuSSE uses bitboards to represent Sudoku puzzles.
 
-### C++ data structures to solve sudoku puzzles
+### C++ data structures to solve Sudoku puzzles
 
 #### Class SudokuCell
 
-A cell in a sudoku puzzle. The puzzle contains 81 cells.  The member
+A cell in a Sudoku puzzle. The puzzle contains 81 cells.  The member
 `candidates_` contains candidate number set.
 
 #### Integer SudokuCellCandidates
@@ -379,7 +374,7 @@ I define this type as unsigned int (uint32_t). Unsigned short
 
 #### Class SudokuMap
 
-All cells in a sudoku puzzle. The cells are numbered left to right,
+All cells in a Sudoku puzzle. The cells are numbered left to right,
 top to bottom as shown below and set in `SudokuCell::indexNumber_`.
 
 ```text
@@ -391,7 +386,7 @@ top to bottom as shown below and set in `SudokuCell::indexNumber_`.
 
 #### SudokuMap::Group_ and SudokuMap::ReverseGroup_
 
-Look up table that indicates each cell is in which row, column, or 3x3
+Lookup table that indicates each cell is in which row, column, or 3x3
 box.  `Group_` looks up forward (a 9-cells group to cells) and
 `ReverseGroup_` looks up reverse (a cell to 9-cells groups).
 
@@ -417,29 +412,29 @@ cache (32Kbyte) can hold it whole.
 
 #### Class SudokuSolver
 
-SudokuSolver receives a given string, extracts 81 characters as cells
+SudokuSolver receives a string, extracts 81 cells from its characters,
 and solves it. In extracting, it parses input lines and detects in
-which format a sudoku puzzle is described.
+which format a Sudoku puzzle is described.
 
 #### Class SudokuLoader
 
-SudokuLoader understands command line options, read a sudoku puzzle
+SudokuLoader understands command line options, read a Sudoku puzzle
 file, solve it and measure its execution time.
 
-### SSE4.2/AVX data structures to solve sudoku puzzles
+### SSE4.2/AVX data structures to solve Sudoku puzzles
 
 Classes _SudokuSse*_ are data structures using SIMD instructions.
 
-XMM1..9 registers hold rows in a sudoku puzzle. XMM-N register
+XMM1..9 registers hold rows in a Sudoku puzzle. XMM-N register
 (128bit) holds the Nth row that contains four 32bit parts; 0(32bit),
 left 3 cells, middle 3 cells, right 3 cells. The part (32bit) consists
 of 0s(5bit), left cell(9bit), middle cell(9bit), right cell(9bit).
 
-The cell has candidate bitmap as in the form of SudokuCellCandidates.
+The cell has a candidate bitmap as in the form of SudokuCellCandidates.
 Each bit in the bitmap indicates each of 1..9 is a candidate of the
 cell or not.
 
-Note that x86 uses little endian so copying an XMM register to memory
+Note that x86 uses little-endian so copying an XMM register to memory
 looks like bytes are flipped.
 
 * 32bit dump : right 3 cells (32bit), middle(32bit), left(32bit), 0(32bit)
@@ -447,8 +442,7 @@ looks like bytes are flipped.
 
 I define _unique candidate_ means here.
 
-* if the cell has a unique candidate, the bit mask for a candidate
-  (i.e. 1 << (candidate number - 1))
+* if the cell has a unique candidate, the bitmask for a candidate (i.e. 1 << (candidate number - 1))
 * zero if the cell has multiple candidates
 
 Other XMM registers hold data described below.
@@ -462,7 +456,7 @@ Other XMM registers hold data described below.
 |XMM15|Number of cells that have a unique candidate|
 |XMM13, XMM14 | work area|
 
-General purpose registers are used for
+General-purpose registers are used for
 
 |Register|Value|
 |:-------|:----|
@@ -470,7 +464,7 @@ General purpose registers are used for
 |rbp, rsp|not changed|
 |others|work area|
 
-### SSE4.2/AVX data structures to count sudoku solutions
+### SSE4.2/AVX data structures to count Sudoku solutions
 
 XMM registers hold cells described below.
 
@@ -489,11 +483,11 @@ contains the 1st to the 8th column.
 XMM1..9 : Cells in 8th, 7th, 6th, 5th, 4th, 3rd, 2nd, 1st column in a row
 ```
 
-XMM10 register holds rightest cells of 1st to 8th rows.  Each word low
+XMM10 register holds rightmost cells of 1st to 8th rows.  Each word low
 to high (16bit * 8) in XMM10 register contains the 1st to the 8th row.
 
 ```text
-XMM10 : Cells at 8th, 7th, 6th, 5th, 4th, 3rd, 2nd, 1st rows in the rightest column
+XMM10 : Cells at 8th, 7th, 6th, 5th, 4th, 3rd, 2nd, 1st rows in the rightmost column
 ```
 
 _sudokuXmmRightBottomElement_ holds a preset (written in a given file)
@@ -505,7 +499,7 @@ Each word (16bit) holds a bitmap in the form of SudokuCellCandidates
 as described. None or one bit in the word is set and multiple bits are
 never set simultaneously.
 
-### Notice to write assembly code
+### Notice to writing assembly code
 
 All memory accesses in _sudokusse.s_ require RIP (instruction pointer)
 relative addressing.
@@ -530,14 +524,15 @@ syntax. I found this issue in using boost::future and do not find it
 in std::future.
 
 Its workarounds are:
+
 * Writing a compact file that contains inline assembly with fewer header files
-* Using the compile option -masm=intel if it is really required
+* Using the compile option -masm=intel if it is required
 
 ### Footprints
 
-Here is a size (41,163 bytes) of core code solving sudoku puzzles in a
-version of assembly. This is 26% larger than the L1 I-cache size (32
-KBytes per core) in my CPU.
+Here is a size (41,163 bytes) of core code solving Sudoku puzzles in a
+version. This is 26% larger than the L1 I-cache size (32 KBytes per
+core) in my CPU.
 
 ```bash
 $ objdump -x --section=.text bin/sudokusse | sort
@@ -553,20 +548,18 @@ $ objdump -x --section=.text bin/sudokusse | sort
 |findCandidatesLabel|0x428f57|17,349|FindCandidates|
 |loadXmmRegisters|0x42d31c|-|-|
 
-### Algorithm to solve sudoku puzzles
+### Algorithm to solve Sudoku puzzles
 
-I apply steps described in _Shasha[2007]_.
+I apply the steps described in _Shasha[2007]_.
 
 1. Fill a candidate of a cell if any. Apply this to all 81 (9x9) cells.
-1. Find a candidate of a cell if the candidate cannot be set to other
-  cells.  Apply this to all 81 (9x9) cells.
-1. Repeat 1 and 2. If a decrease of the candidates stops, start
-  backtracking. i.e. choose a candidate and repeat 1 and 2 again.
+1. Find a candidate of a cell if the candidate cannot be set to other cells.  Apply this to all 81 (9x9) cells.
+1. Repeat 1 and 2. If a decrease of the candidates stops, start backtracking. i.e. choose a candidate and repeat 1 and 2 again.
 
 #### Step 1
 
 To find a unique candidate of a cell, collect numbers in cells of a
-row, column, and box that the cell belongs. For example, the size of
+row, column, and box that the cell belongs to. For example, the size of
 the number is 8, the rest is the unique candidate. This is commonly
 called _naked single_.
 
@@ -584,7 +577,7 @@ When a row, column, and box have cells as shown below,
 set 9 to `*`.
 
 Now we can extend this rule. To find a unique candidate of a cell,
-collect numbers not used in cells of a row, column and box that the
+collect numbers not used in cells of a row, column, and box that the
 cell belongs. For example,
 
 ```text
@@ -593,13 +586,12 @@ cell belongs. For example,
 7
 ```
 
-we apply `*` to logical AND {8,9}. In other words, we mask `*` by the
-complementary set of {1..7}.
+we apply `*` to logical AND {8,9}. In other words, we mask `*` by the complementary set of {1..7}.
 
 #### Step 2
 
-For a cell, if there is a number that is exclusive for a row, column
-and box that the cell belongs, we can fill the cell with the number.
+For a cell, if there is a number that is exclusive for a row, column,
+and box that the cell belongs to, we can fill the cell with the number.
 This is commonly called _hidden single_.
 
 Consider an example here.
@@ -617,36 +609,32 @@ The 6 cells marked `?` and `!` cannot hold 4 because 4 is on the same
 rows.  The cells filled by 1 and 2 also cannot hold 4. This leads a
 conclusion that the cell `*` only can hold 4.
 
-We can apply this rule for columns and boxes. After filling 4, we
+We can apply this rule to columns and boxes. After filling 4, we
 apply the rule for 7 and set 7 to the cell marked `!`.
 
 #### Step 3 : backtracking
 
 SudokuSSE does not use the locked candidates method. Before starting
 backtracking, SudokuSSE chooses a candidate in a cell in an ongoing
-sudoku map.
+Sudoku map.
 
-1. Select a cell that has least size (2 or more) of candidates in the
-  cells.
-1. If multiple cells are selected, select a row that has the least
-  size of candidates in the cells of the row. (Column and boxes can be
-  used the step 2 instead of rows.)
-1. If the row has multiple cells that have least and same size of
-  candidates, use a cell found first.
+1. Select a cell that has least size (2 or more) of candidates in the cells.
+1. If multiple cells are selected, select a row that has the least size of candidates in the cells of the row. (Column and boxes can be used the step 2 instead of rows.)
+1. If the row has multiple cells that have least and same size of candidates, use a cell found first.
 
-When every cell in the ongoing sudoku map has unique candidate,
+When every cell in the ongoing Sudoku map has a unique candidate,
 SudokuSSE checks whether all rows, columns, and boxes in the map are
-correct. If it is correct, it is a solution of the map.
+correct. If it is correct, it is a solution to the map.
 
-Guessing a candidate sometimes leads an incorrect solution in finding
+Guessing a candidate sometimes leads to an incorrect solution in finding
 inconsistent cells. When the guess is wrong, SudokuSSE filters it out
 and continues to backtracking.
 
-Before starting backtracking, SudokuSSE makes a copy of the sudoku map
+Before starting backtracking, SudokuSSE makes a copy of the Sudoku map
 to rewind backtracking. The map has only primitives so we can use
 compiler-generated copying (trivial copy) and avoid object aliasing.
 
-### Algorithm to count solutions of sudoku puzzles
+### Algorithm to count solutions of Sudoku puzzles
 
 Backtracking only. Set a cell to candidate 1 to 9 if it is not a
 blank, and recursively set other cells.
@@ -678,58 +666,28 @@ threads, it needs to eliminate global variables.
 I have no quantitative analysis of these items because I have not used
 a profiler to SudokuSSE.
 
-* Use the inline keyword and switch it via a macro. SudokuSSE enables
-  inlining and unit tests disable inlining. Inlining causes link
-  errors in unit tests.
-
-* Eliminate virtual function calls. This also prohibits virtual
-  destructor. If you can define virtual destructor as a good practice,
-  undefine `NO_DESTRUCTOR_AND_VTABLE` macro.
-
-* Declare aliases all integer primitives to switch their bit width
-  easily. Performance depends on the bit width and I hope the current
-  combination of bit width makes SudokuSSE fastest. Different
-  processors and compilers may need different bit width.
-
-* Use const and constexpr as much as possible. This is useful to set a
-  constant expression in an if-statement. Constant propagation removes
-  constant expressions and unused blocks in an if-statement (C++17 will
-  support this with _if-constexpr_ officially).
-  _SudokuCell::CountCandidatesIfMultiple_ and
-  _SudokuCell::MaskCandidatesUnlessMultiple_ eliminates if-statements.
-
-* Unroll loops if appropriate. If a loop has complex branch
-  conditions, unrolling the loop can disturb branch prediction of a
-  processor and makes it run slower.
-
-* Unroll loops with member function templates and recursive call.  I
-  hope compilers expand the recursive call and there is no overhead in
-  runtime.
-
-* Use macros instead of function templates if really needed.  C++ code
-  cannot break to exit nested loops and use macro `#define func {
-  ... return; }` to do it.
-
-* Change `#define FAST_MODE true` to false and run code that is easy
-  to read but slow.
-
+* Use the inline keyword and switch it via a macro. SudokuSSE enables inlining, and unit tests disable inlining. Inlining causes link errors in unit tests.
+* Eliminate virtual function calls. This also prohibits virtual destructors. If you can define virtual destructors as a good practice, undefine `NO_DESTRUCTOR_AND_VTABLE` macro.
+* Declare aliases all integer primitives to switch their bit widths easily. Performance depends on the bit widths and I hope the current combination of bit widths makes SudokuSSE the fastest. Different processors and compilers may need different bit widths.
+* Use const and constexpr as much as possible. This is useful to set a constant expression in an if-statement. Constant propagation removes constant expressions and unused blocks in an if-statement (C++17 will support this with _if-constexpr_ officially). _SudokuCell::CountCandidatesIfMultiple_ and _SudokuCell::MaskCandidatesUnlessMultiple_ eliminates if-statements.
+* Unroll loops if appropriate. If a loop has complex branch conditions, unrolling the loop can disturb branch prediction of a processor and makes it run slower.
+* Unroll loops with member function templates and recursive call.  I hope compilers expand the recursive call and there is no overhead in runtime.
+* Use macros instead of function templates if really needed.  C++ code cannot break to exit nested loops and use macro `#define func { ... return; }` to do it.
+* Change `#define FAST_MODE true` to false and run code that is easy to read but slow.
 * Set optimization level -O2. -O3 makes SudokuSSE slower.
 
 To write fast code in x86_64 assembly, we need to read the x86_64
 manual closely. The manual tells us not only general optimization
-guidelines but slight differences on performance such as CMOV
+guidelines but slight differences in performance such as CMOV
 instructions.
 
-* Use the x86_64 32-bit registers instead of the 64-bit registers if
-possible.  Output to a 32-bit register clears its upper 32 bits and
-removes redundant bit masking. This rule surely works fine on the
-_using-32bit-registers_ branch.
+* Use the x86_64 32-bit registers instead of the 64-bit registers if possible.  Output to a 32-bit register clears its upper 32 bits and removes redundant bit masking. This rule surely works fine on the _using-32bit-registers_ branch.
 
 * To return from a function in assembly, pop + jmp is faster than ret.
 
 I replaced assembly macro parameters as 64-bit registers with 32-bit
 registers manually. If you know how to convert a 64-bit register to
-its 32-bit register alias, for example RAX to EAX register, I would
+its 32-bit register alias, for example, RAX to EAX register, I would
 like to share your solution on
 [the Stack Overflow Community](http://stackoverflow.com/questions/41107642/how-to-convert-x86-64-64-bit-register-names-to-their-corresponding-32-bit-regist).
 
@@ -737,7 +695,7 @@ like to share your solution on
 
 I write a Python script to solve 9x9 and 16x16 Sudoku puzzles with
 NumPy. This script accepts files in the format 1 (one row in one
-line) and guess whether input puzzles are 9x9 or 16x16.  Notice that
+line) and guesses whether input puzzles are 9x9 or 16x16.  Notice that
 its backtracking is very slow.
 
 ```bash
@@ -747,9 +705,9 @@ $ python3 sudoku_numpy.py puzzle_text_filename
 ## Solving Sudoku puzzles with Rust
 
 You can build a [Rust Sudoku solver](sudoku_rust/src/main.rs),
-measure how long it takes to solve puzzles, and check whether their
+measure how long it takes to solve puzzles and check whether their
 solutions are correct. To do it, the make command below builds C++ and
-Rust based executable, run them and compare their solutions.
+Rust-based executable, run them and compare their solutions.
 
 ```bash
 $ make all rust
@@ -763,13 +721,13 @@ $ cargo build
 $ target/debug/sudoku_rust ../data/sudoku_example.txt
 ```
 
-If you specify one or more sudoku puzzle files, __sudoku_rust__ solves
+If you specify one or more Sudoku puzzle files, __sudoku_rust__ solves
 puzzles in the files. Otherwise, __sudoku_rust__ takes puzzles from
 stdin. Some options are available to compare execution time with the
 C++/SSE based solvers.
 
 * -n Number : solve only the head Number of puzzles (equivalent to ```head -n Number ../data/sudoku_example.txt | sudoku_rust```)
-* -s : do not print solutions to save time to writing them into stdout
+* -s : do not print solutions to save time to write them into stdout
 * -1 : run on a single thread instead of multi-threads
 * -v : verify solutions and panic if it finds a wrong solution
 
@@ -786,8 +744,7 @@ $ cargo profiler callgrind -n 10 --bin target/release/sudoku_rust
 
 ## Bibliography and acknowledgments
 
-1. I cite the sudoku solver algorithm and puzzle examples from the
-  book.
+1. I cite the Sudoku solver algorithm and puzzle examples from the book.
 
   Dennis E. Shasha (May 2007), "Puzzles for Programmers and Pros", Wrox
   (I read its Japanese translation published by Ohmsha. See my Japanese
@@ -797,19 +754,17 @@ $ cargo profiler callgrind -n 10 --bin target/release/sudoku_rust
 
   _http://www.atmarkit.co.jp/fdotnet/cpptest/cpptest02/cpptest02_02.html_
 
-3. I adopt an idea of Mr. Kawai Hidemi to count how many solutions in
-  a sudoku puzzle and compare execution time with his program on the
-  article.
+3. I adopt an idea of Mr. Kawai Hidemi to count how many solutions in a Sudoku puzzle and compare execution time with his program on the article.
 
   _http://developer.cybozu.co.jp/tech/?p=1692_
 
-4. I check instruction set and latency of x86_64 on the manual.
+4. I check instructions of x86_64 and their latency on the manual.
 
   "Intel 64 and IA-32 Architectures Optimization Reference Manual"
 
   _http://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-optimization-manual.html_
 
-5. I use these sudoku puzzles as test cases.
+5. I use these Sudoku puzzles as test cases.
 
   http://staffhome.ecm.uwa.edu.au/~00013890/sudoku17
 
@@ -823,6 +778,6 @@ $ cargo profiler callgrind -n 10 --bin target/release/sudoku_rust
 
   http://stackoverflow.com/questions/41107642/how-to-convert-x86-64-64-bit-register-names-to-their-corresponding-32-bit-regist
 
-7. I learned best practices in C++ from books listed below.
+7. I learned best practices in C++ from the books listed below.
 
   https://github.com/zettsu-t/zettsu-t.github.io/wiki/Books-English
