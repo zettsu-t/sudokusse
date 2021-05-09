@@ -19,20 +19,20 @@ This Sudoku solver is built on and runs on Cygwin and Ubuntu on WSL2 with tools 
 
 ## How to build
 
-Launch a terminal and change its current directory to a directory
+Launch a terminal and change its working directory to a directory
 that contains _sudoku.cpp_.
 
 ```bash
 cd path/to/sudokusse
 ```
 
-And execute _make_ without arguments to build.
+And execute `make` without arguments to build.
 
 ```bash
 make
 ```
 
-After built successfully, executable files _bin/sudokusse*.exe_ are generated.
+After built successfully, executable files _bin/sudokusse*.exe_ are created.
 
 SudokuSSE with AVX uses ANDN instruction of BMI1 (Bit Manipulation
 Instructions), which is available on Haswell and newer
@@ -42,7 +42,7 @@ exception occurs.
 
 ## Solve a Sudoku puzzle example
 
-Execute the generated binary from a terminal. _sudokusse.exe_ solves a
+Execute the created binary in a terminal. _sudokusse.exe_ solves a
 sudoku puzzle example 10,000 times and shows elapsed time to solve it.
 
 ```bash
@@ -61,7 +61,7 @@ bin/sudokusse sudoku17
 ```
 
 When you place an argument "-N" following a filename, SudokuSSE
-solves puzzles with multi-threading.
+solves puzzles using multiple threads.
 
 ```bash
 bin/sudokusse sudoku17 -N
@@ -69,14 +69,14 @@ bin/sudokusse sudoku17 -N
 
 ## Solve Sudoku-X puzzles
 
-__bin/sudokusse_diagonal__ is a solver for Sudoku-X (diagonal Sudoku)
+_bin/sudokusse_diagonal_ is a solver for Sudoku-X (diagonal Sudoku)
 puzzles. I tested with puzzles cited from these websites (these
 puzzles are not included in this repository).
 
 * http://logicmastersindia.com/BeginnersSudoku/Types/?test=B201312 (I cite this puzzle in my unit tests.)
 * [The hardest Sudoku-X puzzle](http://www.sudocue.net/minx.php) (I solved all of these 7193 puzzles in [sudoku-x-12-7193.sdm](http://www.sudocue.net/files/sudoku-x-12-7193.sdm).)
 
-Execute the generated binary as the solver for the original Sudoku.
+Execute the created binary similarly to the solver for the original Sudoku.
 
 ```bash
 # Solve a puzzle
