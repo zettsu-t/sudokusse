@@ -36,7 +36,7 @@ const SUDOKU_CANDIDATE_SIZE: usize = SUDOKU_GROUP_SIZE;
 const SUDOKU_GROUP_SIZE: usize = SUDOKU_BOX_SIZE * SUDOKU_BOX_SIZE;
 const SUDOKU_CELL_SIZE: usize = SUDOKU_GROUP_SIZE * SUDOKU_GROUP_SIZE;
 const SUDOKU_NO_CANDIDATES: SudokuCandidate = 0;
-const SUDOKU_ALL_CANDIDATES: SudokuCandidate = ((1 << SUDOKU_CANDIDATE_SIZE) - 1);
+const SUDOKU_ALL_CANDIDATES: SudokuCandidate = (1 << SUDOKU_CANDIDATE_SIZE) - 1;
 
 macro_rules! print_if_needed {
     ($cond:expr, $($arg:expr),*) => {if $cond { print!($($arg),*);} }
@@ -77,7 +77,7 @@ impl SudokuCell {
     fn preset_candidate(&mut self, ch: char) {
         let code_digit_base = '1'.to_digit(SUDOKU_DIGIT_BASE).unwrap();
         match ch {
-            '1'...'9' => {
+            '1'..='9' => {
                 let number = (ch.to_digit(SUDOKU_DIGIT_BASE).unwrap() - code_digit_base) as SudokuCandidate;
                 self.candidates = SudokuCell::digit_to_candidate(&number);
             }
@@ -810,14 +810,15 @@ fn create_group_index_set() -> SudokuCellGroups {
 
 fn exec_threads(lines: &Vec<String>, verify_mode: bool) -> (bool, String) {
     // Shares cell groups between all questions
-    let count = lines.len();
-    let n_cores = std::cmp::min(num_cpus::get(), count);
-    let lines_per_core = count / n_cores;
-    let mut children = vec![];
     let total_result = AtomicBool::new(true);
-    let mut all_answers = String::new();
 
-    crossbeam::scope(|scope| {
+    let answers = crossbeam::scope(|scope| {
+        let count = lines.len();
+        let n_cores = std::cmp::min(num_cpus::get(), count);
+        let mut children = vec![];
+        let lines_per_core = count / n_cores;
+        let mut all_answers = String::new();
+
         for core_index in 0..n_cores {
             let cell_groups = create_group_index_set();
             let group_builder = SudokuGroupGenBuilder::new();
@@ -828,7 +829,7 @@ fn exec_threads(lines: &Vec<String>, verify_mode: bool) -> (bool, String) {
                 start_pos + lines_per_core
             };
 
-            children.push(scope.spawn(move || {
+            children.push(scope.spawn(move |_| {
                 let mut result = true;
                 let mut answers = String::new();
                 for line_index in start_pos..end_pos {
@@ -851,9 +852,11 @@ fn exec_threads(lines: &Vec<String>, verify_mode: bool) -> (bool, String) {
             total_result.fetch_and(result, Ordering::SeqCst);
             all_answers.push_str(&answers);
         }
-    });
 
-    return (total_result.load(Ordering::SeqCst), all_answers);
+        all_answers
+    }).unwrap();
+
+    return (total_result.load(Ordering::SeqCst), answers);
 }
 
 fn exec_single_threads(lines: &Vec<String>, verify_mode: bool) -> (bool, String) {
@@ -896,7 +899,7 @@ fn main() {
 
     let matches = match opts.parse(&args[0..]) {
         Ok(m) => { m }
-        Err(f) => { panic!(f.to_string()) }
+        Err(_) => { panic!("Invalid options") }
     };
 
     if matches.opt_present("h") {
